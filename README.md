@@ -1,29 +1,97 @@
 # AffectiveVR
 
-`[Last update: November 29, 2023]`
+`[Last update: December 12, 2023]`
 
-***
-    Period:     2023-11 - ...
+    Period:     2023-10 - 2024-09
     Status:     work in progress
 
     Author(s):  Lucy Roellecke
     Contact:    lucy.roellecke@fu-berlin.de
 
-***
-
-*In general, one can add README's in nearly every folder. The guiding principle should always be that any person who is not familiar with the project can find their way exclusively via the README's – 'This may be you one day'*
 
 ## Project description
 
-*A brief general description of the project.*
+*Affective VR* (AVR) aims to develop and test a tool for continous emotion ratings. The project proposes such a tool and assesses its effectiveness, usability and reliability using videos presented in virtual reality (VR).
 
 ## Project structure
 
-*A brief description of the folder structure of the project (Where is what?). Anticipate new lab members who suppose to be able to orientate within this structure without your help. At the same time, avoid too detailed descriptions. Down the folder structure, there suppose to be further README's explaining subsequent folders & data.*
+
+     📂 code
+     ├── 📂 AVR
+     │   ├── 📁 datacomparison
+     │   ├── 📁 datavisualization
+     │   ├── 📁 modelling
+     │   └── 📁 preprocessing
+     │       ├── 📁 annotation
+     │       └── 📁 physiological 
+     ├── 📁 configs
+     ├── 📁 Rscripts
+     │   └── 📁 phase1
+     └── 📁 tests
+     
+     📂 data
+     ├── 📁 CASE
+     │   ├── 📁 initial
+     │   ├── 📁 interpolated
+     │   ├── 📁 metadata
+     │   ├── 📁 non-interpolated
+     │   ├── 📁 preprocessed
+     │   └── 📁 raw
+     ├── 📁 CEAP
+     │   └── 📁 CEAP-360VR
+     ├── 📁 EmoCompass
+     │   ├── 📁 data_codebank
+     │   ├── 📁 data_raw
+     │   ├── 📁 emotion_compass_material
+     │   ├── 📁 experiment_scripts
+     │   ├── 📁 source_data
+     │   ├── 📁 stimuli
+     │   ├── 📁 Supplementary_Software_1
+     │   └── 📁 Wiki images
+     ├── 📁 phase1
+     │   ├── 📁 AVR
+     │   └── 📁 preprocessed
+     └── 📁 phase2
+         ├── 📁 AVR
+         └── 📁 preprocessed
+
+     📂 literature
+     └──📁 pdfs
+
+     📂 organisation
+     ├── 📁 color_schemes
+     ├── 📁 experiment_preparation
+     ├── 📁 participation_forms
+     └── 📁 project_proposal
+     
+     📂 publications
+     ├── 📁 articles
+     ├── 📁 poster
+     └── 📁 presentations
+     
+     📂 results
+     ├── 📁 CASE
+     │   ├── 📁 cpa
+     │   └── 📁 summary_stats
+     ├── 📁 CEAP
+     │   └── 📁 descriptives
+     ├── 📁 EmoCompass
+     ├── 📁 phase1
+     │   ├── 📁 assessment_results
+     │   ├── 📁 cocor_results
+     │   ├── 📁 cor_results
+     │   ├── 📁 cr_plots
+     │   ├── 📁 datacomparison
+     │   ├── 📁 datavisualization
+     │   ├── 📁 descriptives
+     │   └── 📁 icc_results
+     └── 📁 phase2
+
+
 
 ## Install research code as package
 
-In case, there is no project-related virtual / conda environment yet, create one for the project:
+In case there is no project-related virtual / conda environment yet, create one for the project:
 
 ```shell
 conda create -n AVR_3.11 python=3.11
@@ -52,14 +120,17 @@ Corresponding *R*-scripts can be stored in `./code/Rscripts/`
 
 Similarly, use this structure for Matlab or other programming languages, which are employed in this project.
 
-## Publications
+## To Dos
 
-*List publications resulted from this project (including papers, posters, talks, ...)*
-
-## Preregistration
-
-*If applicable, was the project pre-registered and if yes, when and where (link)*
+- [ ] write a more meaningful project structure paragraph
+- [ ] adapt all other READMEs
+- [ ] adapt main README before going public
 
 ## Contributors/Collaborators
 
-*Name people who are involved in this project, their position and/or contribution. Optional: add contact data*
+Antonin Fourcade   
+Francesca Malandrone   
+Michael Gaebler   
+
+## License
+MIT

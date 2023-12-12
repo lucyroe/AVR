@@ -32,6 +32,8 @@ else:
 import logging.config
 from pathlib import Path
 from typing import Any
+import sys
+import toml
 
 # %% Config class & functions ><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -82,7 +84,7 @@ class _CONFIG:
     def update(self, new_configs: dict[str, Any]):
         """Update config object with new entries."""
         for k, val in new_configs.items():
-            if isinstance(val, (list, tuple)):
+            if isinstance(val | (list, tuple)):
                 setattr(self, k, [_CONFIG(x) if isinstance(x, dict) else x for x in val])
             else:
                 setattr(self, k, _CONFIG(val) if isinstance(val, dict) else val)
@@ -132,7 +134,8 @@ class _CONFIG:
                     path.update_paths(parent_path=parent_path, for_logging=for_logging)
 
         else:
-            print("\033[91mPaths can't be converted to absolute paths, since no PROJECT_ROOT is found!\033[0m")  # red
+            # red
+            print("\033[91mPaths can't be converted to absolute paths, since no PROJECT_ROOT is found!\033[0m")
 
 
 def _set_wd(new_dir: str | Path) -> None:
@@ -145,7 +148,8 @@ def _set_wd(new_dir: str | Path) -> None:
         msg = f"Current working dir '{Path.cwd()}' is outside of project '{PROJECT_NAME}'."
         raise OSError(msg)
 
-    print("\033[94m" + f"Current working dir:\t{Path.cwd()}" + "\033[0m")  # print blue
+    # print blue
+    print("\033[94m" + f"Current working dir:\t{Path.cwd()}" + "\033[0m")
 
     # Check if new_dir is a folder path or just a folder name
     new_dir = Path(new_dir)
@@ -179,25 +183,27 @@ def _set_wd(new_dir: str | Path) -> None:
                 os.chdir(paths_found.pop())
 
     if found and change_dir:
-        print("\033[93m" + f"New working dir: '{Path.cwd()}'\n" + "\033[0m")  # yellow print
+        # yellow print
+        print("\033[93m" + f"New working dir: '{Path.cwd()}'\n" + "\033[0m")
     elif found and not change_dir:
         pass
     else:
-        print("\033[91m" + f"Given folder not found. Working dir remains: '{Path.cwd()}'\n" + "\033[0m")  # red print
+        # red print
+        print("\033[91m" + f"Given folder not found. Working dir remains: '{Path.cwd()}'\n" + "\033[0m")
 
 
 # %% Setup configuration object < o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-# Instantiate config object
 config = _CONFIG()  # ready for import in other scripts
 
 # Load config file(s)
 for config_file in Path(__file__).parent.glob("../configs/*config.toml"):
     if sys.version_info >= (3, 11):
-        with config_file.open("rb") as f:
+        with config_file.open("r", encoding="utf-8") as f:
             config.update(new_configs=toml.load(f))
     else:
-        config.update(new_configs=toml.load(str(config_file)))
+        with config_file.open("r") as f:
+            config.update(new_configs=toml.load(f))
 
 # Extract some useful globals
 PROJECT_NAME = config.PROJECT_NAME  # ready for import in other scripts
@@ -219,7 +225,8 @@ _create_parent_dirs(config_as_dict=config.logging.asdict())
 # Extract paths & params, and set logging configs
 paths = config.paths  # ready for import in other scripts
 params = config.params  # ready for import in other scripts
-logging.config.dictConfig(config.logging.asdict())  # in other scripts: import logging & logging.getLogger(__name__)
+# in other scripts: import logging & logging.getLogger(__name__)
+logging.config.dictConfig(config.logging.asdict())
 
 # Welcome
 print("\n" + ("*" * 95 + "\n") * 2 + "\n" + "\t" * 10 + PROJECT_NAME + "\n" * 2 + ("*" * 95 + "\n") * 2)
