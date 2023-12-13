@@ -1,0 +1,64 @@
+VALENCE - Test-retest Torino - Berlin 
+ Average Score Intraclass Correlation
+
+   Model: twoway 
+   Type : consistency 
+
+   Subjects = 12 
+     Raters = 2 
+   ICC(C,2) = 0.995
+
+ F-Test, H0: r0 = 0 ; H1: r0 > 0 
+   F(11,11) = 191 , p = 6.46e-11 
+
+ 95%-Confidence Interval for ICC Population Values:
+  0.982 < ICC < 0.998
+
+AROUSAL - Test-retest Torino - Berlin 
+ Average Score Intraclass Correlation
+
+   Model: twoway 
+   Type : consistency 
+
+   Subjects = 12 
+     Raters = 2 
+   ICC(C,2) = 0.995
+
+ F-Test, H0: r0 = 0 ; H1: r0 > 0 
+   F(11,11) = 197 , p = 5.52e-11 
+
+ 95%-Confidence Interval for ICC Population Values:
+  0.982 < ICC < 0.999
+
+DISTANCE - Test-retest Torino - Berlin 
+ Average Score Intraclass Correlation
+
+   Model: twoway 
+   Type : consistency 
+
+   Subjects = 12 
+     Raters = 2 
+   ICC(C,2) = 0.97
+
+ F-Test, H0: r0 = 0 ; H1: r0 > 0 
+   F(11,11) = 33.9 , p = 7.08e-07 
+
+ 95%-Confidence Interval for ICC Population Values:
+  0.897 < ICC < 0.992
+
+ANGLE - Test-retest Torino - Berlin 
+ Average Score Intraclass Correlation
+
+   Model: twoway 
+   Type : consistency 
+
+   Subjects = 12 
+     Raters = 2 
+   ICC(C,2) = 0.989
+
+ F-Test, H0: r0 = 0 ; H1: r0 > 0 
+   F(11,11) = 90.2 , p = 3.83e-09 
+
+ 95%-Confidence Interval for ICC Population Values:
+  0.961 < ICC < 0.997
+

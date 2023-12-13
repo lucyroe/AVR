@@ -1,0 +1,13 @@
+Results cr_auc_a 
+
+	Pearson's product-moment correlation
+
+data:  curDat$sr and curDat$value
+t = 43.727, df = 610, p-value < 2.2e-16
+alternative hypothesis: true correlation is not equal to 0
+95 percent confidence interval:
+ 0.8501180 0.8886399
+sample estimates:
+      cor 
+0.8707081 
+

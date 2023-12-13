@@ -1,0 +1,114 @@
+Paired t-tests between Grid and Baseline 
+
+	Paired t-test
+
+data:  rm1 and baseline
+t = 1.6319, df = 50, p-value = 0.109
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.06336309  0.61238270
+sample estimates:
+mean of the differences 
+              0.2745098 
+
+adjusted p-value:
+[1] 0.1634809
+Cohens d:
+mean of the differences 
+              0.2285094 
+
+Paired t-tests between Flubber and Baseline 
+
+	Paired t-test
+
+data:  rm2 and baseline
+t = 1.218, df = 50, p-value = 0.2289
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.1654513  0.6752552
+sample estimates:
+mean of the differences 
+               0.254902 
+
+adjusted p-value:
+[1] 0.2747336
+Cohens d:
+mean of the differences 
+              0.1705526 
+
+Paired t-tests between Proprioceptive and Baseline 
+
+	Paired t-test
+
+data:  rm3 and baseline
+t = -1.8434, df = 50, p-value = 0.07121
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.94237553  0.04041474
+sample estimates:
+mean of the differences 
+             -0.4509804 
+
+adjusted p-value:
+[1] 0.1424135
+Cohens d:
+mean of the differences 
+             -0.2581228 
+
+Paired t-tests between Grid and Flubber 
+
+	Paired t-test
+
+data:  rm1 and rm2
+t = 0.10268, df = 50, p-value = 0.9186
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3639318  0.4031474
+sample estimates:
+mean of the differences 
+             0.01960784 
+
+adjusted p-value:
+[1] 0.9186242
+Cohens d:
+mean of the differences 
+             0.01437868 
+
+Paired t-tests between Grid and Proprioceptive 
+
+	Paired t-test
+
+data:  rm1 and rm3
+t = 3.0098, df = 50, p-value = 0.004089
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.2413452 1.2096352
+sample estimates:
+mean of the differences 
+              0.7254902 
+
+adjusted p-value:
+[1] 0.01226583
+Cohens d:
+mean of the differences 
+              0.4214593 
+
+Paired t-tests between Flubber and Proprioceptive 
+
+	Paired t-test
+
+data:  rm2 and rm3
+t = 3.0279, df = 50, p-value = 0.003888
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.2376324 1.1741323
+sample estimates:
+mean of the differences 
+              0.7058824 
+
+adjusted p-value:
+[1] 0.01226583
+Cohens d:
+mean of the differences 
+              0.4239886 
+

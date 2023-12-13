@@ -1,0 +1,114 @@
+Grid vs. Flubber 
+
+  Results of a comparison of two nonoverlapping correlations based on dependent groups
+
+Comparison between r.jk (CR_Grid, SR_Grid) = -0.0051 and r.hm (CR_Flubber, SR_Flubber) = -0.183
+Difference: r.jk - r.hm = 0.1779
+Related correlations: r.jh = 0.2346, r.jm = 0.0791, r.kh = -0.0593, r.km = 0.7204
+Data: j = CR_Grid, k = SR_Grid, h = CR_Flubber, m = SR_Flubber
+Group size: n = 51
+Null hypothesis: r.jk is equal to r.hm
+Alternative hypothesis: r.jk is not equal to r.hm (two-sided)
+Alpha: 0.05
+
+pearson1898: Pearson and Filon's z (1898)
+  z = 1.0077, p-value = 0.3136
+  Null hypothesis retained
+
+dunn1969: Dunn and Clark's z (1969)
+  z = 0.9727, p-value = 0.3307
+  Null hypothesis retained
+
+steiger1980: Steiger's (1980) modification of Dunn and Clark's z (1969) using average correlations
+  z = 0.9688, p-value = 0.3326
+  Null hypothesis retained
+
+raghunathan1996: Raghunathan, Rosenthal, and Rubin's (1996) modification of Pearson and Filon's z (1898)
+  z = 0.9727, p-value = 0.3307
+  Null hypothesis retained
+
+silver2004: Silver, Hittner, and May's (2004) modification of Dunn and Clark's z (1969) using a backtransformed average Fisher's (1921) Z procedure
+  z = 0.9689, p-value = 0.3326
+  Null hypothesis retained
+
+zou2007: Zou's (2007) confidence interval
+  95% confidence interval for r.jk - r.hm: -0.1783 0.5177
+  Null hypothesis retained (Interval includes 0)
+
+
+Grid vs. Proprioceptive 
+
+  Results of a comparison of two nonoverlapping correlations based on dependent groups
+
+Comparison between r.jk (CR_Grid, SR_Grid) = -0.0051 and r.hm (CR_Proprioceptive, SR_Proprioceptive) = -0.3771
+Difference: r.jk - r.hm = 0.3719
+Related correlations: r.jh = 0.0826, r.jm = 0.0195, r.kh = -0.2631, r.km = 0.6562
+Data: j = CR_Grid, k = SR_Grid, h = CR_Proprioceptive, m = SR_Proprioceptive
+Group size: n = 51
+Null hypothesis: r.jk is equal to r.hm
+Alternative hypothesis: r.jk is not equal to r.hm (two-sided)
+Alpha: 0.05
+
+pearson1898: Pearson and Filon's z (1898)
+  z = 2.0710, p-value = 0.0384
+  Null hypothesis rejected
+
+dunn1969: Dunn and Clark's z (1969)
+  z = 1.9708, p-value = 0.0487
+  Null hypothesis rejected
+
+steiger1980: Steiger's (1980) modification of Dunn and Clark's z (1969) using average correlations
+  z = 1.9433, p-value = 0.0520
+  Null hypothesis retained
+
+raghunathan1996: Raghunathan, Rosenthal, and Rubin's (1996) modification of Pearson and Filon's z (1898)
+  z = 1.9708, p-value = 0.0487
+  Null hypothesis rejected
+
+silver2004: Silver, Hittner, and May's (2004) modification of Dunn and Clark's z (1969) using a backtransformed average Fisher's (1921) Z procedure
+  z = 1.9428, p-value = 0.0520
+  Null hypothesis retained
+
+zou2007: Zou's (2007) confidence interval
+  95% confidence interval for r.jk - r.hm: 0.0009 0.7122
+  Null hypothesis rejected (Interval does not include 0)
+
+
+Flubber vs. Proprioceptive 
+
+  Results of a comparison of two nonoverlapping correlations based on dependent groups
+
+Comparison between r.jk (CR_Flubber, SR_Flubber) = -0.183 and r.hm (CR_Proprioceptive, SR_Proprioceptive) = -0.3771
+Difference: r.jk - r.hm = 0.1941
+Related correlations: r.jh = 0.2696, r.jm = -0.1983, r.kh = -0.2826, r.km = 0.6834
+Data: j = CR_Flubber, k = SR_Flubber, h = CR_Proprioceptive, m = SR_Proprioceptive
+Group size: n = 51
+Null hypothesis: r.jk is equal to r.hm
+Alternative hypothesis: r.jk is not equal to r.hm (two-sided)
+Alpha: 0.05
+
+pearson1898: Pearson and Filon's z (1898)
+  z = 1.1738, p-value = 0.2405
+  Null hypothesis retained
+
+dunn1969: Dunn and Clark's z (1969)
+  z = 1.1352, p-value = 0.2563
+  Null hypothesis retained
+
+steiger1980: Steiger's (1980) modification of Dunn and Clark's z (1969) using average correlations
+  z = 1.1322, p-value = 0.2575
+  Null hypothesis retained
+
+raghunathan1996: Raghunathan, Rosenthal, and Rubin's (1996) modification of Pearson and Filon's z (1898)
+  z = 1.1352, p-value = 0.2563
+  Null hypothesis retained
+
+silver2004: Silver, Hittner, and May's (2004) modification of Dunn and Clark's z (1969) using a backtransformed average Fisher's (1921) Z procedure
+  z = 1.1320, p-value = 0.2576
+  Null hypothesis retained
+
+zou2007: Zou's (2007) confidence interval
+  95% confidence interval for r.jk - r.hm: -0.1400 0.5174
+  Null hypothesis retained (Interval includes 0)
+
+

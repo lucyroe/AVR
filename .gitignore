@@ -1,9 +1,8 @@
 # Bigger research folders
 data/
-literature/pdfs/
+literature/
 organisation/
 publications/
-results/
 
 # Private configs in ./code/configs/
 *_config.toml

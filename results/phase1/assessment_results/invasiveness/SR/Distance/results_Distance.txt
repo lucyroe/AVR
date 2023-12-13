@@ -1,0 +1,66 @@
+Comparison Grid vs. Baseline 
+
+Paired t-test
+
+The equivalence test was non-significant, t(203) = 0.678, p = 2.49e-01
+The null hypothesis test was non-significant, t(203) = 0.678, p = 4.99e-01
+NHST: don't reject null significance hypothesis that the effect is equal to zero 
+TOST: don't reject null equivalence hypothesis
+
+TOST Results 
+                 t  df p.value
+t-test      0.6776 203   0.499
+TOST Lower  0.6776 203   0.249
+TOST Upper -9.9358 203 < 0.001
+
+Effect Sizes 
+               Estimate      SE              C.I. Conf. Level
+Raw             0.01130 0.01668 [-0.0163, 0.0389]         0.9
+Hedges's g(rm)  0.03896 0.05804 [-0.0759, 0.1537]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0.5 
+
+Comparison Flubber vs. Baseline 
+
+Paired t-test
+
+The equivalence test was significant, t(203) = 5.807, p = 1.21e-08
+The null hypothesis test was significant, t(203) = 5.807, p = 2.43e-08
+NHST: reject null significance hypothesis that the effect is equal to zero 
+TOST: reject null equivalence hypothesis
+
+TOST Results 
+                t  df p.value
+t-test      5.807 203 < 0.001
+TOST Lower  5.807 203 < 0.001
+TOST Upper -6.327 203 < 0.001
+
+Effect Sizes 
+               Estimate      SE             C.I. Conf. Level
+Raw              0.0847 0.01459 [0.0606, 0.1088]         0.9
+Hedges's g(rm)   0.2958 0.05348 [0.1782, 0.4127]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0 
+
+Comparison Proprioceptive vs. Baseline 
+
+Paired t-test
+
+The equivalence test was significant, t(203) = 3.211, p = 7.7e-04
+The null hypothesis test was significant, t(203) = 3.211, p = 1.54e-03
+NHST: reject null significance hypothesis that the effect is equal to zero 
+TOST: reject null equivalence hypothesis
+
+TOST Results 
+                t  df p.value
+t-test      3.211 203   0.002
+TOST Lower  3.211 203 < 0.001
+TOST Upper -7.579 203 < 0.001
+
+Effect Sizes 
+               Estimate      SE             C.I. Conf. Level
+Raw             0.05267 0.01640 [0.0256, 0.0798]         0.9
+Hedges's g(rm)  0.17941 0.05708 [0.0635, 0.2949]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0 
+

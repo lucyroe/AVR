@@ -1,0 +1,13 @@
+Results cr_cv_dist 
+
+	Pearson's product-moment correlation
+
+data:  curDat$sr and curDat$value
+t = -11.297, df = 610, p-value < 2.2e-16
+alternative hypothesis: true correlation is not equal to 0
+95 percent confidence interval:
+ -0.4794185 -0.3481926
+sample estimates:
+       cor 
+-0.4159686 
+

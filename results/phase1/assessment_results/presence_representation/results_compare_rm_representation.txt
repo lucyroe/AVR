@@ -1,0 +1,144 @@
+ANOVA with factor feedback and three levels: Grid Flubber Proprioceptive 
+ANOVA Table (type III tests)
+
+         Effect DFn DFd     F    p p<.05   pes
+1 rating_method   2 122 4.014 0.02     * 0.062
+
+ANOVA with factor feedback and four levels: Grid Flubber Proprioceptive Baseline 
+ANOVA Table (type III tests)
+
+         Effect DFn DFd     F     p p<.05   pes
+1 rating_method   3 183 3.531 0.016     * 0.055
+
+Comparison Grid vs. Baseline 
+
+Paired t-test
+
+The equivalence test was significant, t(61) = -1.801, p = 3.83e-02
+The null hypothesis test was non-significant, t(61) = 1.301, p = 1.98e-01
+NHST: don't reject null significance hypothesis that the effect is equal to zero 
+TOST: reject null equivalence hypothesis
+
+TOST Results 
+                t df p.value
+t-test      1.301 61   0.198
+TOST Lower  4.403 61 < 0.001
+TOST Upper -1.801 61   0.038
+
+Effect Sizes 
+               Estimate     SE              C.I. Conf. Level
+Raw              0.2097 0.1612 [-0.0596, 0.4789]         0.9
+Hedges's g(rm)   0.1375 0.1096 [-0.0704, 0.3442]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0.3 
+
+Comparison Flubber vs. Baseline 
+
+Paired t-test
+
+The equivalence test was non-significant, t(61) = 0.312, p = 6.22e-01
+The null hypothesis test was significant, t(61) = 2.734, p = 8.18e-03
+NHST: reject null significance hypothesis that the effect is equal to zero 
+TOST: don't reject null equivalence hypothesis
+
+TOST Results 
+                t df p.value
+t-test     2.7340 61   0.008
+TOST Lower 5.1555 61 < 0.001
+TOST Upper 0.3125 61   0.622
+
+Effect Sizes 
+               Estimate     SE             C.I. Conf. Level
+Raw              0.5645 0.2065 [0.2196, 0.9094]         0.9
+Hedges's g(rm)   0.3954 0.1534 [0.1793, 0.6084]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0.02 
+
+Comparison Proprioceptive vs. Baseline 
+
+Paired t-test
+
+The equivalence test was significant, t(61) = -2.165, p = 1.72e-02
+The null hypothesis test was non-significant, t(61) = 0.0722, p = 9.43e-01
+NHST: don't reject null significance hypothesis that the effect is equal to zero 
+TOST: reject null equivalence hypothesis
+
+TOST Results 
+                  t df p.value
+t-test      0.07215 61   0.943
+TOST Lower  2.30891 61   0.012
+TOST Upper -2.16460 61   0.017
+
+Effect Sizes 
+               Estimate     SE              C.I. Conf. Level
+Raw             0.01613 0.2235 [-0.3572, 0.3895]         0.9
+Hedges's g(rm)  0.01090 0.1555 [-0.1955, 0.2172]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0.94 
+
+Comparison Grid vs. Flubber 
+
+Paired t-test
+
+The equivalence test was non-significant, t(61) = 0.776, p = 2.2e-01
+The null hypothesis test was non-significant, t(61) = -1.898, p = 6.24e-02
+NHST: don't reject null significance hypothesis that the effect is equal to zero 
+TOST: don't reject null equivalence hypothesis
+
+TOST Results 
+                 t df p.value
+t-test     -1.8980 61   0.062
+TOST Lower  0.7764 61    0.22
+TOST Upper -4.5724 61 < 0.001
+
+Effect Sizes 
+               Estimate     SE               C.I. Conf. Level
+Raw             -0.3548 0.1870 [-0.6671, -0.0426]         0.9
+Hedges's g(rm)  -0.2678 0.1474 [-0.4768, -0.0566]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0.12 
+
+Comparison Grid vs. Proprioceptive 
+
+Paired t-test
+
+The equivalence test was non-significant, t(61) = -1.491, p = 7.05e-02
+The null hypothesis test was non-significant, t(61) = 0.942, p = 3.5e-01
+NHST: don't reject null significance hypothesis that the effect is equal to zero 
+TOST: don't reject null equivalence hypothesis
+
+TOST Results 
+                t df p.value
+t-test      0.942 61    0.35
+TOST Lower  3.375 61 < 0.001
+TOST Upper -1.491 61   0.071
+
+Effect Sizes 
+               Estimate     SE              C.I. Conf. Level
+Raw              0.1935 0.2055 [-0.1496, 0.5367]         0.9
+Hedges's g(rm)   0.1396 0.1531 [-0.0683, 0.3464]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0.42 
+
+Comparison Flubber vs. Proprioceptive 
+
+Paired t-test
+
+The equivalence test was non-significant, t(61) = 0.247, p = 5.97e-01
+The null hypothesis test was significant, t(61) = 2.797, p = 6.89e-03
+NHST: reject null significance hypothesis that the effect is equal to zero 
+TOST: don't reject null equivalence hypothesis
+
+TOST Results 
+                t df p.value
+t-test     2.7973 61   0.007
+TOST Lower 5.3477 61 < 0.001
+TOST Upper 0.2468 61   0.597
+
+Effect Sizes 
+               Estimate     SE            C.I. Conf. Level
+Raw              0.5484 0.1960 [0.221, 0.8758]         0.9
+Hedges's g(rm)   0.4307 0.1636 [0.213, 0.6451]         0.9
+Note: SMD confidence intervals are an approximation. See vignette("SMD_calcs").
+FDR adjusted NHST p-value:  0.02 
+

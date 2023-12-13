@@ -1,0 +1,13 @@
+Results cr_skew_a 
+
+	Pearson's product-moment correlation
+
+data:  curDat$sr and curDat$value
+t = -13.185, df = 610, p-value < 2.2e-16
+alternative hypothesis: true correlation is not equal to 0
+95 percent confidence interval:
+ -0.5303853 -0.4068559
+sample estimates:
+       cor 
+-0.4709259 
+

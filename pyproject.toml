@@ -12,7 +12,7 @@ authors = [
 maintainers = [
     { name = "Lucy Roellecke", email = "lucy.roellecke@fu-berlin.de" },
 ]
-keywords = ["very", "great", "study"]  # TODO change to actual keywords
+keywords = ["emotion", "VR", "EEG", "circumplex model"]
 # Check for classifiers: https://pypi.org/classifiers/
 classifiers = [
     "Development Status :: 1 - Planning",  # see: https://pypi.org/classifiers/
@@ -44,7 +44,7 @@ develop = [
 [project.urls]
 homepage = "https://www.AVR.org"  # TODO: change to actual homepage
 documentation = "https://readthedocs.org"  # TODO: change to actual documentation
-repository = "https://github.com/lucyroe/AVR"  # TODO: change to actual repository
+repository = "https://github.com/lucyroe/AVR"
 # Consider other URLs: pre-registration, data repository, etc.
 
 # Entry points for the project
@@ -174,7 +174,7 @@ ignore = [
 ignore-init-module-imports = true  # void automatically removing unused imports in __init__.py
 respect-gitignore = true  # files & folder ignored in gitignore are ignored by ruff as well [default: true]
 
-src = ["code/AVR", "code/notebooks", "code/tests"]
+src = ["code/AVR", "code/tests"]
 include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
 
 # Exclude a variety of commonly ignored directories:
@@ -231,7 +231,7 @@ max-statements = 50  # default: 50
 [tool.black]
 line-length = 119
 target-version = ["py311"]
-src = ["code/AVR", "code/notebooks", "code/tests"]
+src = ["code/AVR", "code/tests"]
 include = '(\.pyi?|\.ipynb)$'
 exclude = '''  # A regex preceded with ^/ will apply only to files and directories in the root of the project.
 (

@@ -1,0 +1,13 @@
+Results cr_kurtosis_dist 
+
+	Pearson's product-moment correlation
+
+data:  curDat$sr and curDat$value
+t = 1.5228, df = 610, p-value = 0.1283
+alternative hypothesis: true correlation is not equal to 0
+95 percent confidence interval:
+ -0.01780081  0.14011297
+sample estimates:
+       cor 
+0.06154119 
+

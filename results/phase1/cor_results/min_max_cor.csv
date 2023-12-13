@@ -1,0 +1,3 @@
+"","Valence","Arousal","Distance","Angle"
+"max_cor_metric","cr_mean","cr_mean","cr_mean","cr_auc"
+"min_cor_metric","cr_cv","cr_cv","cr_kurtosis","cr_cv"

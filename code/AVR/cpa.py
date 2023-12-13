@@ -42,7 +42,7 @@ datasets = ["CASE"]
 sampling_rates = {"CASE": 20, "CEAP": 10, "AVR": 20}
 
 # change to where you saved the preprocessed data
-datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AffectiveVR/"
+datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/"
 
 # cost function model to use for CPA
 model = "l2"  # we use the least squared deviation model as a default as this was also used by McClay et al.
@@ -94,8 +94,9 @@ def plot_elbow(signal: np.ndarray, model: str, list_penalties: list[int], jump: 
     plt.plot(list_penalties, list_number_of_changepoints)
     plt.xlabel("Penalty")
     plt.ylabel("Number of changepoints")
+    plt.axvline(pen, color="r", linestyle="--")
     # show plot
-    #plt.show()
+    plt.show()
 
 
 # function that plots results of changepoint analysis
@@ -155,9 +156,9 @@ if __name__ == "__main__":
     # loop over dataset
     for dataset in datasets:
         # set data path
-        datapath_set = os.path.join(datapath, "Phase1/{}/data/".format(dataset))
+        datapath_set = os.path.join(datapath, "data/{}/".format(dataset))
         # set result path
-        resultpath_set = os.path.join(datapath, "Phase1/{}/results/cpa/".format(dataset))
+        resultpath_set = os.path.join(datapath, "results/{}/cpa/".format(dataset))
         # create result folder if it doesn't exist yet
         if not os.path.exists(resultpath_set):
             os.makedirs(resultpath_set)
@@ -212,7 +213,7 @@ if __name__ == "__main__":
                 )
 
                 # group data by video
-                grouped_data = annotation_data.groupby("video")
+                grouped_data = annotation_data.groupby("video_id")
 
                 # create empty list to store changepoints
                 changepoint_data = []
@@ -236,7 +237,7 @@ if __name__ == "__main__":
                     # ELBOW PLOT TO DETERMINE OPTIMAL PENALTY VALUE
                     # if you've already decided which penalty value to use or if you want to use the same penalty value for all videos,
                     # comment out the following lines and change the pen value at the top of the script
-                    """
+                    
                     # plot elbow plot to determine the optimal penalty value for valence data
                     plot_elbow(valence_data, model, list_penalties, jump)
                     # ask for input of the best penalty value to use for subsequent analysis of valence data
@@ -248,7 +249,7 @@ if __name__ == "__main__":
                     # ask for input of the best penalty value to use for subsequent analysis of arousal data
                     arousal_pen = int(input("Please enter the penalty value you want to use for arousal and press Enter: "))
                     plt.close()
-                    """
+                    
 
                     # perform changepoint analysis on valence
                     valence_changepoints = get_changepoints(
