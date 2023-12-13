@@ -101,7 +101,6 @@ For other programming languages, corresponding scripts must be implemented to us
 
 ## To Dos
 
-- [ ] put images in README
 - [ ] CASE: calculate summary stats (number and distribution of change points across participants)
 - [ ] Adapt `cpa.py` and `cpa_averaged.py` so they can be used for any dataset (both annotation & physiological data)
 - [ ] Do CPA on CEAP data and AVR phase 1 and phase 2 data
