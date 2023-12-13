@@ -9,7 +9,7 @@
 
 The main analysis method used in this project is **Change Point Analysis (CPA)**. CPA is a data-driven method to detect relevant changes in time series, and can be applied to a wide range of purposes. The CPA applied in this project was inspired by the procedure applied by [McClay et al. (2023)](https://www.nature.com/articles/s41467-023-42241-2) and [Sharma et al. (2017)](https://ieeexplore.ieee.org/abstract/document/8105870). Click [here](https://www.jstor.org/stable/23427357?sid=primo) if you want to find out more about the mathematics behind CPA.
 
-![image](/pics/changepoints_V7_arousal_avg.jpg)
+![image](./pics/changepoints_V7_arousal_avg.jpg)
 
 ## Preprocessing
 
@@ -37,7 +37,7 @@ For the CASE and the CEAP dataset, already preprocessed physiological data was u
 All code is written in Python 3.11. See below on how to install the code as a python package. Change point analysis was performed using the python package :hammer_and_wrench: `ruptures` by [Truong et al. (2020)](https://linkinghub.elsevier.com/retrieve/pii/S0165168419303494). See their [documentation](https://centre-borelli.github.io/ruptures-docs/) of the package for detailed information.   
 The `ruptures` package allows for the usage of different algorithms and models to define change points. For pragmatic reasons (especially the lack of a pre-defined number of change points), I decided to use the `Pelt` algorithm that linearly penalizes the segmentation of the time series. For this, a penalty parameter `pen` needs to be set. The optimal penalty parameter can be assessed by plotting different penalty values on the x-axis and the corresponding number of change points on the y-axis. In the resulting elbow plot, the optimal penalty value can be visually found at the 'knee' of the curve.
 
-![elbow_plot](/pics/elbow_plot.png)
+![elbow_plot](./pics/elbow_plot.png)
 
 In this case, the penalty value would be defined as 1. Furthermore, the algorithm can use different models, defined in the `model` parameter. I decided to follow McClay et al. and use the least squared deviation `l2` model that detects the mean-shifts in a signal, but it's also possible to use the median or other models altogether. Different models, penalty and `jump` parameters will be compared in the future to see if they yield different results (see To Dos below).
 
