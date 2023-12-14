@@ -27,11 +27,13 @@
 ########################################################################################################################
 
 # -------------------- IMPORT PACKAGES -------------------------
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import ruptures as rpt
+import seaborn as sns
 
 # ------------------------- SETUP ------------------------------
 # datasets to perform CPA on
@@ -156,9 +158,9 @@ if __name__ == "__main__":
     # loop over dataset
     for dataset in datasets:
         # set data path
-        datapath_set = os.path.join(datapath, "data/{}/".format(dataset))
+        datapath_set = os.path.join(datapath, f"data/{dataset}/")
         # set result path
-        resultpath_set = os.path.join(datapath, "results/{}/cpa/".format(dataset))
+        resultpath_set = os.path.join(datapath, f"results/{dataset}/cpa/")
         # create result folder if it doesn't exist yet
         if not os.path.exists(resultpath_set):
             os.makedirs(resultpath_set)
@@ -207,9 +209,7 @@ if __name__ == "__main__":
 
                 # read in annotation data from excel file
                 annotation_data = pd.read_csv(
-                    os.path.join(
-                        datapath_set, f"preprocessed/sub_{subject}_preprocessed.csv"
-                    )
+                    os.path.join(datapath_set, f"preprocessed/sub_{subject}_preprocessed.csv")
                 )
 
                 # group data by video
@@ -237,32 +237,31 @@ if __name__ == "__main__":
                     # ELBOW PLOT TO DETERMINE OPTIMAL PENALTY VALUE
                     # if you've already decided which penalty value to use or if you want to use the same penalty value for all videos,
                     # comment out the following lines and change the pen value at the top of the script
-                    
+                    """
                     # plot elbow plot to determine the optimal penalty value for valence data
                     plot_elbow(valence_data, model, list_penalties, jump)
                     # ask for input of the best penalty value to use for subsequent analysis of valence data
-                    valence_pen = int(input("Please enter the penalty value you want to use for valence and press Enter: "))
+                    valence_pen = int(
+                        input("Please enter the penalty value you want to use for valence and press Enter: ")
+                    )
                     plt.close()
 
                     # plot elbow plot to determine the optimal penalty value for arousal data
                     plot_elbow(arousal_data, model, list_penalties, jump)
                     # ask for input of the best penalty value to use for subsequent analysis of arousal data
-                    arousal_pen = int(input("Please enter the penalty value you want to use for arousal and press Enter: "))
-                    plt.close()
-                    
-
-                    # perform changepoint analysis on valence
-                    valence_changepoints = get_changepoints(
-                        valence_data, model, pen, jump
+                    arousal_pen = int(
+                        input("Please enter the penalty value you want to use for arousal and press Enter: ")
                     )
+                    plt.close()
+                    """
+                    # perform changepoint analysis on valence
+                    valence_changepoints = get_changepoints(valence_data, model, pen, jump)
                     # change third parameter to valence_pen when using elbow method and pen when not
                     # delete last element of the list (which is the number of samples)
                     valence_changepoints.pop()
 
                     # perform changepoint analysis on arousal
-                    arousal_changepoints = get_changepoints(
-                        arousal_data, model, pen, jump
-                    )
+                    arousal_changepoints = get_changepoints(arousal_data, model, pen, jump)
                     # change third parameter to arousal_pen when using elbow method and pen when not
                     # delete last element of the list (which is the number of samples)
                     arousal_changepoints.pop()
@@ -311,12 +310,10 @@ if __name__ == "__main__":
 
                     # convert changepoints to seconds (rounded to two decimals)
                     valence_changepoints_seconds = [
-                        round((changepoint / sampling_rates[dataset]), 2)
-                        for changepoint in valence_changepoints
+                        round((changepoint / sampling_rates[dataset]), 2) for changepoint in valence_changepoints
                     ]
                     arousal_changepoints_seconds = [
-                        round((changepoint / sampling_rates[dataset]), 2)
-                        for changepoint in arousal_changepoints
+                        round((changepoint / sampling_rates[dataset]), 2) for changepoint in arousal_changepoints
                     ]
 
                     # add changepoints to changepoint_data
@@ -325,13 +322,9 @@ if __name__ == "__main__":
                             "subject": subject,
                             "video": video,
                             "valence_changepoints": valence_changepoints_seconds,
-                            "number_valence_changepoints": len(
-                                valence_changepoints_seconds
-                            ),
+                            "number_valence_changepoints": len(valence_changepoints_seconds),
                             "arousal_changepoints": arousal_changepoints_seconds,
-                            "number_arousal_changepoints": len(
-                                arousal_changepoints_seconds
-                            ),
+                            "number_arousal_changepoints": len(arousal_changepoints_seconds),
                             "model": model,
                             "jump_value": jump,
                             "penalty_value": pen,
@@ -362,7 +355,7 @@ if __name__ == "__main__":
 
             # create new folder for all changepoints
             resultpath_set_all = os.path.join(resultpath_set, "all")
-            if resultpath_set_all not in os.listdir(resultpath_set):
+            if "all" not in os.listdir(resultpath_set):
                 os.mkdir(resultpath_set_all)
 
             # save changepoints_all_df to csv
@@ -373,6 +366,210 @@ if __name__ == "__main__":
                 ),
                 index=False,
             )
+
+            # calculate summary statistics of changepoints for all participants
+            # create empty dataframe to store summary statistics
+            summary_statistics = pd.DataFrame(
+                {
+                    "subject": [],
+                    "rating": [],
+                    "video 1": [],
+                    "video 2": [],
+                    "video 3": [],
+                    "video 4": [],
+                    "video 5": [],
+                    "video 6": [],
+                    "video 7": [],
+                    "video 8": [],
+                    "mean subject": [],
+                    "std subject": [],
+                }
+            )
+
+            for subject in subjects:
+                # get changepoint data
+                changepoint_data = changepoints_all_df.loc[changepoints_all_df["subject"] == subject]
+
+                # calculate mean number of valence changepoints across videos
+                mean_subject_valence = changepoint_data["number_valence_changepoints"].mean()
+
+                # calculate mean number of arousal changepoints across videos
+                mean_subject_arousal = changepoint_data["number_arousal_changepoints"].mean()
+
+                # calculate standard deviation of number of valence changepoints across videos
+                std_subject_valence = changepoint_data["number_valence_changepoints"].std()
+
+                # calculate standard deviation of number of arousal changepoints across videos
+                std_subject_arousal = changepoint_data["number_arousal_changepoints"].std()
+
+                # add mean number of changepoints to summary statistics
+                row_index = 2 * int(subject) - 1
+                summary_statistics.loc[row_index, "subject"] = subject
+                summary_statistics.loc[row_index + 1, "subject"] = subject
+                summary_statistics.loc[row_index, "rating"] = "valence"
+                summary_statistics.loc[row_index + 1, "rating"] = "arousal"
+                summary_statistics.loc[row_index, "mean subject"] = mean_subject_valence
+                summary_statistics.loc[row_index + 1, "mean subject"] = mean_subject_arousal
+
+                # add standard deviation of number of changepoints to summary statistics
+                summary_statistics.loc[row_index, "std subject"] = std_subject_valence
+                summary_statistics.loc[row_index + 1, "std subject"] = std_subject_arousal
+
+                # loop over videos
+                for index, video in enumerate(changepoint_data["video"]):
+                    # get number of changepoints for each video
+                    number_valence_changepoints = changepoint_data.loc[index, "number_valence_changepoints"]
+                    number_arousal_changepoints = changepoint_data.loc[index, "number_arousal_changepoints"]
+
+                    # add numbers to dataframe
+                    summary_statistics.loc[row_index, f"video {video}"] = number_valence_changepoints
+                    summary_statistics.loc[row_index + 1, f"video {video}"] = number_arousal_changepoints
+
+            # calculate summary stats for all participants
+            # calculate mean number of changepoints for each video
+            mean_video_valence = changepoints_all_df.groupby("video")["number_valence_changepoints"].mean()
+            mean_video_arousal = changepoints_all_df.groupby("video")["number_arousal_changepoints"].mean()
+
+            # calculate standard deviation of number of changepoints for each video
+            std_video_valence = changepoints_all_df.groupby("video")["number_valence_changepoints"].std()
+            std_video_arousal = changepoints_all_df.groupby("video")["number_arousal_changepoints"].std()
+
+            # loop over videos
+            for index, video in enumerate(changepoint_data["video"]):
+                # add mean number of changepoints for each video to dataframe
+                last_two_rows = len(subjects) * 2 + 1
+                summary_statistics.loc[last_two_rows, "subject"] = "mean"
+                summary_statistics.loc[last_two_rows + 1, "subject"] = "mean"
+                summary_statistics.loc[last_two_rows, "rating"] = "valence"
+                summary_statistics.loc[last_two_rows + 1, "rating"] = "arousal"
+                summary_statistics.loc[last_two_rows, f"video {video}"] = mean_video_valence[video]
+                summary_statistics.loc[last_two_rows + 1, f"video {video}"] = mean_video_arousal[video]
+
+                # add standard deviation of number of changepoints for each video to dataframe
+                summary_statistics.loc[last_two_rows + 2, "subject"] = "std"
+                summary_statistics.loc[last_two_rows + 3, "subject"] = "std"
+                summary_statistics.loc[last_two_rows + 2, "rating"] = "valence"
+                summary_statistics.loc[last_two_rows + 3, "rating"] = "arousal"
+                summary_statistics.loc[last_two_rows + 2, f"video {video}"] = std_video_valence[video]
+                summary_statistics.loc[last_two_rows + 3, f"video {video}"] = std_video_arousal[video]
+
+            # calculate overall mean and std
+            overall_mean_valence = summary_statistics.loc[
+                last_two_rows, ["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"]
+            ].mean()
+            overall_mean_arousal = summary_statistics.loc[
+                last_two_rows + 1,
+                ["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"],
+            ].mean()
+            std_mean_valence = summary_statistics.loc[
+                last_two_rows, ["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"]
+            ].std()
+            std_mean_arousal = summary_statistics.loc[
+                last_two_rows + 1,
+                ["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"],
+            ].std()
+
+            overall_std_valence = summary_statistics.loc[
+                last_two_rows + 2,
+                ["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"],
+            ].mean()
+            overall_std_arousal = summary_statistics.loc[
+                last_two_rows + 3,
+                ["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"],
+            ].mean()
+            std_std_valence = summary_statistics.loc[
+                last_two_rows + 2,
+                ["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"],
+            ].std()
+            std_std_arousal = summary_statistics.loc[
+                last_two_rows + 3,
+                ["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"],
+            ].std()
+
+            # add overall mean and std to dataframe
+            summary_statistics.loc[last_two_rows, "mean subject"] = overall_mean_valence
+            summary_statistics.loc[last_two_rows + 1, "mean subject"] = overall_mean_arousal
+            summary_statistics.loc[last_two_rows, "std subject"] = std_mean_valence
+            summary_statistics.loc[last_two_rows + 1, "std subject"] = std_mean_arousal
+            summary_statistics.loc[last_two_rows + 2, "mean subject"] = overall_std_valence
+            summary_statistics.loc[last_two_rows + 3, "mean subject"] = overall_std_arousal
+            summary_statistics.loc[last_two_rows + 2, "std subject"] = std_std_valence
+            summary_statistics.loc[last_two_rows + 3, "std subject"] = std_std_arousal
+
+            # save summary statistics to csv
+            summary_statistics.to_csv(
+                os.path.join(
+                    resultpath_set_all,
+                    f"summary_statistics_model={model}_jump={jump}.csv",
+                ),
+                index=False,
+            )
+
+            # create violin plots of number of changepoints for each video
+            sns.set_theme(style="whitegrid")
+
+            # get number of changepoints per participant
+            data_plot = pd.melt(
+                summary_statistics,
+                id_vars=["subject", "rating"],
+                value_vars=["video 1", "video 2", "video 3", "video 4", "video 5", "video 6", "video 7", "video 8"],
+                var_name="video",
+                value_name="number of changepoints",
+            )
+
+            # remove overall mean and std from dataframe
+            data_plot = data_plot.loc[data_plot["subject"] != "mean"]
+            data_plot = data_plot.loc[data_plot["subject"] != "std"]
+            
+            valence_data_plot = data_plot.loc[data_plot["rating"] == "valence"]
+            arousal_data_plot = data_plot.loc[data_plot["rating"] == "arousal"]
+
+            # set up the matplotlib figure
+            figure, axes = plt.subplots(figsize=(12, 6))
+
+            # create violin plot for valence
+            sns.violinplot(data=arousal_data_plot, x="video", y="number of changepoints",
+            cut=0, native_scale=True, saturation=0.5, split=True,
+            inner_kws=dict(box_width=15, whis_width=2, marker="o", markeredgecolor="grey", markeredgewidth=1))
+
+            # set title
+            plt.title("Number of Valence Changepoints per Video for each Participant")
+
+            # show plot
+            plt.show()
+
+            # save plot to result folder
+            plt.savefig(
+                os.path.join(
+                    resultpath_set_all,
+                    f"violin_plot_valence_model={model}_jump={jump}.pdf",
+                )
+            )
+
+            # close plot
+            plt.close()
+
+            # create violin plot for arousal
+            sns.violinplot(data=arousal_data_plot, x="video", y="number of changepoints",
+            cut=0, native_scale=True, saturation=0.5, split=True,
+            inner_kws=dict(box_width=15, whis_width=2, marker="o", markeredgecolor="grey", markeredgewidth=1))
+
+            # set title
+            plt.title("Number of Arousal Changepoints per Video for each Participant")
+
+            # show plot
+            plt.show()
+
+            # save plot to result folder
+            plt.savefig(
+                os.path.join(
+                    resultpath_set_all,
+                    f"violin_plot_arousal_model={model}_jump={jump}.pdf",
+                )
+            )
+
+            # close plot
+            plt.close()
 
         else:
             print("Dataset not available.")
