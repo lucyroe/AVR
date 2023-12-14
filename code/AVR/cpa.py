@@ -520,12 +520,12 @@ if __name__ == "__main__":
             # remove overall mean and std from dataframe
             data_plot = data_plot.loc[data_plot["subject"] != "mean"]
             data_plot = data_plot.loc[data_plot["subject"] != "std"]
-            
+
             valence_data_plot = data_plot.loc[data_plot["rating"] == "valence"]
             arousal_data_plot = data_plot.loc[data_plot["rating"] == "arousal"]
 
             # set up the matplotlib figure
-            figure, axes = plt.subplots(figsize=(12, 6))
+            plt.figure(figsize=(12, 6))
 
             # create violin plot for valence
             sns.violinplot(data=arousal_data_plot, x="video", y="number of changepoints",
@@ -548,6 +548,9 @@ if __name__ == "__main__":
 
             # close plot
             plt.close()
+
+            # set up the matplotlib figure
+            plt.figure(figsize=(12, 6))
 
             # create violin plot for arousal
             sns.violinplot(data=arousal_data_plot, x="video", y="number of changepoints",
