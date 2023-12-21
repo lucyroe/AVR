@@ -5,7 +5,7 @@
 # Outputs:      Preprocessed data from AVR data for each participant as csv files in "Preprocessed" directory
 #
 # Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
-# Last version: 27.11.2023
+# Last version: 21.12.2023
 ########################################################################################################################
 
 # -------------------- IMPORT PACKAGES -------------------------
@@ -17,7 +17,7 @@ from scipy.interpolate import interp1d
 # ------------------------- SETUP ------------------------------
 # change the data_path to the path where you saved the AVR data
 main_path = (
-    "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AffectiveVR/Phase2/data/"
+    "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase2/"
 )
 preprocessed_path = main_path + "preprocessed/"
 
@@ -28,8 +28,7 @@ if not os.path.exists(preprocessed_path):
 # Set experimental parameters
 blocks = ["Practice", "Experiment"]
 logging_freq = ["CR", "SR"]
-test_site = ["Torino", "Berlin"]  # Torino (even SJ nb) = 0, Berlin (odd SJ nb) = 1
-questionnaire = ["SUS", "invasive_presence", "Kunin"]
+test_site = ["Torino", "Berlin"]  # Torino (subject code) = 0, Berlin (odd SJ nb) = 1
 frequency = 1 / 0.05  # sampling frequency CR in Hz
 video_length = (
     90 * 4 + 253 + 390 + 381
@@ -37,13 +36,11 @@ video_length = (
 session = "S000"  # session of recording
 resample = True  # resample CR to cr_fs (if samples are not even). Note: does not interpolate NA values
 
-# get list of participants
-subject_list = os.listdir(main_path + "AVR/")
+# list files in directory
+datafiles = os.listdir(main_path + "AVR/")
 # delete the DS_Store file (I cannot see it in the folder, but it appears in the table for some reason)
-if ".DS_Store" in subject_list:
-    subject_list.remove(".DS_Store")
-# sort participants in ascending order
-subject_list.sort()
+if ".DS_Store" in datafiles:
+    datafiles.remove(".DS_Store")
 
 # ------------------------- MAIN ------------------------------
 # read and preprocess data
@@ -53,8 +50,8 @@ if __name__ == "__main__":
     # create empty list for data of all participants
     list_data_all = []
     
-    for subject, subject_id in enumerate(subject_list):
-        print("Processing subject " + subject_id + " ...")
+    for subject_index, datafile in enumerate(datafiles):
+        print("Processing subject " + str(subject_index+1) + " ...")
 
         # initialize variables
         sj_id = []
@@ -66,7 +63,7 @@ if __name__ == "__main__":
         time = []
 
         # read results in csv file
-        subject_path = main_path + "AVR/" + subject_id + "/" + session + "/"
+        subject_path = main_path + "/AVR/" + datafile + "/" + session + "/"
         trial_results_filename = subject_path + "trial_results.csv"
         trials_results = pd.read_csv(trial_results_filename)
 
@@ -130,10 +127,10 @@ if __name__ == "__main__":
         number_samples = cr_time.__len__()  # number of samples
 
         # save CR data of this trial in variables
-        sj_id = np.append(sj_id, np.tile(subject_id, number_samples))
+        sj_id = np.append(sj_id, np.tile(subject_index+1, number_samples))
 
-        # sjs with even number are in the first testing site, odd in the second
-        if int(subject_id) % 2 == 0:
+        # sjs with subject code with letters are in the first testing site, odd numbers in the second
+        if any(c.isalpha() for c in datafile) and any(c.isdigit() for c in datafile):
             site = np.append(site, np.tile(test_site[0], number_samples))
         else:
             site = np.append(site, np.tile(test_site[1], number_samples))
@@ -162,10 +159,10 @@ if __name__ == "__main__":
         # save dataframe in csv file
         if resample:
             filename_cr = (
-                preprocessed_path + f"/sub_{subject_id}_cr_preprocessed_rs.csv"
+                preprocessed_path + f"/sub_{subject_index+1}_cr_preprocessed_rs.csv"
             )
         else:
-            filename_cr = preprocessed_path + f"/sub_{subject_id}_cr_preprocessed.csv"
+            filename_cr = preprocessed_path + f"/sub_{subject_index+1}_cr_preprocessed.csv"
 
         dataframe_cr.to_csv(filename_cr, na_rep="NaN", index=False)
 
@@ -184,9 +181,15 @@ if __name__ == "__main__":
     data_all.to_csv(filename_all, na_rep="NaN", index=False)
 
     # calculate mean CR data
-    data_mean = data_all.groupby("time").mean()
+    # Select only numeric columns
+    numeric_cols = data_all.select_dtypes(include=[np.number]).columns
+
+    # Calculate mean only on numeric columns
+    data_mean = data_all[numeric_cols].groupby("time").mean()
     # add time column
-    data_mean["time"] = list_data_all[0]["time"].values
+    data_mean["time"] = data_mean.index
+    # remove sj_id column
+    data_mean = data_mean.drop(columns=["sj_id"])
 
     # TODO: this does not work when the data is not resampled
     # different timepoints for different participants

@@ -14,8 +14,15 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: December 19, 2023
+Last update: December 21, 2023
 """
+
+# TODO: (Status 21.12.2023)
+# - CPA for all three datasets for annotation data DONE
+# - make CPA plots for phase 1 of AVR longer / reduce number of change points
+# - Elbow plots for all three datasets for annotation data
+# - Make plots prettier
+# - NO physiological data CPA working atm
 
 # %% Import
 import os
@@ -24,18 +31,20 @@ import numpy as np
 import pandas as pd
 import ruptures as rpt
 import seaborn as sns
-
+import re
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # datasets to perform CPA on
-datasets = ["CEAP"]
-# "CASE", "AVR"]
+datasets = ["CASE", "CEAP", "AVR"]
 
 # dataset modalities
-modalities = {"CASE": ["annotations", "physiological"],
-                "CEAP": ["annotations", "physiological"],
+modalities = {"CASE": ["annotations"],
+                "CEAP": ["annotations"],
                 "AVR": ["annotations_phase1", "annotations_phase2"]}
+# "CASE": ["annotations", "physiological"],
+# "CEAP": ["annotations", "physiological"],
+# "AVR": ["annotations_phase1", "annotations_phase2"]
 
 # physiological modalities
 physiological_modalities = {"CEAP": ["ibi"]}
@@ -66,11 +75,11 @@ datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
 resultpath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"
 
 # analysis steps to perform
-steps = ["elbow", "cpa"]
-# "summary statistics", "test"
+steps = ["cpa"]
+# "elbow", "summary statistics", "test"
 
 # turn on debug mode (if True, only one subject is processed)
-debug = True
+debug = False
 
 # %% Set CPA parameters >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -152,9 +161,10 @@ def plot_changepoints(
     plt.xticks(x_ticks, [int((xtick / sampling_rate)) for xtick in x_ticks])
 
     # set limits of x-axis
-    plt.xlim(0, len(signal) + 1/10 * len(signal))
+    plt.xlim(0, len(signal) + 1/20 * len(signal))
+
     # set limits of y-axis
-    # plt.ylim(-1, 1)
+    plt.ylim(-1.5, 1.5)
 
     # add title and axis labels
     plt.title(title)
@@ -192,13 +202,14 @@ if __name__ == "__main__":
             print(f"Performing changepoint analysis for {modality} data of {dataset} dataset...")
 
             # Set datapath for dataset
+            # Set resultpath for dataset
             if dataset == "AVR":
-                datapath_dataset = os.path.join(datapath, modality.split("_")[1:], 'preprocessed', modality.split("_")[0])
+                datapath_dataset = os.path.join(datapath, modality.split("_")[1], 'preprocessed', modality.split("_")[0])
+                resultpath_dataset = os.path.join(resultpath, modality.split("_")[1], 'cpa', modality.split("_")[0])
             else:
                 datapath_dataset = os.path.join(datapath, dataset, 'preprocessed', modality)
-
-            # Set resultpath for dataset
-            resultpath_dataset = os.path.join(resultpath, dataset, 'cpa', modality)
+                resultpath_dataset = os.path.join(resultpath, dataset, 'cpa', modality)
+            
             # Create resultpath if it doesn't exist yet
             if not os.path.exists(resultpath_dataset):
                 os.makedirs(resultpath_dataset)
@@ -209,9 +220,15 @@ if __name__ == "__main__":
             data_files = [file for file in data_files if not file.startswith(".")]
 
             # Create subject list from files
-            subjects = [str(subject_number) for subject_number in range(1, len(data_files)+1)]
+            subjects = []
+            for file in data_files:
+                # find the participant number in the filename
+                subject_number = re.findall(r"\d+", file)[0]
+                subjects.append(subject_number)
+            # sort subject list
+            subjects.sort()
             if debug:
-                subjects = ["1"]
+                subjects = ["06"]
 
             # Loop through analysis steps
             for step_number, step in enumerate(steps):
@@ -224,7 +241,16 @@ if __name__ == "__main__":
                         print("Processing subject ", subject, " of ", str(len(subjects)), "...")
 
                         # Load data
-                        data = pd.read_csv(os.path.join(datapath_dataset, data_files[subject_index]))
+                        right_datafile = [data_file for data_file in data_files if subject in data_file][0]
+                        data = pd.read_csv(os.path.join(datapath_dataset, right_datafile))
+
+                        # if dataset is AVR, use only "Flubber" as rating_method
+                        # drop the rows containing "Grid" or "Proprioceptive" values
+                        if modality == "annotations_phase1":
+                            data = data[data["rating_method"] == "Flubber"]
+                        
+                        # drop rows containing NaN values
+                        data = data.dropna()
 
                         # Create subject result folder
                         resultpath_subject = os.path.join(resultpath_dataset, f"sub_{subject}", "elbow_plots")
@@ -233,11 +259,12 @@ if __name__ == "__main__":
                         
                         if "elbow_plots" not in os.listdir(os.path.join(resultpath_dataset, f"sub_{subject}")):
                             os.mkdir(resultpath_subject)
-                        else:
-                            print("Caution: Result folder already exists. Files may be overwritten.")
 
                         # Group data by video
-                        grouped_data = data.groupby("quadrant") if dataset == "AVR" else data.groupby("video_id")
+                        if modality == "annotations_phase2":
+                            grouped_data = data.groupby("sj_id")
+                        else:
+                            grouped_data = data.groupby("quadrant") if modality == "annotations_phase1" else data.groupby("video_id")
 
                         # Loop over videos
                         for video, group_data in grouped_data:
@@ -257,7 +284,7 @@ if __name__ == "__main__":
                                 # plt.show()
 
                                 # save elbow plot
-                                plt.savefig(os.path.join(resultpath_subject, f"elbow_plot_valence_sub_{subject}_video_{video}.png"))
+                                plt.savefig(os.path.join(resultpath_subject, f"elbow_plot_valence_sub_{subject}_video_{video}.jpg"))
                                 plt.close()
 
                                 # plot elbow plot to determine the optimal penalty value for arousal data
@@ -267,7 +294,7 @@ if __name__ == "__main__":
                                 # plt.show()
 
                                 # save elbow plot
-                                plt.savefig(os.path.join(resultpath_subject, f"elbow_plot_arousal_sub_{subject}_video_{video}.png"))
+                                plt.savefig(os.path.join(resultpath_subject, f"elbow_plot_arousal_sub_{subject}_video_{video}.jpg"))
                                 plt.close()
 
                             else:   # if modality is physiological data
@@ -288,7 +315,7 @@ if __name__ == "__main__":
                                     # plt.show()
 
                                     # save elbow plot
-                                    plt.savefig(os.path.join(resultpath_subject, f"elbow_plot_{physiological_modality}_sub_{subject}_video_{video}.png"))
+                                    plt.savefig(os.path.join(resultpath_subject, f"elbow_plot_{physiological_modality}_sub_{subject}_video_{video}.jpg"))
                                     plt.close()
 
 # %% step 2: cpa >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -301,17 +328,29 @@ if __name__ == "__main__":
                         print("Processing subject ", subject, " of ", str(len(subjects)), "...")
 
                         # Load data
-                        data = pd.read_csv(os.path.join(datapath_dataset, data_files[subject_index]))
+                        # check if datafile contains subject number
+                        pattern = r'\D' + str(subject) + r'\D'
+                        right_datafile = [data_file for data_file in data_files if re.search(pattern, data_file)][0]
+                        data = pd.read_csv(os.path.join(datapath_dataset, right_datafile))
+                        
+                        # if dataset is AVR, use only "Flubber" as rating_method
+                        # drop the rows containing "Grid" or "Proprioceptive" values
+                        if modality == "annotations_phase1":
+                            data = data[data["rating_method"] == "Flubber"]
+
+                        # drop rows containing NaN values
+                        data = data.dropna()
 
                         # Create subject result folder
                         resultpath_subject = os.path.join(resultpath_dataset, f"sub_{subject}")
                         if f"sub_{subject}" not in os.listdir(resultpath_dataset):
                             os.mkdir(resultpath_subject)
-                        else:
-                            print("Caution: Result folder already exists. Files may be overwritten.")
 
                         # Group data by video
-                        grouped_data = data.groupby("quadrant") if dataset == "AVR" else data.groupby("video_id")
+                        if modality == "annotations_phase2":
+                            grouped_data = data.groupby("sj_id")
+                        else:
+                            grouped_data = data.groupby("quadrant") if modality == "annotations_phase1" else data.groupby("video_id")
 
                         # Create empty list to store changepoints
                         changepoint_data = []
@@ -346,6 +385,10 @@ if __name__ == "__main__":
                                     "Time (seconds)",
                                     "Valence",
                                 )
+
+                                # set y-axis limits
+                                plt.ylim(-1, 1)
+
                                 # show plot
                                 # plt.show()
 
@@ -353,7 +396,7 @@ if __name__ == "__main__":
                                 plt.savefig(
                                     os.path.join(
                                         resultpath_subject,
-                                        f"sub_{subject}_changepoints_V{video}_valence.pdf",
+                                        f"sub_{subject}_changepoints_V{video}_valence.jpg",
                                     )
                                 )
                                 plt.close()
@@ -367,6 +410,10 @@ if __name__ == "__main__":
                                     "Time (seconds)",
                                     "Arousal",
                                 )
+
+                                # set y-axis limits
+                                plt.ylim(-1, 1)
+
                                 # show plot
                                 # plt.show()
 
@@ -374,7 +421,7 @@ if __name__ == "__main__":
                                 plt.savefig(
                                     os.path.join(
                                         resultpath_subject,
-                                        f"sub_{subject}_changepoints_V{video}_arousal.pdf",
+                                        f"sub_{subject}_changepoints_V{video}_arousal.jpg",
                                     )
                                 )
                                 plt.close()
@@ -406,10 +453,10 @@ if __name__ == "__main__":
 
                                 for physio_index, physiological_modality in enumerate(physiological_modalities[dataset]):
                                     # get physiological data of that modality
-                                    data = group_data[physiological_modality].values
+                                    original_data = group_data[physiological_modality].values
 
                                     # drop NaN values
-                                    data = data[~np.isnan(data)]
+                                    data = original_data[~np.isnan(original_data)]
 
                                     # reshape data to fit the input format of the algorithm
                                     data = np.array(data).reshape(-1, 1)
@@ -421,7 +468,10 @@ if __name__ == "__main__":
 
                                     # sanity check: plot physiological timeseries
                                     plt.figure(figsize=(12, 6))
-                                    plt.plot(data)
+                                    physiological_timepoints = group_data["time"][~np.isnan(original_data)]
+                                    # reshape x data
+                                    physiological_timepoints = np.array(physiological_timepoints).reshape(-1, 1)
+                                    plt.plot(physiological_timepoints, data)
 
                                     # set ticks to seconds
                                     # x_ticks = plt.xticks()[0]
@@ -450,7 +500,7 @@ if __name__ == "__main__":
                                     plt.savefig(
                                         os.path.join(
                                             resultpath_subject,
-                                            f"sub_{subject}_changepoints_V{video}_{physiological_modality}.pdf",
+                                            f"sub_{subject}_changepoints_V{video}_{physiological_modality}.jpg",
                                         )
                                     )
 
