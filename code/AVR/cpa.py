@@ -14,13 +14,14 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: December 21, 2023
+Last update: January 4th, 2024
 """
 
-# TODO: (Status 21.12.2023)
+# TODO: (Status 04.01.2024)
 # - CPA for all three datasets for annotation data DONE
-# - make CPA plots for phase 1 of AVR longer / reduce number of change points
-# - Elbow plots for all three datasets for annotation data
+# - Elbow plots for all three datasets for annotation data DONE FOR FIRST SUBJECT -> pen = 1 always optimal
+
+# - make CPA plots for phase 1 of AVR longer / reduce number of change points (maybe with min_size parameter?)
 # - Make plots prettier
 # - NO physiological data CPA working atm
 
@@ -79,7 +80,7 @@ steps = ["cpa"]
 # "elbow", "summary statistics", "test"
 
 # turn on debug mode (if True, only one subject is processed)
-debug = False
+debug = True
 
 # %% Set CPA parameters >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -92,6 +93,14 @@ model = "l2"  # we use the least squared deviation model as a default as this wa
 # the higher the penalty, the fewer change points are detected
 pen = 1
 
+# minimum number of samples between two change points
+# although the technical sampling frequency of an input device might be higher,
+# humans are limited in their ability to rate their emotions on the input device
+# usually, humans are able to rate their emotions at a maximum frequency of 1-2 Hz
+# (see Ian D Loram et al. (2011): Human control of an inverted pendulum)
+min_size = sampling_rates   # if we assume a maximal motor control frequency of 1 Hz
+# results in a minimum distance between two change points of 1 second
+
 # create list of possible penalty values to test
 list_penalties = list(range(11))
 
@@ -103,10 +112,10 @@ jump = 5
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-def get_changepoints(signal: np.ndarray, model: str, pen: int, jump: int) -> list:
+def get_changepoints(signal: np.ndarray, model: str, pen: int, jump: int, min_size: int) -> list:
     """Function that returns the changepoints for a given dataset."""
     # .fit() takes a signal as input and fits the algorithm to the data
-    algorithm = rpt.Pelt(model=model, jump=jump).fit(signal)
+    algorithm = rpt.Pelt(model=model, jump=jump, min_size=min_size).fit(signal)
     # other algorithms to use are: "Dynp", "Binseg", "Window"
 
     # .predict() returns a list of indexes corresponding to the end of each regime
@@ -119,23 +128,23 @@ def get_changepoints(signal: np.ndarray, model: str, pen: int, jump: int) -> lis
     return changepoints
 
 
-def plot_elbow(signal: np.ndarray, model: str, list_penalties: list[int], jump: int):
+def plot_elbow(signal: np.ndarray, model: str, list_penalties: list[int], jump: int, min_size: int):
     """Function that creates an elbow plot to determine the optimal penalty"""
     # create an empty list to store the number of changepoints for each penalty value
     list_number_of_changepoints = []
     # perform a cpa for each possible penalty value specified in list_penalties
     for penalty_value in list_penalties:
-        changepoints = get_changepoints(signal, model, penalty_value, jump)
+        changepoints = get_changepoints(signal, model, penalty_value, jump, min_size)
         number_of_changepoints = len(changepoints)
         list_number_of_changepoints.append(number_of_changepoints)
 
     # plot elbow plot
     plt.figure(figsize=(12, 6))
-    plt.plot(list_penalties, list_number_of_changepoints)
-    plt.xlabel("Penalty")
-    plt.ylabel("Number of changepoints")
-    plt.axvline(pen, color="r", linestyle="--")
-
+    sns.set_theme(style="whitegrid")
+    # concatenate the two lists to create a dataframe
+    data = pd.DataFrame(list(zip(list_penalties, list_number_of_changepoints, strict=False)),
+        columns=["Penalty", "Number of changepoints"])
+    sns.lineplot(data=data, x="Penalty", y="Number of changepoints", color="#CC79A7", linewidth=2)
 
 def plot_changepoints(
     changepoints: list[int],  # changepoints need to be in seconds
@@ -144,17 +153,37 @@ def plot_changepoints(
     title: str,
     xlabel: str,
     ylabel: str,
+    figsize: tuple
 ):
     """Function that plots results of changepoint analysis"""
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=figsize)
+
     # plot annotation data
-    plt.plot(signal)
+    sns.set_theme(style="whitegrid")
+    sns.lineplot(data=signal, color="#000000", linewidth=2) # black line
 
-    # TODO: make plot prettier? e.g. with shaded areas instead of lines for changepoints? using seaborn?
+    # consecutively plot changepoints as vertical lines and shade area between changepoints
+    for index, changepoint in enumerate(changepoints):
 
-    # plot changepoints as red vertical lines
-    for changepoint in changepoints:
-        plt.axvline(changepoint, color="r", linestyle="--")
+        # plot vertical line at changepoint location
+        plt.axvline(changepoint, color="#009E73", linestyle="--", linewidth=2)   # green dashed line
+
+        # determine color and x-coordinate of shade area
+        if index % 2 == 0:
+            shade_color = "#E69F00" # orange shade
+        else:
+            shade_color = "#56B4E9" # sky blue shade
+        
+        if index == 0:
+            start_x = 0
+        else:
+            start_x = changepoints[index - 1]
+
+        # shade area between changepoints
+        plt.axvspan(start_x, changepoint, color=shade_color, alpha=0.5)
+
+    # shade area between last changepoint and end of signal
+    plt.axvspan(changepoints[-1], len(signal), color=shade_color, alpha=0.5)
 
     # set ticks to seconds
     x_ticks = plt.xticks()[0]
@@ -179,8 +208,8 @@ def plot_changepoints(
         ha="center",
         va="center",
         size=12,
-        color="r",
-        bbox=dict(facecolor=(1, 1, 1, 0.8), edgecolor="r"),
+        color="#009E73",
+        bbox=dict(facecolor=(1, 1, 1, 0.8), edgecolor="#009E73"),
     )
 
 
@@ -227,8 +256,11 @@ if __name__ == "__main__":
                 subjects.append(subject_number)
             # sort subject list
             subjects.sort()
+            # process only one subject if debug mode is on
             if debug:
-                subjects = ["06"]
+                subjects = ["1"]
+                if (dataset == "AVR") & (modality == "annotations_phase1"): # AVR dataset for phase 1 doesn't have annotations for subject 1
+                    subjects = ["06"]
 
             # Loop through analysis steps
             for step_number, step in enumerate(steps):
@@ -238,7 +270,7 @@ if __name__ == "__main__":
                 if step == "elbow":
                     # Loop through subjects
                     for subject_index, subject in enumerate(subjects):
-                        print("Processing subject ", subject, " of ", str(len(subjects)), "...")
+                        print("Processing subject ", subject, " of ", str(max(subjects)), "...")
 
                         # Load data
                         right_datafile = [data_file for data_file in data_files if subject in data_file][0]
@@ -278,7 +310,7 @@ if __name__ == "__main__":
                                 arousal_data = np.array(arousal_data).reshape(-1, 1)
 
                                 # plot elbow plot to determine the optimal penalty value for valence data
-                                plot_elbow(valence_data, model, list_penalties, jump)
+                                plot_elbow(valence_data, model, list_penalties, jump, min_size[dataset][modality_index])
 
                                 # show elbow plot
                                 # plt.show()
@@ -288,7 +320,7 @@ if __name__ == "__main__":
                                 plt.close()
 
                                 # plot elbow plot to determine the optimal penalty value for arousal data
-                                plot_elbow(arousal_data, model, list_penalties, jump)
+                                plot_elbow(arousal_data, model, list_penalties, jump, min_size[dataset][modality_index])
 
                                 # show elbow plot
                                 # plt.show()
@@ -309,7 +341,7 @@ if __name__ == "__main__":
                                     data = data[~np.isnan(data)]
 
                                     # plot elbow plot to determine the optimal penalty value for physiological data
-                                    plot_elbow(data, model, list_penalties, jump)
+                                    plot_elbow(data, model, list_penalties, jump, min_size[dataset][modality_index])
 
                                     # show elbow plot
                                     # plt.show()
@@ -325,7 +357,7 @@ if __name__ == "__main__":
 
                     # Loop through subjects
                     for subject_index, subject in enumerate(subjects):
-                        print("Processing subject ", subject, " of ", str(len(subjects)), "...")
+                        print("Processing subject ", subject, " of ", str(max(subjects)), "...")
 
                         # Load data
                         # check if datafile contains subject number
@@ -367,14 +399,17 @@ if __name__ == "__main__":
                                 arousal_data = np.array(arousal_data).reshape(-1, 1)
 
                                 # perform changepoint analysis on valence
-                                valence_changepoints = get_changepoints(valence_data, model, pen, jump)
+                                valence_changepoints = get_changepoints(valence_data, model, pen, jump, min_size[dataset][modality_index])
                                 # delete last element of the list (which is the number of samples)
                                 valence_changepoints.pop()
 
                                 # perform changepoint analysis on arousal
-                                arousal_changepoints = get_changepoints(arousal_data, model, pen, jump)
+                                arousal_changepoints = get_changepoints(arousal_data, model, pen, jump, min_size[dataset][modality_index])
                                 # delete last element of the list (which is the number of samples)
                                 arousal_changepoints.pop()
+
+                                # determine size of figure depending on length of stimuli
+                                figsize = (20, 4) if (dataset == "AVR") & (modality == "annotations_phase2") else (12, 6)
 
                                 # visualize changepoints for valence
                                 plot_changepoints(
@@ -384,6 +419,7 @@ if __name__ == "__main__":
                                     f"Changepoint Analysis of annotation data of {dataset} dataset for Valence (Subject: {subject}, Video: {video})",
                                     "Time (seconds)",
                                     "Valence",
+                                    figsize
                                 )
 
                                 # set y-axis limits
@@ -409,6 +445,7 @@ if __name__ == "__main__":
                                     f"Changepoint Analysis of annotation data of {dataset} dataset for Arousal (Subject: {subject}, Video: {video})",
                                     "Time (seconds)",
                                     "Arousal",
+                                    figsize
                                 )
 
                                 # set y-axis limits
@@ -446,6 +483,7 @@ if __name__ == "__main__":
                                         "model": model,
                                         "jump_value": jump,
                                         "penalty_value": pen,
+                                        "min_size": min_size[dataset][modality_index],
                                     }
                                 )
                             
@@ -462,7 +500,7 @@ if __name__ == "__main__":
                                     data = np.array(data).reshape(-1, 1)
 
                                     # perform changepoint analysis on physiological data
-                                    physiological_changepoints = get_changepoints(data, model, pen, jump)
+                                    physiological_changepoints = get_changepoints(data, model, pen, jump, min_size[dataset][modality_index])
                                     # delete last element of the list (which is the number of samples)
                                     physiological_changepoints.pop()
 
@@ -491,6 +529,7 @@ if __name__ == "__main__":
                                         f"Changepoint Analysis of {physiological_modality} data of {dataset} dataset (Subject: {subject}, Video: {video})",
                                         "Time (seconds)",
                                         physiological_modality,
+                                        figsize
                                     )
 
                                     # show plot
