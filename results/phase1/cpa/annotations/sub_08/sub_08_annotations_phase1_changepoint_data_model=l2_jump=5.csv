@@ -1,5 +1,0 @@
-subject,video,valence_changepoints,number_valence_changepoints,arousal_changepoints,number_arousal_changepoints,model,jump_value,penalty_value
-08,HN,"[1.0, 3.5, 13.5, 18.5, 26.75, 35.0]",6,"[5.0, 14.75]",2,l2,5,1
-08,HP,[1.5],1,[1.75],1,l2,5,1
-08,LN,"[1.25, 4.0, 16.75, 28.0]",4,[3.5],1,l2,5,1
-08,LP,"[0.75, 2.0, 2.75, 10.25, 27.25]",5,"[2.0, 9.0, 27.75]",3,l2,5,1
