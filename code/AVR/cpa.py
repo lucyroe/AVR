@@ -290,7 +290,7 @@ if __name__ == "__main__":
                 if step == "elbow":
                     # Loop through subjects
                     for subject in subjects:
-                        print("Processing subject ", subject, " of ", str(max(subjects)), "...")
+                        print("Processing subject ", subject, " of ", str(len(subjects)), "...")
 
                         # Load data
                         pattern = r"\D" + str(subject) + r"\D"
@@ -412,7 +412,7 @@ if __name__ == "__main__":
 
                     # Loop through subjects
                     for subject in subjects:
-                        print("Processing subject ", subject, " of ", str(max(subjects)), "...")
+                        print("Processing subject ", subject, " of ", str(len(subjects)), "...")
 
                         # Load data
                         # check if datafile contains subject number
