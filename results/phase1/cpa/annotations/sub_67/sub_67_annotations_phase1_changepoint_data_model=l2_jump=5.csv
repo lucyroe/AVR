@@ -1,0 +1,5 @@
+,subject,video,valence_changepoints,number_valence_changepoints,arousal_changepoints,number_arousal_changepoints,model,jump_value,penalty_value,min_size
+0,67,HN,"[5.75, 11.25, 32.75]",3,"[10.75, 11.75, 23.25]",3,l2,5,1,20
+1,67,HP,[1.0],1,"[1.0, 24.75]",2,l2,5,1,20
+2,67,LN,"[1.0, 8.25]",2,[2.0],1,l2,5,1,20
+3,67,LP,"[2.0, 23.25, 49.75]",3,"[2.0, 4.25, 23.25, 49.25]",4,l2,5,1,20
