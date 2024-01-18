@@ -13,14 +13,15 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: January 17th, 2024
+Last update: January 18th, 2024
 """
 
-# TODO: (Status 17.01.2024)  # noqa: FIX002
+# TODO: (Status 18.01.2024)  # noqa: FIX002
 # - CPA for all three datasets for annotation data averaged across participants' cps and timeseries DONE
 
-# - repeat 1st CPA after subject 89 data is there
-# - CPA for all three datasets for annotation data averaged across participants' timeseries
+# - CPA for all three datasets for annotation data averaged across participants' timeseries DONE for CASE & CEAP
+# (does not work for AVR atm)
+#
 # - CPA for all three datasets for annotation data averaged across participants' cps
 # - CPA for all three datasets for physiological data averaged across participants' timeseries
 # - CPA for all three datasets for physiological data averaged across participants' cps
@@ -52,14 +53,12 @@ warnings.filterwarnings("ignore", category=FutureWarning)   # ignore future warn
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # datasets to perform CPA on
-datasets = ["AVR"]
-# "CASE", "CEAP"
+datasets = ["CASE", "CEAP", "AVR"]
 
 # dataset modalities
-modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase2"]}
+modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase1", "annotations_phase2"]}
 # "CASE": ["physiological"],  # noqa: ERA001
 # "CEAP": ["physiological"],  # noqa: ERA001
-# "AVR": ["annotations_phase1"],  # noqa: ERA001
 
 # physiological modalities
 physiological_modalities = {"CEAP": ["ibi"]}
@@ -110,8 +109,9 @@ steps = ["cpa"]
 # "summary statistics", "test"
 
 # averaging modes
-averaging_modes = ["all"]
-# "timeseries", "changepoints"
+averaging_modes = ["timeseries"] 
+# "changepoints"]
+# "all"
 # "all": average both across all participants' timeseries and their changepoints
 # "timeseries": average only across all participants' timeseries, plot changepoints separately
 # "changepoints": average only across all participants' changepoints, plot timeseries separately
@@ -448,27 +448,34 @@ if __name__ == "__main__":
                             # change name to include the two parameters model & jump (so that when we test different values, we save different files)
                             changepoint_df.to_csv(
                                 Path(resultpath_dataset) / "all"/
-                                f"annotations_changepoint_data_model={model}_jump={jump}_avg.csv",
+                                f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv",
                                 index=False,
                             )
 
                         elif averaging_mode == "timeseries":    # average across timeseries only
                             
-                            # get individual changepoints
-                            changepoints_all = pd.read_csv(
-                                Path(resultpath) / modality.split("_")[1] / "cpa" / modality.split("_")[0] /"all"/
-                                    f"annotations_{modality.split('_')[1]}_changepoint_data_model={model}_jump={jump}.csv"
-                                )
-                            
-                            # get averaged changepoints
-                            changepoints_avg = pd.read_csv(
-                                Path(resultpath_dataset) / "all"/
-                                    f"annotations_{modality.split('_')[1]}_changepoint_data_model={model}_jump={jump}_avg.csv"
-                                )
+                            if modality == "annotations":
+                                
+                                individual_cp_filename = f"annotations_{modality.split('_')[1]}_changepoint_data_model={model}_jump={jump}.csv" if dataset == "AVR" else f"annotations_changepoint_data_model={model}_jump={jump}.csv"
 
-                            # Loop over videos
-                            for video, group_data in grouped_data_avg.groupby(group_variable):
-                                if "annotations" in modality:
+                                # get individual changepoints
+                                changepoints_all = pd.read_csv(
+                                    Path("/".join(str(resultpath_dataset).split("/")[:-1])) /"all"/
+                                        individual_cp_filename
+                                    )
+                                
+                                averaged_cp_filename = f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv"
+
+                                # get averaged changepoints
+                                changepoints_avg = pd.read_csv(
+                                    Path(resultpath_dataset) / "all"/
+                                        averaged_cp_filename
+                                    )
+
+
+                                # Loop over videos
+                                for video, group_data in grouped_data_avg.groupby(group_variable):
+
                                     valence_data = group_data["cr_v"].to_numpy()
                                     arousal_data = group_data["cr_a"].to_numpy()
 
@@ -477,7 +484,7 @@ if __name__ == "__main__":
                                     arousal_data = np.array(arousal_data).reshape(-1, 1)
 
                                     # get changepoints for all participants for that video
-                                    changepoints_video = changepoints_all.loc[changepoints_all[group_variable] == video]
+                                    changepoints_video = changepoints_all.loc[changepoints_all["video"] == video]
                                     valence_changepoints = changepoints_video["valence_changepoints"]
                                     arousal_changepoints = changepoints_video["arousal_changepoints"]
 
@@ -502,12 +509,12 @@ if __name__ == "__main__":
                                             # Reset the index of the DataFrame
                                             valence_changepoints = valence_changepoints.reset_index(drop=True)
                                             for changepoint in ast.literal_eval(valence_changepoints[index]):
-                                                plt.axvline(changepoint*sampling_rates[dataset][modality_index], color=subjects_colormap[0](index/number_colors), alpha=0.3)
-                                        subject_line = mlines.Line2D([], [], color=subjects_colormap[0](index/number_colors), alpha=0.3, label='cp ' + subject)
+                                                plt.axvline(changepoint*sampling_rates[dataset][modality_index], color=subjects_colormap(index), alpha=0.3)
+                                        subject_line = mlines.Line2D([], [], color=subjects_colormap(index), alpha=0.3, label='cp ' + subject)
                                         legend_subjects.append(subject_line)
                                     
                                     # plot averaged changepoints
-                                    changepoints_avg_video_valence = changepoints_avg.loc[changepoints_avg[group_variable] == video]["valence_changepoints"]
+                                    changepoints_avg_video_valence = changepoints_avg.loc[changepoints_avg["video"] == video]["valence_changepoints"]
                                     # check if the series is empty
                                     if not changepoints_avg_video_valence.empty:
                                         # Reset the index of the Series
@@ -521,7 +528,7 @@ if __name__ == "__main__":
                                     mean_legend = mlines.Line2D([], [], color=timeseries_color, linewidth=1, label='mean')
                                     avg_legend = mlines.Line2D([], [], color=change_point_color, linestyle="--", linewidth=2, label='cp mean')
                                     legend_subjects.extend([avg_legend, mean_legend])
-                                    plt.legend(handles=legend_subjects, fontsize='x-small')
+                                    plt.legend(handles=legend_subjects, fontsize='x-small', loc='right')
 
                                     # set ticks to seconds
                                     x_ticks = plt.xticks()[0]
@@ -563,7 +570,7 @@ if __name__ == "__main__":
                                         title_valence = (f"Changepoint Analysis of annotation data of "
                                             f"{dataset} dataset for Valence (Video: {video})")
                                         title_arousal = (f"Changepoint Analysis of annotation data of "
-                                            f"{dataset} dataset for Arousal(Video: {video})")
+                                            f"{dataset} dataset for Arousal (Video: {video})")
                                         x_axis_label = "Time (seconds)"
                                     
                                     plt.title(title_valence)
@@ -601,12 +608,12 @@ if __name__ == "__main__":
                                             # Reset the index of the DataFrame
                                             arousal_changepoints = arousal_changepoints.reset_index(drop=True)
                                             for changepoint in ast.literal_eval(arousal_changepoints[index]):
-                                                plt.axvline(changepoint*sampling_rates[dataset][modality_index], color=subjects_colormap[0](index/number_colors), alpha=0.3)
-                                        subject_line = mlines.Line2D([], [], color=subjects_colormap[0](index/number_colors), alpha=0.3, label='cp ' + subject)
+                                                plt.axvline(changepoint*sampling_rates[dataset][modality_index], color=subjects_colormap(index), alpha=0.3)
+                                        subject_line = mlines.Line2D([], [], color=subjects_colormap(index), alpha=0.3, label='cp ' + subject)
                                         legend_subjects.append(subject_line)
                                     
                                     # plot averaged changepoints
-                                    changepoints_avg_video_arousal = changepoints_avg.loc[changepoints_avg[group_variable] == video]["arousal_changepoints"]
+                                    changepoints_avg_video_arousal = changepoints_avg.loc[changepoints_avg["video"] == video]["arousal_changepoints"]
                                     # check if the series is empty
                                     if not changepoints_avg_video_arousal.empty:
                                         # Reset the index of the Series
@@ -620,7 +627,7 @@ if __name__ == "__main__":
                                     mean_legend = mlines.Line2D([], [], color=timeseries_color, linewidth=1, label='mean')
                                     avg_legend = mlines.Line2D([], [], color=change_point_color, linestyle="--", linewidth=2, label='cp mean')
                                     legend_subjects.extend([avg_legend, mean_legend])
-                                    plt.legend(handles=legend_subjects, fontsize='x-small')
+                                    plt.legend(handles=legend_subjects, fontsize='x-small', loc='right')
 
                                     # set ticks to seconds
                                     x_ticks = plt.xticks()[0]
@@ -666,17 +673,18 @@ if __name__ == "__main__":
                                     plt.close()
 
                                     
-                                else:  # if modality is physiological data (TODO)
-                                    for physio_index, physiological_modality in enumerate(
-                                        physiological_modalities[dataset]
-                                    ):
-                                        # get physiological data of that modality
-                                        original_data = group_data[physiological_modality].to_numpy()
-                                        ...
+                            else:  # if modality is physiological data (TODO)
+                                    ...
 
                         else:   # averaging_mode == "changepoints"  # average across changepoints only
-                            ...
+                            
+                            averaged_cp_filename = f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv"
 
+                            # get averaged changepoints
+                            changepoints_avg = pd.read_csv(
+                                Path(resultpath_dataset) / "all"/
+                                    averaged_cp_filename
+                                )
 
 '''
             # ---------------------- PLOT AVERAGED CPs + INDIVIDUAL DATA --------------------------
