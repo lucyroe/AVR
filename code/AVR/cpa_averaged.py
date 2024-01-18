@@ -13,12 +13,13 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: January 9th, 2024
+Last update: January 17th, 2024
 """
 
-# TODO: (Status 09.01.2024)  # noqa: FIX002
+# TODO: (Status 17.01.2024)  # noqa: FIX002
 # - CPA for all three datasets for annotation data averaged across participants' cps and timeseries DONE
 
+# - repeat 1st CPA after subject 89 data is there
 # - CPA for all three datasets for annotation data averaged across participants' timeseries
 # - CPA for all three datasets for annotation data averaged across participants' cps
 # - CPA for all three datasets for physiological data averaged across participants' timeseries
@@ -51,12 +52,14 @@ warnings.filterwarnings("ignore", category=FutureWarning)   # ignore future warn
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # datasets to perform CPA on
-datasets = ["CASE", "CEAP", "AVR"]
+datasets = ["AVR"]
+# "CASE", "CEAP"
 
 # dataset modalities
-modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase1", "annotations_phase2"]}
+modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase2"]}
 # "CASE": ["physiological"],  # noqa: ERA001
 # "CEAP": ["physiological"],  # noqa: ERA001
+# "AVR": ["annotations_phase1"],  # noqa: ERA001
 
 # physiological modalities
 physiological_modalities = {"CEAP": ["ibi"]}
@@ -107,8 +110,8 @@ steps = ["cpa"]
 # "summary statistics", "test"
 
 # averaging modes
-averaging_modes = ["timeseries", "changepoints"]
-# "all"
+averaging_modes = ["all"]
+# "timeseries", "changepoints"
 # "all": average both across all participants' timeseries and their changepoints
 # "timeseries": average only across all participants' timeseries, plot changepoints separately
 # "changepoints": average only across all participants' changepoints, plot timeseries separately
@@ -444,7 +447,7 @@ if __name__ == "__main__":
                             # save changepoint dataframe to csv
                             # change name to include the two parameters model & jump (so that when we test different values, we save different files)
                             changepoint_df.to_csv(
-                                Path(resultpath_dataset) / "all",
+                                Path(resultpath_dataset) / "all"/
                                 f"annotations_changepoint_data_model={model}_jump={jump}_avg.csv",
                                 index=False,
                             )
@@ -453,14 +456,14 @@ if __name__ == "__main__":
                             
                             # get individual changepoints
                             changepoints_all = pd.read_csv(
-                                Path(resultpath) / dataset / "cpa" / modality / "all",
-                                    f"annotations_changepoint_data_model={model}_jump={jump}.csv"
+                                Path(resultpath) / modality.split("_")[1] / "cpa" / modality.split("_")[0] /"all"/
+                                    f"annotations_{modality.split('_')[1]}_changepoint_data_model={model}_jump={jump}.csv"
                                 )
                             
                             # get averaged changepoints
                             changepoints_avg = pd.read_csv(
-                                Path(resultpath_dataset) / "all",
-                                    f"annotations_changepoint_data_model={model}_jump={jump}_avg.csv"
+                                Path(resultpath_dataset) / "all"/
+                                    f"annotations_{modality.split('_')[1]}_changepoint_data_model={model}_jump={jump}_avg.csv"
                                 )
 
                             # Loop over videos

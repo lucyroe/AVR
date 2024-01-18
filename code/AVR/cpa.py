@@ -14,10 +14,10 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: January 5th, 2024
+Last update: January 17th, 2024
 """
 
-# TODO: (Status 05.01.2024)  # noqa: FIX002
+# TODO: (Status 17.01.2024)  # noqa: FIX002
 # - CPA for all three datasets for annotation data DONE
 # - Elbow plots for all three datasets for annotation data DONE -> pen = 1 always optimal
 # - make CPA plots for phase 1 of AVR longer / reduce number of change points (maybe with min_size parameter?) DONE
@@ -25,6 +25,7 @@ Last update: January 5th, 2024
 # - Make plots prettier DONE
 
 # - Check all elbow plots and see whether pen should always be 1
+# - AVR phase 2 subject 89 missing atm
 # - NO physiological data CPA working atm
 
 # %% Import
@@ -44,12 +45,14 @@ warnings.filterwarnings("ignore", category=FutureWarning)   # ignore future warn
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # datasets to perform CPA on
-datasets = ["CASE", "CEAP", "AVR"]
+datasets = ["AVR"]
+# "CASE", "CEAP"    # noqa: ERA001
 
 # dataset modalities
-modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase1", "annotations_phase2"]}
+modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase2"]}
 # "CASE": ["physiological"],  # noqa: ERA001
 # "CEAP": ["physiological"],  # noqa: ERA001
+# "AVR": ["annotations_phase1"],  # noqa: ERA001
 
 # physiological modalities
 physiological_modalities = {"CEAP": ["ibi"]}
@@ -97,7 +100,7 @@ steps = ["elbow", "cpa"]
 # "summary statistics", "test"
 
 # turn on debug mode (if True, only one subject is processed)
-debug = False
+debug = True
 
 # %% Set CPA parameters >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -276,7 +279,9 @@ if __name__ == "__main__":
             subjects.sort()
             # process only one subject if debug mode is on
             if debug:
-                subjects = ["1"]
+                subjects = ["61", "62", "63", "64", "65", "66", "67", "68", "69", "70",
+                "71", "72", "73", "74", "75", "76", "77", "78", "79", "80",
+                "81", "82", "83", "84", "85", "86", "87", "88", "89"]
                 if (dataset == "AVR") & (
                     modality == "annotations_phase1"
                 ):  # AVR dataset for phase 1 doesn't have annotations for subject 1

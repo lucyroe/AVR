@@ -5,7 +5,7 @@
 # Outputs:      Preprocessed data from AVR data for each participant as csv files in "Preprocessed" directory
 #
 # Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
-# Last version: 21.12.2023
+# Last version: 17.01.2023
 ########################################################################################################################
 
 # -------------------- IMPORT PACKAGES -------------------------
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         time = []
 
         # read results in csv file
-        subject_path = main_path + "/AVR/" + datafile + "/" + session + "/"
+        subject_path = main_path + "AVR/" + datafile + "/" + session + "/"
         trial_results_filename = subject_path + "trial_results.csv"
         trials_results = pd.read_csv(trial_results_filename)
 
