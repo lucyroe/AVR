@@ -13,7 +13,7 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: January 18th, 2024
+Last update: January 29th, 2024
 """
 
 # TODO: (Status 18.01.2024)  # noqa: FIX002
@@ -53,12 +53,14 @@ warnings.filterwarnings("ignore", category=FutureWarning)   # ignore future warn
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # datasets to perform CPA on
-datasets = ["CASE", "CEAP", "AVR"]
+datasets = ["AVR"]
+# "CASE", "CEAP", 
 
 # dataset modalities
-modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase1", "annotations_phase2"]}
+modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase2"]}
 # "CASE": ["physiological"],  # noqa: ERA001
 # "CEAP": ["physiological"],  # noqa: ERA001
+# "AVR": ["annotations_phase1"],  # noqa: ERA001
 
 # physiological modalities
 physiological_modalities = {"CEAP": ["ibi"]}
@@ -97,6 +99,8 @@ shade_colors = [
 change_point_color = color_palette[6]  # color to use for vertical lines at change points (vermillion)
 timeseries_color = color_palette[0]  # color to use for plotting the time series (black)
 elbow_color = color_palette[3]  # color to use for plotting the elbow plot (bluish green)
+videos_color = color_palette[3]  # color to use for plotting the video boundaries (bluish green)
+events_color = color_palette[4]  # color to use for plotting the events (yellow)
 
 # change to where you saved the preprocessed data
 datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
@@ -109,12 +113,15 @@ steps = ["cpa"]
 # "summary statistics", "test"
 
 # averaging modes
-averaging_modes = ["timeseries"] 
+averaging_modes = ["all"] 
 # "changepoints"]
-# "all"
+# "timeseries"
 # "all": average both across all participants' timeseries and their changepoints
 # "timeseries": average only across all participants' timeseries, plot changepoints separately
 # "changepoints": average only across all participants' changepoints, plot timeseries separately
+
+# overlay averaged changepoints with event boundaries as rated by raters
+overlay = True
 
 # turn on debug mode (if True, only two subjects are processed)
 debug = False
@@ -313,6 +320,43 @@ if __name__ == "__main__":
                                         title_arousal = (f"Changepoint Analysis of annotation data of Phase 2 of "
                                             f"{dataset} dataset for Arousal averaged across participants)")
                                         x_axis_label = "Time (minutes)"
+
+                                        if overlay:
+                                            # read in event timepoints as rated by raters
+                                            event_times_file = pd.read_csv(
+                                                Path(datapath) / modality.split("_")[1] / "events_rating_lucy.csv",
+                                                usecols=["start_time", "end_time", "event_duration",
+                                                "event_description", "video_boundary", "major_event"],
+                                            )
+                                            # generate list of video onsets
+                                            video_onsets = []
+                                            # generate list of major event onsets
+                                            major_event_onsets = []
+                                            for index, row in event_times_file.iterrows():
+                                                if row["video_boundary"] == 1:
+                                                # get timepoints of video onsets                                                if row["video_boundary"] == "1":
+                                                    video_onsets.append(row["start_time"])
+                                                # get timepoints of major event onsets
+                                                if row["major_event"] == 1:
+                                                    major_event_onsets.append(row["start_time"])
+                                            
+                                            # convert timepoints to seconds and then to samples
+                                            video_onsets_samples = []
+                                            major_event_onsets_samples = []
+                                            for onset in video_onsets:
+                                                onset_minutes = onset.split(':')[0]
+                                                onset_seconds = onset.split(':')[1]
+                                                onset = (int(onset_minutes) * 60 + int(onset_seconds)) * sampling_rates[dataset][modality_index]
+                                                video_onsets_samples.append(onset)
+                                            for onset in major_event_onsets:
+                                                onset_minutes = onset.split(':')[0]
+                                                onset_seconds = onset.split(':')[1]
+                                                onset = (int(onset_minutes) * 60 + int(onset_seconds)) * sampling_rates[dataset][modality_index]
+                                                major_event_onsets_samples.append(onset)
+
+                                            # remove video onsets from major event onsets
+                                            major_event_onsets_samples = [onset for onset in major_event_onsets_samples if onset not in video_onsets_samples]
+
                                     elif (dataset == "AVR") & (modality == "annotations_phase1"):
                                         title_valence = (f"Changepoint Analysis of annotation data of Phase 1 of "
                                             f"{dataset} dataset for Valence averaged across participants (Video: {video})")
@@ -337,6 +381,12 @@ if __name__ == "__main__":
                                         figsize,
                                     )
 
+                                    if overlay:
+                                        plt.vlines(video_onsets_samples, -1.1, 1.1, color=videos_color, linewidth=3, label="video onsets")
+                                        plt.vlines(major_event_onsets_samples, -1.1, 1.1, color=events_color, linewidth=2, label="major event onsets")
+                                        video_onset_line = mlines.Line2D([], [], color=videos_color, linewidth=3, label="video onsets")
+                                        major_event_line = mlines.Line2D([], [], color=events_color, linewidth=2, label="major event onsets")
+
                                     # change x-ticks to minutes if dataset is AVR phase 2
                                     # (because stimulus video is more than 20 minutes long)
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
@@ -351,8 +401,13 @@ if __name__ == "__main__":
                                         # set limits of x-axis
                                         plt.xlim(0, len(valence_data))
 
+                                        # add legend
+                                        cp_line = mlines.Line2D([], [], color=change_point_color, linestyle="--", label='changepoints')
+                                        legend = [video_onset_line, major_event_line, cp_line]
+                                        plt.legend(handles=legend, fontsize='x-small', loc='right')
+
                                     # show plot
-                                    # plt.show()  # noqa: ERA001
+                                    #plt.show()  # noqa: ERA001
 
                                     # define name of file
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
@@ -378,6 +433,12 @@ if __name__ == "__main__":
                                         figsize,
                                     )
 
+                                    if overlay:
+                                        plt.vlines(video_onsets_samples, -1.1, 1.1, color=videos_color, linewidth=3, label="video onsets")
+                                        plt.vlines(major_event_onsets_samples, -1.1, 1.1, color=events_color, linewidth=2, label="major event onsets")
+                                        video_onset_line = mlines.Line2D([], [], color=videos_color, linewidth=3, label="video onsets")
+                                        major_event_line = mlines.Line2D([], [], color=events_color, linewidth=2, label="major event onsets")
+
                                     # change x-ticks to minutes if dataset is AVR phase 2
                                     # (because stimulus video is more than 20 minutes long)
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
@@ -392,8 +453,13 @@ if __name__ == "__main__":
                                         # set limits of x-axis
                                         plt.xlim(0, len(valence_data))
 
+                                        # add legend
+                                        cp_line = mlines.Line2D([], [], color=change_point_color, linestyle="--", label='changepoints')
+                                        legend = [video_onset_line, major_event_line, cp_line]
+                                        plt.legend(handles=legend, fontsize='x-small', loc='right')
+
                                     # show plot
-                                    # plt.show()  # noqa: ERA001
+                                    #plt.show()  # noqa: ERA001
 
                                     # define name of file
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
