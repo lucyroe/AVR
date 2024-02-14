@@ -81,8 +81,7 @@ video_quadrant_mapping = {
 color_palette = ["#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"]
 # black, orange, sky-blue, bluish green, yellow, blue, vermillion, reddish purple
 shade_colors = [
-    color_palette[2],
-    color_palette[7],
+    "#FFFFFF", "#FFFFFF"
 ]  # colors to use for shading between change points (sky-blue & reddish purple)
 change_point_color = color_palette[6]  # color to use for vertical lines at change points (vermillion)
 timeseries_color = color_palette[0]  # color to use for plotting the time series (black)
@@ -184,7 +183,7 @@ def plot_changepoints(  # noqa: PLR0913
     counter = 0
     for index, changepoint in enumerate(changepoints):
         # plot vertical line at changepoint location
-        plt.axvline(changepoint, color=change_point_color, linestyle="--", linewidth=2)  # vermillion dashed line
+        plt.axvline(changepoint, color=change_point_color, linewidth=2)  # vermillion dashed line
 
         # determine color and x-coordinate of shade area
         # reddish-purple shade if index is even, sky-blue shade if index is odd

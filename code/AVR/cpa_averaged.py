@@ -13,7 +13,7 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: January 29th, 2024
+Last update: February 14th, 2024
 """
 
 # TODO: (Status 18.01.2024)  # noqa: FIX002
@@ -28,33 +28,33 @@ Last update: January 29th, 2024
 # - CPA for all three datasets for physiological data averaged across participants' cps and timeseries
 
 # %% Import
+import ast
 import os
 import re
-import ast
 import warnings
 from pathlib import Path
-import matplotlib
 
-import matplotlib.pyplot as plt
+import matplotlib
 import matplotlib.lines as mlines
-from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import ruptures as rpt
 import seaborn as sns
+from matplotlib.colors import LinearSegmentedColormap
+
 from cpa import (
     get_changepoints,
     plot_changepoints,
-)  # cpa.py and cpa_averaged.py need to be in the same directory!
+)
 
-
-warnings.filterwarnings("ignore", category=FutureWarning)   # ignore future warnings from seaborn
+warnings.filterwarnings("ignore", category=FutureWarning)  # ignore future warnings from seaborn
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # datasets to perform CPA on
 datasets = ["AVR"]
-# "CASE", "CEAP", 
+# "CASE", "CEAP",
 
 # dataset modalities
 modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase2"]}
@@ -92,15 +92,15 @@ color_palette = ["#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2
 # make color palette into Matplotlib colormap
 wong_colormap = LinearSegmentedColormap.from_list("Wong", color_palette, N=8)
 
-shade_colors = [
-    color_palette[2],
-    color_palette[7],
-]  # colors to use for shading between change points (sky-blue & reddish purple)
+shade_colors = ["#FFFFFF", "#FFFFFF"]
+shade_colors_videos = [color_palette[2], color_palette[5]]
+
+# colors to use for shading between videos (blue & sky-blue)
 change_point_color = color_palette[6]  # color to use for vertical lines at change points (vermillion)
 timeseries_color = color_palette[0]  # color to use for plotting the time series (black)
 elbow_color = color_palette[3]  # color to use for plotting the elbow plot (bluish green)
-videos_color = color_palette[3]  # color to use for plotting the video boundaries (bluish green)
-events_color = color_palette[4]  # color to use for plotting the events (yellow)
+videos_color = color_palette[5]  # color to use for plotting the video boundaries (blue)
+events_color = color_palette[3]  # color to use for plotting the events (bluish green)
 
 # change to where you saved the preprocessed data
 datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
@@ -113,7 +113,7 @@ steps = ["cpa"]
 # "summary statistics", "test"
 
 # averaging modes
-averaging_modes = ["all"] 
+averaging_modes = ["all"]
 # "changepoints"]
 # "timeseries"
 # "all": average both across all participants' timeseries and their changepoints
@@ -122,6 +122,9 @@ averaging_modes = ["all"]
 
 # overlay averaged changepoints with event boundaries as rated by raters
 overlay = True
+
+# shade area between video onsets
+shade = True
 
 # turn on debug mode (if True, only two subjects are processed)
 debug = False
@@ -195,19 +198,19 @@ if __name__ == "__main__":
                     modality == "annotations_phase1"
                 ):  # AVR dataset for phase 1 doesn't have annotations for subject 1 and 2
                     subjects = ["06", "08"]
-            
+
             # Create color maps for plots
             number_colors = len(subjects)
             # Create a new colormap from the Wong color palette with one color for each subject
             subjects_colormap = LinearSegmentedColormap.from_list(
-                'Wong_colormap_subjects', 
+                "Wong_colormap_subjects",
                 [wong_colormap(i / (len(color_palette) - 1)) for i in range(len(color_palette))],
-                N=number_colors  # Number of colors in the new colormap
-                )
+                N=number_colors,  # Number of colors in the new colormap
+            )
 
             # Create empty list to store data from all participants
             grouped_data_all = []
-            
+
             # Loop through subjects
             for subject in subjects:
                 # Load data
@@ -235,15 +238,15 @@ if __name__ == "__main__":
                     data["row_id"] = data.groupby(group_variable).cumcount()
                     # drop columns with test site and rating_method (as they're not numeric and cannot be averaged over)
                     data = data.drop(columns=["test_site", "rating_method"])
-                else:   # create a unique identifier for each row for phase 2 of AVR dataset
+                else:  # create a unique identifier for each row for phase 2 of AVR dataset
                     group_variable = "sj_id"
                     data["row_id"] = data.groupby(group_variable).cumcount()
                     # drop columns with test site (as they're not numeric and cannot be averaged over)
                     data = data.drop(columns=["test_site"])
-                
+
                 # add grouped data to list
                 grouped_data_all.append(data)
-            
+
             # concatenate all dataframes in the list
             concatenated_data = pd.concat(grouped_data_all)
 
@@ -266,20 +269,20 @@ if __name__ == "__main__":
             # Loop through analysis steps
             for step_number, step in enumerate(steps):
                 print(f"Performing '{step}' (step {(step_number + 1)!s} of {len(steps)!s})...")
-                
+
                 # %% step 1: cpa >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
                 if step == "cpa":
-
                     for averaging_mode in averaging_modes:
-                        print(f"Averaging across '{averaging_mode}' (mode {(averaging_modes.index(averaging_mode) + 1)!s} of {len(averaging_modes)!s})...")
+                        print(
+                            f"Averaging across '{averaging_mode}' (mode {(averaging_modes.index(averaging_mode) + 1)!s} of {len(averaging_modes)!s})..."
+                        )
 
                         # Create result folder
-                        resultpath_averaging_mode = (resultpath_dataset / averaging_mode)
+                        resultpath_averaging_mode = resultpath_dataset / averaging_mode
                         if averaging_mode not in os.listdir(resultpath_dataset):
                             Path.mkdir(resultpath_averaging_mode)
 
-                        if averaging_mode == "all": # average across both timeseries and changepoints
-                            
+                        if averaging_mode == "all":  # average across both timeseries and changepoints
                             # create empty list to store changepoints
                             changepoint_data = []
 
@@ -315,18 +318,28 @@ if __name__ == "__main__":
 
                                     # set title and axes of plot
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
-                                        title_valence = (f"Changepoint Analysis of annotation data of Phase 2 of "
-                                            f"{dataset} dataset for Valence averaged across participants")
-                                        title_arousal = (f"Changepoint Analysis of annotation data of Phase 2 of "
-                                            f"{dataset} dataset for Arousal averaged across participants)")
+                                        title_valence = (
+                                            f"Changepoint Analysis of annotation data of Phase 2 of "
+                                            f"{dataset} dataset for Valence averaged across participants"
+                                        )
+                                        title_arousal = (
+                                            f"Changepoint Analysis of annotation data of Phase 2 of "
+                                            f"{dataset} dataset for Arousal averaged across participants"
+                                        )
                                         x_axis_label = "Time (minutes)"
 
                                         if overlay:
                                             # read in event timepoints as rated by raters
                                             event_times_file = pd.read_csv(
                                                 Path(datapath) / modality.split("_")[1] / "events_rating_lucy.csv",
-                                                usecols=["start_time", "end_time", "event_duration",
-                                                "event_description", "video_boundary", "major_event"],
+                                                usecols=[
+                                                    "start_time",
+                                                    "end_time",
+                                                    "event_duration",
+                                                    "event_description",
+                                                    "video_boundary",
+                                                    "major_event",
+                                                ],
                                             )
                                             # generate list of video onsets
                                             video_onsets = []
@@ -334,40 +347,56 @@ if __name__ == "__main__":
                                             major_event_onsets = []
                                             for index, row in event_times_file.iterrows():
                                                 if row["video_boundary"] == 1:
-                                                # get timepoints of video onsets                                                if row["video_boundary"] == "1":
+                                                    # get timepoints of video onsets                                                if row["video_boundary"] == "1":
                                                     video_onsets.append(row["start_time"])
                                                 # get timepoints of major event onsets
                                                 if row["major_event"] == 1:
                                                     major_event_onsets.append(row["start_time"])
-                                            
+
                                             # convert timepoints to seconds and then to samples
                                             video_onsets_samples = []
                                             major_event_onsets_samples = []
                                             for onset in video_onsets:
-                                                onset_minutes = onset.split(':')[0]
-                                                onset_seconds = onset.split(':')[1]
-                                                onset = (int(onset_minutes) * 60 + int(onset_seconds)) * sampling_rates[dataset][modality_index]
+                                                onset_minutes = onset.split(":")[0]
+                                                onset_seconds = onset.split(":")[1]
+                                                onset = (
+                                                    int(onset_minutes) * 60 + int(onset_seconds)
+                                                ) * sampling_rates[dataset][modality_index]
                                                 video_onsets_samples.append(onset)
                                             for onset in major_event_onsets:
-                                                onset_minutes = onset.split(':')[0]
-                                                onset_seconds = onset.split(':')[1]
-                                                onset = (int(onset_minutes) * 60 + int(onset_seconds)) * sampling_rates[dataset][modality_index]
+                                                onset_minutes = onset.split(":")[0]
+                                                onset_seconds = onset.split(":")[1]
+                                                onset = (
+                                                    int(onset_minutes) * 60 + int(onset_seconds)
+                                                ) * sampling_rates[dataset][modality_index]
                                                 major_event_onsets_samples.append(onset)
 
                                             # remove video onsets from major event onsets
-                                            major_event_onsets_samples = [onset for onset in major_event_onsets_samples if onset not in video_onsets_samples]
+                                            major_event_onsets_samples = [
+                                                onset
+                                                for onset in major_event_onsets_samples
+                                                if onset not in video_onsets_samples
+                                            ]
 
                                     elif (dataset == "AVR") & (modality == "annotations_phase1"):
-                                        title_valence = (f"Changepoint Analysis of annotation data of Phase 1 of "
-                                            f"{dataset} dataset for Valence averaged across participants (Video: {video})")
-                                        title_arousal = (f"Changepoint Analysis of annotation data of Phase 1 of "
-                                            f"{dataset} dataset for Arousal averaged across participants (Video: {video})")
+                                        title_valence = (
+                                            f"Changepoint Analysis of annotation data of Phase 1 of "
+                                            f"{dataset} dataset for Valence averaged across participants (Video: {video})"
+                                        )
+                                        title_arousal = (
+                                            f"Changepoint Analysis of annotation data of Phase 1 of "
+                                            f"{dataset} dataset for Arousal averaged across participants (Video: {video})"
+                                        )
                                         x_axis_label = "Time (seconds)"
                                     else:
-                                        title_valence = (f"Changepoint Analysis of annotation data of "
-                                            f"{dataset} dataset for Valence averaged across participants (Video: {video})")
-                                        title_arousal = (f"Changepoint Analysis of annotation data of "
-                                            f"{dataset} dataset for Arousal averaged across participants (Video: {video})")
+                                        title_valence = (
+                                            f"Changepoint Analysis of annotation data of "
+                                            f"{dataset} dataset for Valence averaged across participants (Video: {video})"
+                                        )
+                                        title_arousal = (
+                                            f"Changepoint Analysis of annotation data of "
+                                            f"{dataset} dataset for Arousal averaged across participants (Video: {video})"
+                                        )
                                         x_axis_label = "Time (seconds)"
 
                                     # visualize changepoints for valence
@@ -382,10 +411,42 @@ if __name__ == "__main__":
                                     )
 
                                     if overlay:
-                                        plt.vlines(video_onsets_samples, -1.1, 1.1, color=videos_color, linewidth=3, label="video onsets")
-                                        plt.vlines(major_event_onsets_samples, -1.1, 1.1, color=events_color, linewidth=2, label="major event onsets")
-                                        video_onset_line = mlines.Line2D([], [], color=videos_color, linewidth=3, label="video onsets")
-                                        major_event_line = mlines.Line2D([], [], color=events_color, linewidth=2, label="major event onsets")
+                                        plt.vlines(
+                                            video_onsets_samples,
+                                            -1.1,
+                                            1.1,
+                                            color=videos_color,
+                                            linewidth=3,
+                                            label="video onsets",
+                                        )
+                                        plt.vlines(
+                                            major_event_onsets_samples,
+                                            -1.1,
+                                            1.1,
+                                            color=events_color,
+                                            linewidth=2,
+                                            label="major event onsets",
+                                        )
+                                        video_onset_line = mlines.Line2D(
+                                            [], [], color=videos_color, linewidth=3, label="video onsets"
+                                        )
+                                        major_event_line = mlines.Line2D(
+                                            [], [], color=events_color, linewidth=2, label="major event onsets"
+                                        )
+
+                                        # shade area between video onsets
+                                        if shade:
+                                            for index, onset in enumerate(video_onsets_samples):
+                                                start_x = 0 if index == 0 else video_onsets_samples[index - 1]
+                                                if index % 2 == 0:
+                                                    continue
+                                                else:
+                                                    plt.axvspan(
+                                                        start_x,
+                                                        onset,
+                                                        color=shade_colors_videos[1],
+                                                        alpha=0.7,
+                                                    )
 
                                     # change x-ticks to minutes if dataset is AVR phase 2
                                     # (because stimulus video is more than 20 minutes long)
@@ -402,12 +463,14 @@ if __name__ == "__main__":
                                         plt.xlim(0, len(valence_data))
 
                                         # add legend
-                                        cp_line = mlines.Line2D([], [], color=change_point_color, linestyle="--", label='changepoints')
+                                        cp_line = mlines.Line2D(
+                                            [], [], color=change_point_color, label="changepoints"
+                                        )
                                         legend = [video_onset_line, major_event_line, cp_line]
-                                        plt.legend(handles=legend, fontsize='x-small', loc='right')
+                                        plt.legend(handles=legend, fontsize="x-small", loc="right")
 
                                     # show plot
-                                    #plt.show()  # noqa: ERA001
+                                    # plt.show()  # noqa: ERA001
 
                                     # define name of file
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
@@ -416,10 +479,7 @@ if __name__ == "__main__":
                                         name = f"averaged_changepoints_time_V{video}_valence.pdf"
 
                                     # save plot to subject result folder
-                                    plt.savefig(
-                                            resultpath_averaging_mode /
-                                            name
-                                    )
+                                    plt.savefig(resultpath_averaging_mode / name)
                                     plt.close()
 
                                     # visualize changepoints for arousal
@@ -434,10 +494,42 @@ if __name__ == "__main__":
                                     )
 
                                     if overlay:
-                                        plt.vlines(video_onsets_samples, -1.1, 1.1, color=videos_color, linewidth=3, label="video onsets")
-                                        plt.vlines(major_event_onsets_samples, -1.1, 1.1, color=events_color, linewidth=2, label="major event onsets")
-                                        video_onset_line = mlines.Line2D([], [], color=videos_color, linewidth=3, label="video onsets")
-                                        major_event_line = mlines.Line2D([], [], color=events_color, linewidth=2, label="major event onsets")
+                                        plt.vlines(
+                                            video_onsets_samples,
+                                            -1.1,
+                                            1.1,
+                                            color=videos_color,
+                                            linewidth=3,
+                                            label="video onsets",
+                                        )
+                                        plt.vlines(
+                                            major_event_onsets_samples,
+                                            -1.1,
+                                            1.1,
+                                            color=events_color,
+                                            linewidth=2,
+                                            label="major event onsets",
+                                        )
+                                        video_onset_line = mlines.Line2D(
+                                            [], [], color=videos_color, linewidth=3, label="video onsets"
+                                        )
+                                        major_event_line = mlines.Line2D(
+                                            [], [], color=events_color, linewidth=2, label="major event onsets"
+                                        )
+
+                                        # shade area between video onsets
+                                        if shade:
+                                            for index, onset in enumerate(video_onsets_samples):
+                                                start_x = 0 if index == 0 else video_onsets_samples[index - 1]
+                                                if index % 2 == 0:
+                                                    continue
+                                                else:
+                                                    plt.axvspan(
+                                                        start_x,
+                                                        onset,
+                                                        color=shade_colors_videos[1],
+                                                        alpha=0.7,
+                                                    )
 
                                     # change x-ticks to minutes if dataset is AVR phase 2
                                     # (because stimulus video is more than 20 minutes long)
@@ -454,12 +546,14 @@ if __name__ == "__main__":
                                         plt.xlim(0, len(valence_data))
 
                                         # add legend
-                                        cp_line = mlines.Line2D([], [], color=change_point_color, linestyle="--", label='changepoints')
+                                        cp_line = mlines.Line2D(
+                                            [], [], color=change_point_color, label="changepoints"
+                                        )
                                         legend = [video_onset_line, major_event_line, cp_line]
-                                        plt.legend(handles=legend, fontsize='x-small', loc='right')
+                                        plt.legend(handles=legend, fontsize="x-small", loc="right")
 
                                     # show plot
-                                    #plt.show()  # noqa: ERA001
+                                    # plt.show()  # noqa: ERA001
 
                                     # define name of file
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
@@ -468,10 +562,7 @@ if __name__ == "__main__":
                                         name = f"averaged_changepoints_time_V{video}_arousal.pdf"
 
                                     # save plot to subject result folder
-                                    plt.savefig(
-                                            resultpath_averaging_mode /
-                                            name
-                                        )
+                                    plt.savefig(resultpath_averaging_mode / name)
                                     plt.close()
 
                                     # convert changepoints to seconds (rounded to two decimals)
@@ -506,42 +597,43 @@ if __name__ == "__main__":
                                         # get physiological data of that modality
                                         original_data = group_data[physiological_modality].to_numpy()
                                         ...
-                            
+
                             # create dataframe from changepoint_data
                             changepoint_df = pd.DataFrame(changepoint_data)
 
                             # save changepoint dataframe to csv
                             # change name to include the two parameters model & jump (so that when we test different values, we save different files)
                             changepoint_df.to_csv(
-                                Path(resultpath_dataset) / "all"/
-                                f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv",
+                                Path(resultpath_dataset)
+                                / "all"
+                                / f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv",
                                 index=False,
                             )
 
-                        elif averaging_mode == "timeseries":    # average across timeseries only
-                            
+                        elif averaging_mode == "timeseries":  # average across timeseries only
                             if modality == "annotations":
-                                
-                                individual_cp_filename = f"annotations_{modality.split('_')[1]}_changepoint_data_model={model}_jump={jump}.csv" if dataset == "AVR" else f"annotations_changepoint_data_model={model}_jump={jump}.csv"
+                                individual_cp_filename = (
+                                    f"annotations_{modality.split('_')[1]}_changepoint_data_model={model}_jump={jump}.csv"
+                                    if dataset == "AVR"
+                                    else f"annotations_changepoint_data_model={model}_jump={jump}.csv"
+                                )
 
                                 # get individual changepoints
                                 changepoints_all = pd.read_csv(
-                                    Path("/".join(str(resultpath_dataset).split("/")[:-1])) /"all"/
-                                        individual_cp_filename
-                                    )
-                                
-                                averaged_cp_filename = f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv"
+                                    Path("/".join(str(resultpath_dataset).split("/")[:-1]))
+                                    / "all"
+                                    / individual_cp_filename
+                                )
+
+                                averaged_cp_filename = (
+                                    f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv"
+                                )
 
                                 # get averaged changepoints
-                                changepoints_avg = pd.read_csv(
-                                    Path(resultpath_dataset) / "all"/
-                                        averaged_cp_filename
-                                    )
-
+                                changepoints_avg = pd.read_csv(Path(resultpath_dataset) / "all" / averaged_cp_filename)
 
                                 # Loop over videos
                                 for video, group_data in grouped_data_avg.groupby(group_variable):
-
                                     valence_data = group_data["cr_v"].to_numpy()
                                     arousal_data = group_data["cr_a"].to_numpy()
 
@@ -553,7 +645,6 @@ if __name__ == "__main__":
                                     changepoints_video = changepoints_all.loc[changepoints_all["video"] == video]
                                     valence_changepoints = changepoints_video["valence_changepoints"]
                                     arousal_changepoints = changepoints_video["arousal_changepoints"]
-
 
                                     # determine size of figure depending on length of stimuli
                                     figsize = (
@@ -575,30 +666,52 @@ if __name__ == "__main__":
                                             # Reset the index of the DataFrame
                                             valence_changepoints = valence_changepoints.reset_index(drop=True)
                                             for changepoint in ast.literal_eval(valence_changepoints[index]):
-                                                plt.axvline(changepoint*sampling_rates[dataset][modality_index], color=subjects_colormap(index), alpha=0.3)
-                                        subject_line = mlines.Line2D([], [], color=subjects_colormap(index), alpha=0.3, label='cp ' + subject)
+                                                plt.axvline(
+                                                    changepoint * sampling_rates[dataset][modality_index],
+                                                    color=subjects_colormap(index),
+                                                    alpha=0.3,
+                                                )
+                                        subject_line = mlines.Line2D(
+                                            [], [], color=subjects_colormap(index), alpha=0.3, label="cp " + subject
+                                        )
                                         legend_subjects.append(subject_line)
-                                    
+
                                     # plot averaged changepoints
-                                    changepoints_avg_video_valence = changepoints_avg.loc[changepoints_avg["video"] == video]["valence_changepoints"]
+                                    changepoints_avg_video_valence = changepoints_avg.loc[
+                                        changepoints_avg["video"] == video
+                                    ]["valence_changepoints"]
                                     # check if the series is empty
                                     if not changepoints_avg_video_valence.empty:
                                         # Reset the index of the Series
-                                        changepoints_avg_video_valence = changepoints_avg_video_valence.reset_index(drop=True)
+                                        changepoints_avg_video_valence = changepoints_avg_video_valence.reset_index(
+                                            drop=True
+                                        )
                                         for changepoint_avg in ast.literal_eval(changepoints_avg_video_valence[0]):
-                                            plt.axvline(changepoint_avg*sampling_rates[dataset][modality_index], color=change_point_color, linestyle="--", linewidth=2, label="cp mean")
+                                            plt.axvline(
+                                                changepoint_avg * sampling_rates[dataset][modality_index],
+                                                color=change_point_color,
+                                                linewidth=2,
+                                                label="cp mean",
+                                            )
 
                                     # add legend
                                     # create Line2D instances for the legend
-                                    cp_line = mlines.Line2D([], [], color=change_point_color, alpha=0.5, label='cp')
-                                    mean_legend = mlines.Line2D([], [], color=timeseries_color, linewidth=1, label='mean')
-                                    avg_legend = mlines.Line2D([], [], color=change_point_color, linestyle="--", linewidth=2, label='cp mean')
+                                    cp_line = mlines.Line2D([], [], color=change_point_color, alpha=0.5, label="cp")
+                                    mean_legend = mlines.Line2D(
+                                        [], [], color=timeseries_color, linewidth=1, label="mean"
+                                    )
+                                    avg_legend = mlines.Line2D(
+                                        [], [], color=change_point_color, linewidth=2, label="cp mean"
+                                    )
                                     legend_subjects.extend([avg_legend, mean_legend])
-                                    plt.legend(handles=legend_subjects, fontsize='x-small', loc='right')
+                                    plt.legend(handles=legend_subjects, fontsize="x-small", loc="right")
 
                                     # set ticks to seconds
                                     x_ticks = plt.xticks()[0]
-                                    plt.xticks(x_ticks, [int((xtick / sampling_rates[dataset][modality_index])) for xtick in x_ticks])
+                                    plt.xticks(
+                                        x_ticks,
+                                        [int((xtick / sampling_rates[dataset][modality_index])) for xtick in x_ticks],
+                                    )
 
                                     # set limits of x-axis
                                     plt.xlim(0, len(valence_data))
@@ -621,24 +734,36 @@ if __name__ == "__main__":
 
                                     # set title and axes of plot
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
-                                        title_valence = (f"Changepoint Analysis of annotation data of Phase 2 of "
-                                            f"{dataset} dataset for Valence")
-                                        title_arousal = (f"Changepoint Analysis of annotation data of Phase 2 of "
-                                            f"{dataset} dataset for Arousal")
+                                        title_valence = (
+                                            f"Changepoint Analysis of annotation data of Phase 2 of "
+                                            f"{dataset} dataset for Valence"
+                                        )
+                                        title_arousal = (
+                                            f"Changepoint Analysis of annotation data of Phase 2 of "
+                                            f"{dataset} dataset for Arousal"
+                                        )
                                         x_axis_label = "Time (minutes)"
                                     elif (dataset == "AVR") & (modality == "annotations_phase1"):
-                                        title_valence = (f"Changepoint Analysis of annotation data of Phase 1 of "
-                                            f"{dataset} dataset for Valence (Video: {video})")
-                                        title_arousal = (f"Changepoint Analysis of annotation data of Phase 1 of "
-                                            f"{dataset} dataset for Arousal (Video: {video})")
+                                        title_valence = (
+                                            f"Changepoint Analysis of annotation data of Phase 1 of "
+                                            f"{dataset} dataset for Valence (Video: {video})"
+                                        )
+                                        title_arousal = (
+                                            f"Changepoint Analysis of annotation data of Phase 1 of "
+                                            f"{dataset} dataset for Arousal (Video: {video})"
+                                        )
                                         x_axis_label = "Time (seconds)"
                                     else:
-                                        title_valence = (f"Changepoint Analysis of annotation data of "
-                                            f"{dataset} dataset for Valence (Video: {video})")
-                                        title_arousal = (f"Changepoint Analysis of annotation data of "
-                                            f"{dataset} dataset for Arousal (Video: {video})")
+                                        title_valence = (
+                                            f"Changepoint Analysis of annotation data of "
+                                            f"{dataset} dataset for Valence (Video: {video})"
+                                        )
+                                        title_arousal = (
+                                            f"Changepoint Analysis of annotation data of "
+                                            f"{dataset} dataset for Arousal (Video: {video})"
+                                        )
                                         x_axis_label = "Time (seconds)"
-                                    
+
                                     plt.title(title_valence)
                                     plt.xlabel(x_axis_label)
                                     plt.ylabel("Valence")
@@ -653,10 +778,7 @@ if __name__ == "__main__":
                                         name = f"all_changepoints_time_V{video}_valence.pdf"
 
                                     # save plot to result folder
-                                    plt.savefig(
-                                            resultpath_averaging_mode /
-                                            name
-                                    )
+                                    plt.savefig(resultpath_averaging_mode / name)
                                     plt.close()
 
                                     # visualize changepoints for arousal
@@ -674,30 +796,52 @@ if __name__ == "__main__":
                                             # Reset the index of the DataFrame
                                             arousal_changepoints = arousal_changepoints.reset_index(drop=True)
                                             for changepoint in ast.literal_eval(arousal_changepoints[index]):
-                                                plt.axvline(changepoint*sampling_rates[dataset][modality_index], color=subjects_colormap(index), alpha=0.3)
-                                        subject_line = mlines.Line2D([], [], color=subjects_colormap(index), alpha=0.3, label='cp ' + subject)
+                                                plt.axvline(
+                                                    changepoint * sampling_rates[dataset][modality_index],
+                                                    color=subjects_colormap(index),
+                                                    alpha=0.3,
+                                                )
+                                        subject_line = mlines.Line2D(
+                                            [], [], color=subjects_colormap(index), alpha=0.3, label="cp " + subject
+                                        )
                                         legend_subjects.append(subject_line)
-                                    
+
                                     # plot averaged changepoints
-                                    changepoints_avg_video_arousal = changepoints_avg.loc[changepoints_avg["video"] == video]["arousal_changepoints"]
+                                    changepoints_avg_video_arousal = changepoints_avg.loc[
+                                        changepoints_avg["video"] == video
+                                    ]["arousal_changepoints"]
                                     # check if the series is empty
                                     if not changepoints_avg_video_arousal.empty:
                                         # Reset the index of the Series
-                                        changepoints_avg_video_arousal = changepoints_avg_video_arousal.reset_index(drop=True)
+                                        changepoints_avg_video_arousal = changepoints_avg_video_arousal.reset_index(
+                                            drop=True
+                                        )
                                         for changepoint_avg in ast.literal_eval(changepoints_avg_video_arousal[0]):
-                                            plt.axvline(changepoint_avg*sampling_rates[dataset][modality_index], color=change_point_color, linestyle="--", linewidth=2, label="cp mean")
-                                    
+                                            plt.axvline(
+                                                changepoint_avg * sampling_rates[dataset][modality_index],
+                                                color=change_point_color,
+                                                linewidth=2,
+                                                label="cp mean",
+                                            )
+
                                     # add legend
                                     # create Line2D instances for the legend
-                                    cp_line = mlines.Line2D([], [], color=change_point_color, alpha=0.5, label='cp')
-                                    mean_legend = mlines.Line2D([], [], color=timeseries_color, linewidth=1, label='mean')
-                                    avg_legend = mlines.Line2D([], [], color=change_point_color, linestyle="--", linewidth=2, label='cp mean')
+                                    cp_line = mlines.Line2D([], [], color=change_point_color, alpha=0.5, label="cp")
+                                    mean_legend = mlines.Line2D(
+                                        [], [], color=timeseries_color, linewidth=1, label="mean"
+                                    )
+                                    avg_legend = mlines.Line2D(
+                                        [], [], color=change_point_color, linewidth=2, label="cp mean"
+                                    )
                                     legend_subjects.extend([avg_legend, mean_legend])
-                                    plt.legend(handles=legend_subjects, fontsize='x-small', loc='right')
+                                    plt.legend(handles=legend_subjects, fontsize="x-small", loc="right")
 
                                     # set ticks to seconds
                                     x_ticks = plt.xticks()[0]
-                                    plt.xticks(x_ticks, [int((xtick / sampling_rates[dataset][modality_index])) for xtick in x_ticks])
+                                    plt.xticks(
+                                        x_ticks,
+                                        [int((xtick / sampling_rates[dataset][modality_index])) for xtick in x_ticks],
+                                    )
 
                                     # set limits of x-axis
                                     plt.xlim(0, len(arousal_data))
@@ -717,7 +861,7 @@ if __name__ == "__main__":
                                         )
                                         # set limits of x-axis
                                         plt.xlim(0, len(arousal_data))
-                                    
+
                                     plt.title(title_arousal)
                                     plt.xlabel(x_axis_label)
                                     plt.ylabel("Arousal")
@@ -730,29 +874,23 @@ if __name__ == "__main__":
                                         name = "all_changepoints_time_arousal.pdf"
                                     else:
                                         name = f"all_changepoints_time_V{video}_arousal.pdf"
-                                    
+
                                     # save plot to result folder
-                                    plt.savefig(
-                                            resultpath_averaging_mode /
-                                            name
-                                        )
+                                    plt.savefig(resultpath_averaging_mode / name)
                                     plt.close()
 
-                                    
                             else:  # if modality is physiological data (TODO)
-                                    ...
+                                ...
 
-                        else:   # averaging_mode == "changepoints"  # average across changepoints only
-                            
-                            averaged_cp_filename = f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv"
+                        else:  # averaging_mode == "changepoints"  # average across changepoints only
+                            averaged_cp_filename = (
+                                f"annotations_changepoint_data_avg_model={model}_jump={jump}_avg.csv"
+                            )
 
                             # get averaged changepoints
-                            changepoints_avg = pd.read_csv(
-                                Path(resultpath_dataset) / "all"/
-                                    averaged_cp_filename
-                                )
+                            changepoints_avg = pd.read_csv(Path(resultpath_dataset) / "all" / averaged_cp_filename)
 
-'''
+"""
             # ---------------------- PLOT AVERAGED CPs + INDIVIDUAL DATA --------------------------
             # loop over videos
             for video, group_data in grouped_data:
@@ -802,7 +940,7 @@ if __name__ == "__main__":
                 
                 # visualize changepoints for valence averaged across participants
                 for valence_changepoint in valence_changepoints:
-                    plt.axvline(valence_changepoint*sampling_rate, color="black", linestyle="--", linewidth=2, label="cp")
+                    plt.axvline(valence_changepoint*sampling_rate, color="black", linewidth=2, label="cp")
 
                 # add legend
                 legend = subjects + ["mean"] + ["cp"]
@@ -846,7 +984,7 @@ if __name__ == "__main__":
 
                 # visualize changepoints for arousal averaged across participants
                 for arousal_changepoint in arousal_changepoints:
-                    plt.axvline(arousal_changepoint*sampling_rate, color="black", linestyle="--", linewidth=2, label="cp")
+                    plt.axvline(arousal_changepoint*sampling_rate, color="black", linewidth=2, label="cp")
 
                 # add legend
                 plt.legend(legend, fontsize='x-small')
@@ -888,4 +1026,4 @@ if __name__ == "__main__":
 
 # o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END
 
-'''
+"""
