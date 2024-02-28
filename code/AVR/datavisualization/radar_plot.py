@@ -8,7 +8,7 @@ The following steps are performed:
 
 Author: Lucy Roellecke
 Created on: 27 February 2024
-Last updated: 27 February 2024
+Last updated: 28 February 2024
 """
 
 # %% Import
@@ -40,7 +40,20 @@ scales = {
     "satisfaction": [0, 6],
     "sus_score": [0, 100],
 }  # original scales of the questionnaires
-rating_methods = ["Baseline", "Flubber", "Grid", "Proprioceptive"]  # rating methods to be included in the radar chart
+questionnaire_labels = [
+    ("Emotion Representation"),
+    "Invasiveness",
+    "Presence",
+    "Satisfaction",
+    "System Usability Scale",
+]  # labels for the questionnaires
+rating_methods = ["Grid", "Flubber", "Proprioceptive", "Baseline"]  # rating methods to be included in the radar chart
+rm_colors = {
+    "Grid": "#F8766D",
+    "Flubber": "#00BA38",
+    "Proprioceptive": "#619CFF",
+    "Baseline": "#C77CFF",
+}  # colors for the rating methods
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -94,22 +107,45 @@ def plot_radar(data: pd.DataFrame, questionnaires: list, rating_methods: list) -
             go.Scatterpolar(
                 r=data_rating_methods[index_method],
                 theta=questionnaires,
+                line=dict(color=rm_colors[rating_methods[index_method]]),  # set color of the line
                 # fill='toself',    # uncomment to fill the polygons  # noqa: ERA001
+                # opacity=0.5,    # uncomment to set the opacity of the polygons  # noqa: ERA001
                 name=rating_methods[index_method],
+                textfont_size=20,
             )
             for index_method, rating_method in enumerate(rating_methods)
         ],
         layout=go.Layout(
-            title=go.layout.Title(text="Questionnaire Scores across Rating Methods"),
-            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-            showlegend=True,
+            title=go.layout.Title(text="Questionnaire Scores across Rating Methods", font=dict(size=20)),
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 100],
+                    angle=-288,
+                    tickangle=-270,  # so that ticks are not upside down
+                    tickfont_size=10,
+                    tickfont_color="grey",
+                    tickvals=[0, 20, 40, 60, 80, 100],
+                    tickmode="array",
+                    ticktext=["", "20", "40", "60", "80", ""],
+                    ticklen=0,
+                    linewidth=0,
+                ),
+                angularaxis=dict(
+                    tickvals=questionnaires, tickmode="array", ticktext=questionnaire_labels, tickfont_size=18
+                ),
+            ),
+            template="none",  # white background and grey grid
+            paper_bgcolor="#E3F0E9",  # set background color to fit other plots on the poster
+            legend=dict(font=dict(size=16)),
+            showlegend=True,  # show legend
         ),
     )
 
     # show figure
-    fig.show()
+    # fig.show()  # noqa: ERA001
 
-    return fig
+    return fig  # noqa: RET504
 
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -149,8 +185,8 @@ if __name__ == "__main__":
 
         resultpath_phase_datavisualization = resultpath + phase + "/datavisualization/"
         # create path if it does not exist
-        if not os.path.exists(resultpath_phase_datavisualization):
-            os.makedirs(resultpath_phase_datavisualization)
+        if not os.path.exists(resultpath_phase_datavisualization):  # noqa: PTH110
+            os.makedirs(resultpath_phase_datavisualization)  # noqa: PTH103
         # save radar chart as .pdf file
         radar_chart.write_image(resultpath_phase_datavisualization + "radar_chart.pdf")
 
