@@ -1,27 +1,39 @@
 """
-Script to preprocess physiological data for a given dataset
+Script to preprocess physiological data for a given dataset.
 
-Inputs: Raw data
+Inputs: Raw EEG data in .set and .fdt files
 
-Outputs: Preprocessed data (EEG, ECG) in csv files
+Outputs: Preprocessed data (EEG, ECG) in tsv files
 
 Functions: TODO: define
+    crop_data(raw_data, markers, sampling_rate) -> mne.io.Raw: Crops the raw data to the given markers.
+
+Steps:
+1. GET FILES AND FORMAT DATA
+    1a. Read in .set files
+    1b. Get event markers (for conditions (mov/nomov) and sections (Space/Break/Anden)) from annotations
+    1c. Crop data to the given markers for a certain consition and section
+    1d. Trim data to remove artifacts from the beginning and end of the rollercoaster ride
+    1e. Separate EEG and ECG data
+2. PREPROCESS DATA
+    2a. Downsample data
+
+Required packages: mne, neurokit
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: April 14th, 2024
+Last update: April 16th, 2024
 """
 
 # %% Import
-import os
+import os, json
 from pathlib import Path
-import mne
-
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import seaborn as sns
 
+import mne
 import neurokit2 as nk
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -76,15 +88,17 @@ sampling_rates = {"EEG": 500, "ECG": 500}
 # (to remove artifacts from the beginning and end of the rollercoaster ride)
 trim_seconds = 2.5
 
+# define whether data should be downsampled (in Hz)
+downsample = False
+downsample_rate = 250
+
 # only analyze one subject when debug mode is on
 debug = True
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 def crop_data(raw_data, markers, sampling_rate) -> mne.io.Raw:
-    """
-    Crops the raw data to the given markers
-    """
+    """Crops the raw data to the given markers."""
     # Get events from annotations
     events = mne.events_from_annotations(raw_data)
 
@@ -96,17 +110,55 @@ def crop_data(raw_data, markers, sampling_rate) -> mne.io.Raw:
     end_time = events[0][markers_indeces[1]][0] / sampling_rate
 
     # Get the data for the current condition
-    cropped_data = raw_data.copy().crop(tmin=start_time, tmax=end_time)
+    return raw_data.copy().crop(tmin=start_time, tmax=end_time)
 
-    return cropped_data
+def plot_ecgpeaks(ecg_clean, rpeaks_info, min_time, max_time, plot_title, ecg_sampling_rate):
+    """Plot ECG signal with R-peaks
+
+    Arguments:
+    - ecg_clean: dict or ndarray
+    - rpeaks_info = dict obtained from nk.ecg_peaks() function
+    - min_time = starting time of the to-be-plotted interval
+    - max_time = final time of the to-be-plotted interval
+    - plot_title = general title of the plot (optional)
+    - ecg_sampling_rate = sampling rate of the ECG signal
+
+    """
+    # Transform min_time and max_time to samples
+    min_sample = int(min_time * ecg_sampling_rate)
+    max_sample = int(max_time * ecg_sampling_rate)
+    # Create a time vector (samples)
+    time = np.arange(min_sample, max_sample)
+    fig, axs = plt.subplots(figsize=(10, 5))
+
+    # Select ECG signal and R-Peaks interval to plot
+    ecg_select = ecg_clean[min_sample:max_sample]
+    rpeaks = rpeaks_info['ECG_R_Peaks']
+    rpeaks_select = rpeaks[(rpeaks < max_sample) & (rpeaks >= min_sample)]
+
+    axs.plot(time, ecg_select, linewidth=1, label='ECG signal')
+    axs.scatter(rpeaks_select, ecg_select[rpeaks_select - min_sample],
+                            color='gray', edgecolor="k", alpha=.6)
+    axs.set_ylabel('ECG (mV)')
+    axs.set_ylim(-0.015,0.02) # set y-axis range in V
+    # transform y-axis ticks from V to mV
+    axs.set_yticklabels([f'{round(x,3)*100}' for x in axs.get_yticks()])
+    axs.set_xlabel('Time (s)')
+    # transform x-axis to seconds
+    axs.set_xticklabels([f'{x/ecg_sampling_rate}' for x in axs.get_xticks()])
+    if plot_title:
+        axs.set_title(plot_title)
+
+    sns.despine()
+    plt.show()
 
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-# %% Get Files and Format Data
+# %% STEP 1. GET FILES AND FORMAT DATA
 if __name__ == "__main__":
     # get the file path for each file of the dataset
-    file_list = os.listdir(datapath + f"full_SETs")
+    file_list = os.listdir(datapath + "full_SETs")
 
     # deletes all hidden files from the list
     file_list = [file for file in file_list if not file.startswith(".")]
@@ -124,31 +176,31 @@ if __name__ == "__main__":
 
     # only analyze one subject if debug is True
     if debug:
-        subject_list = [subject_list[0]]
+        subject_list = [subject_list[3]]
 
     # Loop over all subjects
-    for subject in subject_list:
-        print(f"Processing subject {subject} of " + str(len(subject_list)) + "...")
+    for subject_index, subject in enumerate(subject_list):
+        print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subject_list)) + "...")
 
         # Get .set file for the current subject
         subject_file = (
-            datapath + f"full_SETs/" + [file for file in file_list if subject in file and file.endswith(".set")][0]
+            datapath + "full_SETs/" + next(file for file in file_list if subject in file and file.endswith(".set"))
         )
 
         # Read in data
         raw_data = mne.io.read_raw_eeglab(subject_file, preload=True)
-        # print(raw_data.info)
+        # print(raw_data.info)  # noqa: ERA001
 
         # Loop over conditions
         for condition_index, condition in enumerate(conditions):
             print(
-                f"Processing condition "
+                "Processing condition "
                 + condition
                 + " (condition "
                 + str(condition_index + 1)
                 + " out of "
                 + str(len(conditions))
-                + "..."
+                + ")..."
             )
 
             # Get markers for the current condition
@@ -168,12 +220,12 @@ if __name__ == "__main__":
                 # Check if the section differentiates from the defined length
                 if round(data_section.times[-1]) - round(data_section.times[0]) != section_lengths[section]:
                     print(
-                        f"Section "
+                        "Section "
                         + section
                         + " is too short or too long. Something wrent wrong. Please check the code."
                     )
                 else:
-                    print(f"Section " + section + " is the correct length.")
+                    print("Section " + section + " is the correct length.")
 
                 # Trim trim_seconds from the beginning and end of the data
                 data_section_trimmed = data_section.copy().crop(
@@ -221,7 +273,63 @@ if __name__ == "__main__":
                         ]
                     )
 
-            # %% Preprocess Data
+            # %% STEP 2. PREPROCESS DATA
+
+            # Downsample data if downsample is True
+            if downsample:
+                data_section_eeg.resample(sfreq=downsample_rate)
+                data_section_ecg.resample(sfreq=downsample_rate)
+            
+            # plot ECG data for manual inspection
+            #data_section_ecg.plot()
+
+            # plot EEG data for manual inspection
+            #data_section_eeg.plot()
+
+            # ------------------------ ECG ------------------------
+            # get data as numpy array
+            ecg_data = data_section_ecg.get_data()[0]
+            # get sampling rate
+            ecg_sampling_rate = data_section_ecg.info["sfreq"]
+
+            # flip ECG signal (as it is inverted)
+            ecg_data_flipped = nk.ecg_invert(ecg_data, sampling_rate=ecg_sampling_rate, force=True)[0]
+
+            # Data Cleaning using NeuroKit
+            # A 50 Hz powerline filter and
+            # 4th-order Butterworth filters (0.5 Hz high-pass, 30 Hz low-pass)
+            # are applied to the ECG signal.
+            ecg_cleaned = nk.signal_filter(ecg_data_flipped, sampling_rate=ecg_sampling_rate, lowcut=0.5, highcut=30,
+                                                  method='butterworth', order=4, powerline=50, show=False)
+
+            # R-peaks detection using NeuroKit
+            r_peaks, info = nk.ecg_peaks(ecg_cleaned, sampling_rate=ecg_sampling_rate)
+
+            # Plot cleaned ECG data and R-peaks for the first 10s
+            plot_ecgpeaks(ecg_clean=ecg_cleaned, rpeaks_info=info, min_time=0, max_time=10,
+                      plot_title="Cleaned ECG signal with R-peaks", ecg_sampling_rate=ecg_sampling_rate)
+            
+            # TODO: manually check R-peaks and adjust if necessary
+            
+            # IBI Calculation
+            # Calculate inter-beat-intervals (IBI) from R-peaks
+            r_peaks_indices = info['ECG_R_Peaks']
+            ibi = nk.signal_period(peaks=r_peaks_indices, sampling_rate=ecg_sampling_rate)
+
+            # Convert to dataframe
+            ibi = pd.DataFrame(ibi)
+
+            # Calculate heart rate (HR) from R-peaks
+            heart_rate = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=ecg_sampling_rate)
+
+            # Convert to dataframe
+            heart_rate = pd.DataFrame(heart_rate)
+
+            # TODO: exclude participants with 40 < HR < 90 ? (as resting state)
+            # TODO: relate HR to resting HR ?
+
+            # ------------------------ ECG ------------------------
+            # PREP Pipeline (MATLAB) #TODO  # noqa: FIX002, TD004
 
 
 # %%
