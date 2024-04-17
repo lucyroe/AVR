@@ -13,7 +13,7 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: February 14th, 2024
+Last update: April 17th, 2024
 """
 
 # TODO: (Status 18.01.2024)  # noqa: FIX002
@@ -53,17 +53,19 @@ warnings.filterwarnings("ignore", category=FutureWarning)  # ignore future warni
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # datasets to perform CPA on
-datasets = ["AVR"]
-# "CASE", "CEAP",
+datasets = ["NeVRo"]
+# "AVR", "CASE", "CEAP",
 
 # dataset modalities
-modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase2"]}
+modalities = {"NeVRo": ["physiological"]}
+#"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase2"]}
 # "CASE": ["physiological"],  # noqa: ERA001
 # "CEAP": ["physiological"],  # noqa: ERA001
 # "AVR": ["annotations_phase1"],  # noqa: ERA001
 
 # physiological modalities
-physiological_modalities = {"CEAP": ["ibi"]}
+physiological_modalities = {"NeVRo": ["IBI"]}
+#"CEAP": ["ibi"]}
 # "CASE": ["ecg", "bvp", "gsr", "rsp", "skt", "emg_zygo", "emg_coru", "emg_trap"],  # noqa: ERA001
 # "CEAP": ["acc_x", "acc_y", "acc_z", "bvp", "eda", "skt", "hr"]
 
@@ -72,11 +74,12 @@ sampling_rates = {
     "CASE": [20, 1000],
     "CEAP": [30, 1],  # physiological CEAP data -> IBI: sampling rate of 1 Hz; rest: sampling rate of 25 Hz
     "AVR": [20, 20],
+    "NeVRo": [500]
 }
 # TODO: adjust sampling rates / downsample physiological data to match sampling rate of annotations?  # noqa: FIX002
 
 # number of videos per dataset
-number_of_videos = {"CASE": 8, "CEAP": 8, "AVR": [4, 1]}
+number_of_videos = {"CASE": 8, "CEAP": 8, "AVR": [4, 1], "NeVRo": 1}
 
 # video to quadrant mapping for each dataset
 # defines which video corresponds to which quadrant of the circumplex model of emotions
@@ -127,7 +130,7 @@ overlay = True
 shade = True
 
 # turn on debug mode (if True, only two subjects are processed)
-debug = False
+debug = True
 
 # %% Set CPA parameters >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -198,6 +201,8 @@ if __name__ == "__main__":
                     modality == "annotations_phase1"
                 ):  # AVR dataset for phase 1 doesn't have annotations for subject 1 and 2
                     subjects = ["06", "08"]
+                if dataset == "NeVRo":
+                    subjects = ["02", "04"]
 
             # Create color maps for plots
             number_colors = len(subjects)
@@ -217,12 +222,16 @@ if __name__ == "__main__":
                 # check if datafile contains subject number
                 pattern = r"\D" + str(subject) + r"\D"
                 right_datafile = next(data_file for data_file in data_files if re.search(pattern, data_file))
-                data = pd.read_csv(datapath_dataset / right_datafile)
+                data = pd.read_csv(datapath_dataset / right_datafile, sep="\t")
 
                 # if dataset is AVR, use only "Flubber" as rating_method
                 # drop the rows containing "Grid" or "Proprioceptive" values
                 if modality == "annotations_phase1":
                     data = data[data["rating_method"] == "Flubber"]
+                
+                if dataset == "NeVRo":
+                    # remove columns with clean ECG data and sampling frequency
+                    data = data.drop(columns=["ECG", "sampling_rate"])
 
                 # drop rows containing NaN values
                 data = data.dropna()
@@ -241,8 +250,9 @@ if __name__ == "__main__":
                 else:  # create a unique identifier for each row for phase 2 of AVR dataset
                     group_variable = "sj_id"
                     data["row_id"] = data.groupby(group_variable).cumcount()
-                    # drop columns with test site (as they're not numeric and cannot be averaged over)
-                    data = data.drop(columns=["test_site"])
+                    if dataset == "AVR":
+                        # drop columns with test site (as they're not numeric and cannot be averaged over)
+                        data = data.drop(columns=["test_site"])
 
                 # add grouped data to list
                 grouped_data_all.append(data)

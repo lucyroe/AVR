@@ -93,7 +93,7 @@ downsample = False
 downsample_rate = 250
 
 # only analyze one subject when debug mode is on
-debug = True
+debug = False
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -306,8 +306,8 @@ if __name__ == "__main__":
             r_peaks, info = nk.ecg_peaks(ecg_cleaned, sampling_rate=ecg_sampling_rate)
 
             # Plot cleaned ECG data and R-peaks for the first 10s
-            plot_ecgpeaks(ecg_clean=ecg_cleaned, rpeaks_info=info, min_time=0, max_time=10,
-                      plot_title="Cleaned ECG signal with R-peaks", ecg_sampling_rate=ecg_sampling_rate)
+            #plot_ecgpeaks(ecg_clean=ecg_cleaned, rpeaks_info=info, min_time=0, max_time=10,
+                      #plot_title="Cleaned ECG signal with R-peaks", ecg_sampling_rate=ecg_sampling_rate)
             
             # TODO: manually check R-peaks and adjust if necessary
             
@@ -316,18 +316,24 @@ if __name__ == "__main__":
             r_peaks_indices = info['ECG_R_Peaks']
             ibi = nk.signal_period(peaks=r_peaks_indices, sampling_rate=ecg_sampling_rate)
 
-            # Convert to dataframe
-            ibi = pd.DataFrame(ibi)
-
             # Calculate heart rate (HR) from R-peaks
             heart_rate = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=ecg_sampling_rate)
-
-            # Convert to dataframe
-            heart_rate = pd.DataFrame(heart_rate)
 
             # TODO: exclude participants with 40 < HR < 90 ? (as resting state)
             # TODO: relate HR to resting HR ?
 
+            # create dataframe with cleaned ECG data, R-peaks, IBI, and HR
+            ecg_data_df = pd.DataFrame({"ECG": ecg_cleaned})
+            ecg_data_df['R-peaks'] = pd.Series(r_peaks_indices)
+            ecg_data_df['IBI'] = pd.Series(ibi)
+            ecg_data_df['HR'] = pd.Series(heart_rate)
+            ecg_data_df['sampling_rate'] = pd.Series(ecg_sampling_rate)
+            # create array with subject id that has the same length as the other series
+            subject_array = [subject] * len(r_peaks_indices)
+            ecg_data_df['sj_id'] = pd.Series(subject_array)
+
+            # save ECG data to tsv file
+            ecg_data_df.to_csv(preprocessed_path + f"sub_{subject}_{condition}_{section}_ECG_preprocessed.tsv", sep="\t")
             # ------------------------ ECG ------------------------
             # PREP Pipeline (MATLAB) #TODO  # noqa: FIX002, TD004
 
