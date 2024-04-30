@@ -6,26 +6,16 @@ for participants from a given dataset individually.
 If you want to perform a CPA for averaged data across participants, use the script cpa_averaged.py
 (script needs to be in the same directory as this one as it imports functions from this script).
 
-Inputs: Preprocessed time series data as .csv files for each participant of a given dataset
+Inputs: Preprocessed time series data for each participant of a given dataset
 
-Outputs:
+Outputs: TODO: define
 
-Functions:
+Functions: TODO: define
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: January 18th, 2024
+Last update: April 30th, 2024
 """
-
-# TODO: (Status 18.01.2024)  # noqa: FIX002
-# - CPA for all three datasets for annotation data DONE
-# - Elbow plots for all three datasets for annotation data DONE -> pen = 1 always optimal
-# - make CPA plots for phase 1 of AVR longer / reduce number of change points (maybe with min_size parameter?) DONE
-#   -> min_size = 20 or 30 so that there is max. one changepoint per second
-# - Make plots prettier DONE
-
-# - Check all elbow plots and see whether pen should always be 1
-# - NO physiological data CPA working atm
 
 # %% Import
 import os
@@ -44,30 +34,31 @@ warnings.filterwarnings("ignore", category=FutureWarning)   # ignore future warn
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # datasets to perform CPA on
-datasets = ["AVR"]
-# "CASE", "CEAP"    # noqa: ERA001
+datasets = ["NeVRo"]
+# "AVR", "CASE", "CEAP"    # noqa: ERA001
 
 # dataset modalities
-modalities = {"CASE": ["annotations"], "CEAP": ["annotations"], "AVR": ["annotations_phase2"]}
-# "CASE": ["physiological"],  # noqa: ERA001
-# "CEAP": ["physiological"],  # noqa: ERA001
-# "AVR": ["annotations_phase1"],  # noqa: ERA001
+modalities = {"NeVRo": ["physiological"]}
+# "CASE": ["annotations", "physiological"],  # noqa: ERA001
+# "CEAP": ["annotations", "physiological"],  # noqa: ERA001
+# "AVR": ["annotations_phase1", "annotations_phase2"],  # noqa: ERA001
 
 # physiological modalities
-physiological_modalities = {"CEAP": ["ibi"]}
+physiological_modalities = {"NeVRo": ["IBI", "HR"]}
 # "CASE": ["ecg", "bvp", "gsr", "rsp", "skt", "emg_zygo", "emg_coru", "emg_trap"],  # noqa: ERA001
-# "CEAP": ["acc_x", "acc_y", "acc_z", "bvp", "eda", "skt", "hr"]
+# "CEAP": ["acc_x", "acc_y", "acc_z", "bvp", "eda", "skt", "hr", "ibi"] # noqa: ERA001
 
 # modalities sampling frequencies
 sampling_rates = {
     "CASE": [20, 1000],
     "CEAP": [30, 1],  # physiological CEAP data -> IBI: sampling rate of 1 Hz; rest: sampling rate of 25 Hz
     "AVR": [20, 20],
+    "NeVRo": [1, 1]
 }
 # TODO: adjust sampling rates / downsample physiological data to match sampling rate of annotations?  # noqa: FIX002
 
 # number of videos per dataset
-number_of_videos = {"CASE": 8, "CEAP": 8, "AVR": [4, 1]}
+number_of_videos = {"CASE": 8, "CEAP": 8, "AVR": [4, 1], "NeVRo": 1}
 
 # video to quadrant mapping for each dataset
 # defines which video corresponds to which quadrant of the circumplex model of emotions
@@ -94,11 +85,11 @@ datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
 resultpath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"
 
 # analysis steps to perform
-steps = ["cpa"]
-# "elbow", "summary statistics", "test"
+steps = ["elbow", "cpa"]
+# "summary statistics", "test"
 
 # turn on debug mode (if True, only one subject is processed)
-debug = False
+debug = True
 
 # %% Set CPA parameters >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -282,13 +273,16 @@ if __name__ == "__main__":
                     modality == "annotations_phase1"
                 ):  # AVR dataset for phase 1 doesn't have annotations for subject 1
                     subjects = ["06"]
+                if dataset == "NeVRo":
+                    subjects = ["02"]
+                    # NeVRo dataset does not have data for subject 1
 
             # Loop through analysis steps
             for step_number, step in enumerate(steps):
                 print(f"Performing '{step}' (step {(step_number + 1)!s} of {len(steps)!s})...")
 
                 # %% step 1: elbow plots >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-                if step == "elbow":
+                if step == 'elbow':
                     # Loop through subjects
                     for subject in subjects:
                         print("Processing subject ", subject, " of ", str(len(subjects)), "...")
@@ -296,7 +290,10 @@ if __name__ == "__main__":
                         # Load data
                         pattern = r"\D" + str(subject) + r"\D"
                         right_datafile = next(data_file for data_file in data_files if re.search(pattern, data_file))
-                        data = pd.read_csv(datapath_dataset / right_datafile)
+                        if dataset == "NeVRo":
+                            data = pd.read_csv(datapath_dataset / right_datafile, sep="\t")
+                        else:
+                            data = pd.read_csv(datapath_dataset / right_datafile)
 
                         # if dataset is AVR, use only "Flubber" as rating_method
                         # drop the rows containing "Grid" or "Proprioceptive" values
@@ -304,7 +301,7 @@ if __name__ == "__main__":
                             data = data[data["rating_method"] == "Flubber"]
 
                         # drop rows containing NaN values
-                        data = data.dropna()
+                        #data = data.dropna()
 
                         # Create subject result folder
                         resultpath_subject = resultpath_dataset / f"sub_{subject}" / "elbow_plots"
@@ -315,7 +312,7 @@ if __name__ == "__main__":
                             Path.mkdir(resultpath_subject)
 
                         # Group data by video
-                        if modality == "annotations_phase2":
+                        if modality == "annotations_phase2" or dataset == "NeVRo":
                             grouped_data = data.groupby("sj_id")
                         else:
                             grouped_data = (
@@ -389,10 +386,12 @@ if __name__ == "__main__":
                                     plot_elbow(data, model, list_penalties, jump, min_size[dataset][modality_index])
 
                                     # show elbow plot
-                                    # plt.show()  # noqa: ERA001
+                                    plt.show()  # noqa: ERA001
 
                                     # define name of file
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
+                                        name = f"elbow_plot_{physiological_modality}_sub_{subject}.pdf"
+                                    elif dataset == "NeVRo":
                                         name = f"elbow_plot_{physiological_modality}_sub_{subject}.pdf"
                                     else:
                                         name = (
@@ -407,7 +406,7 @@ if __name__ == "__main__":
                                     plt.close()
 
                 # %% step 2: cpa >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-                elif step == "cpa":
+                elif step == 'cpa':
                     # Create empty dataframe to store changepoints
                     changepoints_all = []
 
@@ -419,7 +418,10 @@ if __name__ == "__main__":
                         # check if datafile contains subject number
                         pattern = r"\D" + str(subject) + r"\D"
                         right_datafile = next(data_file for data_file in data_files if re.search(pattern, data_file))
-                        data = pd.read_csv(datapath_dataset / right_datafile)
+                        if dataset == "NeVRo":
+                            data = pd.read_csv(datapath_dataset / right_datafile, sep="\t")
+                        else:
+                            data = pd.read_csv(datapath_dataset / right_datafile)
 
                         # if dataset is AVR, use only "Flubber" as rating_method
                         # drop the rows containing "Grid" or "Proprioceptive" values
@@ -427,7 +429,7 @@ if __name__ == "__main__":
                             data = data[data["rating_method"] == "Flubber"]
 
                         # drop rows containing NaN values
-                        data = data.dropna()
+                        #data = data.dropna()
 
                         # Create subject result folder
                         resultpath_subject = (resultpath_dataset / f"sub_{subject}")
@@ -435,7 +437,7 @@ if __name__ == "__main__":
                             Path.mkdir(resultpath_subject)
 
                         # Group data by video
-                        if modality == "annotations_phase2":
+                        if modality == "annotations_phase2" or dataset == "NeVRo":
                             grouped_data = data.groupby("sj_id")
                         else:
                             grouped_data = (
@@ -617,6 +619,8 @@ if __name__ == "__main__":
                                     # reshape data to fit the input format of the algorithm
                                     data = np.array(data).reshape(-1, 1)
 
+                                    pen = input(f"Enter penalty value for CPA of {physiological_modality}: ")
+
                                     # perform changepoint analysis on physiological data
                                     physiological_changepoints = get_changepoints(
                                         data, model, pen, jump, min_size[dataset][modality_index]
@@ -626,7 +630,7 @@ if __name__ == "__main__":
 
                                     # sanity check: plot physiological timeseries
                                     plt.figure(figsize=(12, 6))
-                                    physiological_timepoints = group_data["time"][~np.isnan(original_data)]
+                                    physiological_timepoints = group_data["R_peaks"][~np.isnan(original_data)]
                                     # reshape x data
                                     physiological_timepoints = np.array(physiological_timepoints).reshape(-1, 1)
                                     plt.plot(physiological_timepoints, data)
@@ -648,7 +652,7 @@ if __name__ == "__main__":
                                         data,
                                         sampling_rates[dataset][modality_index],
                                         (f"Changepoint Analysis of {physiological_modality} data of "
-                                            f"{dataset} dataset (Subject: {subject}, Video: {video})"),
+                                            f"{dataset} dataset (Subject: {subject})"),
                                         "Time (seconds)",
                                         physiological_modality,
                                         figsize,
@@ -659,6 +663,8 @@ if __name__ == "__main__":
 
                                     # define name of file
                                     if (dataset == "AVR") & (modality == "annotations_phase2"):
+                                        name = f"sub_{subject}_changepoints_{physiological_modality}.pdf"
+                                    elif dataset == "NeVRo":
                                         name = f"sub_{subject}_changepoints_{physiological_modality}.pdf"
                                     else:
                                         name = (
@@ -682,7 +688,7 @@ if __name__ == "__main__":
                                         changepoint_data.append(
                                             {
                                                 "subject": subject,
-                                                "video": "1" if (dataset == "AVR") & (modality == "annotations_phase2") else video,
+                                                "video": "1" if (((dataset == "AVR") & (modality == "annotations_phase2")) or (dataset == "NeVRo")) else video,
                                                 physiological_modality: physiological_changepoints_seconds,
                                                 f"number_{physiological_modality}_changepoints": len(
                                                     physiological_changepoints_seconds
@@ -695,7 +701,7 @@ if __name__ == "__main__":
                                     else:
                                         changepoint_data.append(
                                             {
-                                                "video": "1" if (dataset == "AVR") & (modality == "annotations_phase2") else video,
+                                                "video": "1" if (((dataset == "AVR") & (modality == "annotations_phase2")) or (dataset == "NeVRo")) else video,
                                                 physiological_modality: physiological_changepoints_seconds,
                                                 f"number_{physiological_modality}_changepoints": len(
                                                     physiological_changepoints_seconds

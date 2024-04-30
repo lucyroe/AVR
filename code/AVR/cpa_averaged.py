@@ -5,7 +5,7 @@ Script performs a CPA for averaged data across participants.
 If you want to perform a CPA for participants individually, use the script cpa.py
 (this script needs to be in the same directory as cpa.py as it imports functions from this script).
 
-Inputs: Preprocessed time series data as .csv files averaged across participants of a given dataset
+Inputs: Preprocessed time series data averaged across participants of a given dataset
 
 Outputs:
 
@@ -13,7 +13,7 @@ Functions:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: April 17th, 2024
+Last update: April 25th, 2024
 """
 
 # TODO: (Status 18.01.2024)  # noqa: FIX002
@@ -34,7 +34,6 @@ import re
 import warnings
 from pathlib import Path
 
-import matplotlib
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import numpy as np
@@ -64,7 +63,7 @@ modalities = {"NeVRo": ["physiological"]}
 # "AVR": ["annotations_phase1"],  # noqa: ERA001
 
 # physiological modalities
-physiological_modalities = {"NeVRo": ["IBI"]}
+physiological_modalities = {"NeVRo": ["IBI", "HR"]}
 #"CEAP": ["ibi"]}
 # "CASE": ["ecg", "bvp", "gsr", "rsp", "skt", "emg_zygo", "emg_coru", "emg_trap"],  # noqa: ERA001
 # "CEAP": ["acc_x", "acc_y", "acc_z", "bvp", "eda", "skt", "hr"]
@@ -74,7 +73,7 @@ sampling_rates = {
     "CASE": [20, 1000],
     "CEAP": [30, 1],  # physiological CEAP data -> IBI: sampling rate of 1 Hz; rest: sampling rate of 25 Hz
     "AVR": [20, 20],
-    "NeVRo": [500]
+    "NeVRo": [1, 1]
 }
 # TODO: adjust sampling rates / downsample physiological data to match sampling rate of annotations?  # noqa: FIX002
 
