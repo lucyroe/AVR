@@ -375,35 +375,68 @@ if __name__ == "__main__":
                 # PREP Pipeline (MATLAB) #TODO  # noqa: FIX002, TD004
     
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
+    # TODO: this does not make sense atm
+    # all participants have different 
     # Loop over conditions
     for condition in conditions:
         # Loop over sections
         for section in sections:
             # List all files in the path
             file_list = os.listdir(preprocessed_path)
+
+            # Average over all participants' ECG & save to .tsv file
             # Get files corresponding to the current condition and section
             file_list_section = [
                 file
                 for file in file_list
                 if f"{condition}_{section}_ECG_preprocessed.tsv" in file
             ]
-            data_all = pd.DataFrame()
+            data_all = []
 
             # Loop over all subjects
             for file in file_list_section:
                 # Read in ECG data
                 ecg_data = pd.read_csv(
-                    preprocessed_path + file
+                    preprocessed_path + file, delimiter="\t"
                 )
-                # Concatenate data
-                data_all = pd.concat([data_all, ecg_data])
+                # Add data to list
+                data_all.append(ecg_data)
             
-            # Average over all participants
-            data_avg = data_all.mean()
+            # Concatenate all dataframes
+            all_data_df = pd.concat(data_all)
+            
+            # Average over all participants (grouped by the index = timepoint)
+            data_avg = all_data_df.groupby(level=0).mean()["ECG"]
 
+            # R-peaks detection using NeuroKit
+            r_peaks, info = nk.ecg_peaks(data_avg, sampling_rate=ecg_data["sampling_rate"][0])
 
-    # Average over all participants' ECG & save to .tsv file
-    # Average over all participants' EEG & save to .tsv file
+            # Plot cleaned ECG data and R-peaks for the first 10s
+            plot_ecgpeaks(ecg_clean=data_avg, rpeaks_info=info, min_time=0, max_time=10,
+                plot_title="Cleaned ECG signal with R-peaks", ecg_sampling_rate=ecg_data["sampling_rate"][0])
 
+            # TODO: manually check R-peaks and adjust if necessary
+
+            # IBI Calculation
+            # Calculate inter-beat-intervals (IBI) from R-peaks
+            r_peaks_indices = info["ECG_R_Peaks"]
+            ibi = nk.signal_period(peaks=r_peaks_indices, sampling_rate=ecg_data["sampling_rate"][0])
+
+            # Calculate heart rate (HR) from R-peaks
+            heart_rate = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=ecg_data["sampling_rate"][0])
+
+            # Create dataframe with cleaned ECG data, R-peaks, IBI, and HR
+            ecg_data_df = pd.DataFrame({"ECG": data_avg})
+            ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices)
+            ecg_data_df["IBI"] = pd.Series(ibi)
+            ecg_data_df["HR"] = pd.Series(heart_rate)
+            ecg_data_df["sampling_rate"] = pd.Series(ecg_data["sampling_rate"][0])
+
+            # Save ECG data to tsv file
+            ecg_data_df.to_csv(
+                preprocessed_path + f"avg_{condition}_{section}_ECG_preprocessed.tsv", sep="\t"
+            )
+            # Average over all participants' EEG & save to .tsv file
+            # TODO
 
 # %%
