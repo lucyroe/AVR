@@ -37,7 +37,7 @@ Required packages: mne, neurokit
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: April 25th, 2024
+Last update: May 22th, 2024
 """
 
 # %% Import
@@ -357,6 +357,12 @@ if __name__ == "__main__":
                 # TODO: exclude participants with 40 < HR < 90 ? (as resting state)
                 # TODO: relate HR to resting HR ?
 
+                # plot IBI
+                plt.plot(ibi)
+
+                # plot HR
+                plt.plot(heart_rate)
+
                 # create dataframe with cleaned ECG data, R-peaks, IBI, and HR
                 ecg_data_df = pd.DataFrame({"ECG": ecg_cleaned})
                 ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices)
@@ -367,16 +373,16 @@ if __name__ == "__main__":
                 subject_array = [subject] * len(r_peaks_indices)
                 ecg_data_df["sj_id"] = pd.Series(subject_array)
 
+
                 # save ECG data to tsv file
                 ecg_data_df.to_csv(
                     preprocessed_path + f"sub_{subject}_{condition}_{section}_ECG_preprocessed.tsv", sep="\t"
                 )
-                # ------------------------ ECG ------------------------
+                # ------------------------ EEG ------------------------
                 # PREP Pipeline (MATLAB) #TODO  # noqa: FIX002, TD004
     
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
     # TODO: this does not make sense atm
-    # all participants have different 
     # Loop over conditions
     for condition in conditions:
         # Loop over sections
