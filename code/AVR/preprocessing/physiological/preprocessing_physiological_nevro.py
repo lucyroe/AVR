@@ -37,7 +37,7 @@ Required packages: mne, neurokit
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: May 22th, 2024
+Last update: May 28th, 2024
 """
 
 # %% Import
@@ -53,7 +53,9 @@ import seaborn as sns
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 datapath = "/Volumes/LUCY_MEMORY/NeVRo/Data/EEG/01_raw/"
-preprocessed_path = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/NeVRo/preprocessed/physiological/"
+preprocessed_path = (
+    "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/NeVRo/preprocessed/physiological/Lucy/"
+)
 
 # create the preprocessed folder if it does not exist
 Path(preprocessed_path).mkdir(parents=True, exist_ok=True)
@@ -234,7 +236,7 @@ if __name__ == "__main__":
                 # Crop data to the current section
                 data_section = crop_data(raw_data, markers_section, sampling_rates["EEG"])
 
-                # TODO: problem: dataframes have different lengths for each participant
+                # TODO: problem: dataframes have different lengths for each participant  # noqa: FIX002
                 # but should be 74.000 samples = 148s
                 # exclude participants with different lengths for now
                 # but sth is wrong with the markers (different markers for different participants?)
@@ -251,8 +253,7 @@ if __name__ == "__main__":
                     )
                     continue
                 else:
-                    print("Section " + section + " of Participant "
-                    + subject + " is the correct length.")
+                    print("Section " + section + " of Participant " + subject + " is the correct length.")
 
                 # Trim trim_seconds from the beginning and end of the data
                 data_section_trimmed = data_section.copy().crop(
@@ -344,7 +345,7 @@ if __name__ == "__main__":
                 # plot_ecgpeaks(ecg_clean=ecg_cleaned, rpeaks_info=info, min_time=0, max_time=10,
                 # plot_title="Cleaned ECG signal with R-peaks", ecg_sampling_rate=ecg_sampling_rate)
 
-                # TODO: manually check R-peaks and adjust if necessary
+                # TODO: manually check R-peaks and adjust if necessary  # noqa: FIX002
 
                 # IBI Calculation
                 # Calculate inter-beat-intervals (IBI) from R-peaks
@@ -354,8 +355,8 @@ if __name__ == "__main__":
                 # Calculate heart rate (HR) from R-peaks
                 heart_rate = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=ecg_sampling_rate)
 
-                # TODO: exclude participants with 40 < HR < 90 ? (as resting state)
-                # TODO: relate HR to resting HR ?
+                # TODO: exclude participants with 40 < HR < 90 ? (as resting state)  # noqa: FIX002
+                # TODO: relate HR to resting HR ?  # noqa: FIX002
 
                 # plot IBI
                 plt.plot(ibi)
@@ -373,16 +374,15 @@ if __name__ == "__main__":
                 subject_array = [subject] * len(r_peaks_indices)
                 ecg_data_df["sj_id"] = pd.Series(subject_array)
 
-
                 # save ECG data to tsv file
                 ecg_data_df.to_csv(
                     preprocessed_path + f"sub_{subject}_{condition}_{section}_ECG_preprocessed.tsv", sep="\t"
                 )
                 # ------------------------ EEG ------------------------
                 # PREP Pipeline (MATLAB) #TODO  # noqa: FIX002, TD004
-    
+
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
-    # TODO: this does not make sense atm
+    # TODO: this does not make sense atm  # noqa: FIX002
     # Loop over conditions
     for condition in conditions:
         # Loop over sections
@@ -392,25 +392,19 @@ if __name__ == "__main__":
 
             # Average over all participants' ECG & save to .tsv file
             # Get files corresponding to the current condition and section
-            file_list_section = [
-                file
-                for file in file_list
-                if f"{condition}_{section}_ECG_preprocessed.tsv" in file
-            ]
+            file_list_section = [file for file in file_list if f"{condition}_{section}_ECG_preprocessed.tsv" in file]
             data_all = []
 
             # Loop over all subjects
             for file in file_list_section:
                 # Read in ECG data
-                ecg_data = pd.read_csv(
-                    preprocessed_path + file, delimiter="\t"
-                )
+                ecg_data = pd.read_csv(preprocessed_path + file, delimiter="\t")
                 # Add data to list
                 data_all.append(ecg_data)
-            
+
             # Concatenate all dataframes
             all_data_df = pd.concat(data_all)
-            
+
             # Average over all participants (grouped by the index = timepoint)
             data_avg = all_data_df.groupby(level=0).mean()["ECG"]
 
@@ -418,10 +412,16 @@ if __name__ == "__main__":
             r_peaks, info = nk.ecg_peaks(data_avg, sampling_rate=ecg_data["sampling_rate"][0])
 
             # Plot cleaned ECG data and R-peaks for the first 10s
-            plot_ecgpeaks(ecg_clean=data_avg, rpeaks_info=info, min_time=0, max_time=10,
-                plot_title="Cleaned ECG signal with R-peaks", ecg_sampling_rate=ecg_data["sampling_rate"][0])
+            plot_ecgpeaks(
+                ecg_clean=data_avg,
+                rpeaks_info=info,
+                min_time=0,
+                max_time=10,
+                plot_title="Cleaned ECG signal with R-peaks",
+                ecg_sampling_rate=ecg_data["sampling_rate"][0],
+            )
 
-            # TODO: manually check R-peaks and adjust if necessary
+            # TODO: manually check R-peaks and adjust if necessary  # noqa: FIX002
 
             # IBI Calculation
             # Calculate inter-beat-intervals (IBI) from R-peaks
@@ -439,10 +439,8 @@ if __name__ == "__main__":
             ecg_data_df["sampling_rate"] = pd.Series(ecg_data["sampling_rate"][0])
 
             # Save ECG data to tsv file
-            ecg_data_df.to_csv(
-                preprocessed_path + f"avg_{condition}_{section}_ECG_preprocessed.tsv", sep="\t"
-            )
+            ecg_data_df.to_csv(preprocessed_path + f"avg_{condition}_{section}_ECG_preprocessed.tsv", sep="\t")
             # Average over all participants' EEG & save to .tsv file
-            # TODO
+            # TODO  # noqa: FIX002, TD004
 
 # %%

@@ -3,41 +3,60 @@ Script to perform a Hidden Markov Model (HMM) analysis on Annotation, ECG and EE
 
 Inputs: Preprocessed Annotation, ECG and EEG data.
 
-Outputs: TODO: define
+Outputs:
+- Hidden Markov Model (HMM) for Annotation, ECG and EEG data.
+- Plot of the data with the hidden states marked in color vertically.
 
 Functions:
-
+- create_model: Create and train a Hidden Markov Model (HMM) on the given data.
+- plot_hidden_states: Plot the data with the hidden states marked in color vertically.
 
 Steps:
-1. 
+1. GET DATA
+2. HIDDEN MARKOV MODEL (HMM)
+    2a. Create and train the Hidden Markov Model for the physiological data.
+    2b. Create and train the Hidden Markov Model for the annotations.
+    2c. Save the Hidden Markov Model.
+    2d. Plot the data with the hidden states marked in color vertically.
 
-Required packages: 
+Required packages: hmmlearn
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: May 23rd, 2024
+Last update: May 28th, 2024
 """
 
 # %% Import
+import glob
 import os
 from pathlib import Path
-import glob
 
 import matplotlib.pyplot as plt
-from hmmlearn.hmm import GaussianHMM
 import numpy as np
 import pandas as pd
-import seaborn as sns
+from hmmlearn.hmm import GaussianHMM
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/NeVRo/preprocessed/"
+resultpath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/NeVRo/hmm/"
+
+# create the result folder if it does not exist
+Path(resultpath).mkdir(parents=True, exist_ok=True)
 
 modalities = ["physiological", "annotations"]
-physiological_measures = ["ECG"]
-#, "EEG"
+# which preprocessing mode to use for physiological data
+preprocessing_mode = "Antonin"
+# "Lucy",
+# which physiological measures to analyze
+physiological_measures = ["IBI", "HF_HRV", "posterior_alpha_power"]
+
+modalities_scales = {
+    "physiological": {"IBI": [0.4, 1.8], "HF_HRV": [0, 0.12], "posterior_alpha_power": [1e-11, 1e-8]},
+    "annotations": [-1, 1],
+}
 
 # if debug is True, only one subject will be analyzed
-debug = True
+debug = False
 
 # Number of states (low and high HR) = hyperparameter that needs to be chosen
 number_of_states = 2
@@ -45,18 +64,20 @@ number_of_states = 2
 # Number of iterations for training the HMM
 iterations = 1000
 
+
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 def create_model(data, num_states, iterations=1000):
     """
-    Create and train a Hidden Markov Model (HMM) on the given data.
-    Then predicts the hidden states.
+    Create and train a Hidden Markov Model (HMM) on the given data. Then predicts the hidden states.
 
     Args:
+    ----
         data (np.array): The data to train the HMM on.
         num_states (int): The number of states of the HMM.
         iterations (int): The number of iterations to train the HMM (defaults to 1000).
 
     Returns:
+    -------
         model (GaussianHMM): The trained HMM model.
         hidden_states (np.array): The predicted hidden states.
     """
@@ -66,41 +87,45 @@ def create_model(data, num_states, iterations=1000):
 
     return model, hidden_states
 
-def plot_hidden_states(data, hidden_states, num_states, title):
+
+def plot_hidden_states(data, hidden_states, num_states, title, ylabel, scale):
     """
     Plot the data with the hidden states marked in color vertically.
 
     Args:
+    ----
         data (np.array): The data to plot.
         hidden_states (np.array): The hidden states of the data.
         num_states (int): The number of states.
         title (str): The title of the plot.
-    
-    Returns:
-        figure: The plot.
+        ylabel (str): The label of the y-axis.
+        scale (list): The scale of the data.
     """
-    figure = plt.figure()
     plt.plot(data)
     plt.title(title)
     for i in range(num_states):
-        plt.fill_between(np.arange(len(data)), 0, 200, where=(hidden_states == i), color="C" + str(i), alpha=0.3)
-    
+        plt.fill_between(
+            np.arange(len(data)), scale[0], scale[1], where=(hidden_states == i), color="C" + str(i), alpha=0.3
+        )
+
     plt.xlabel("Time (s)")
-    plt.ylabel(str(data))
+    plt.ylabel(ylabel)
 
-    plt.show()
-
-    return figure
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # %% STEP 1. GET DATA
 if __name__ == "__main__":
     for modality in modalities:
+        print(f"\nProcessing {modality} data...")
+
         # get right file path for the dataset
         filepath = Path(datapath) / modality
         if modality == "physiological":
+            filepath = filepath / preprocessing_mode
             for physiological_measure in physiological_measures:
+                print(f"\nProcessing {physiological_measure} data...")
+
                 # list all files in the physiological folder corresponding to the physiological measure
                 pattern_measure = f"*_{physiological_measure}_preprocessed.tsv"
                 file_list = glob.fnmatch.filter(os.listdir(filepath), pattern_measure)
@@ -130,14 +155,54 @@ if __name__ == "__main__":
                     subject_data = pd.read_csv(filepath / subject_file, sep="\t")
 
                     # Get measure
-                    if physiological_measure == "ECG":
-                        data = subject_data["HR"].dropna().values.reshape(-1, 1)
-                    else:
-                        ...
+                    data = subject_data[physiological_measure].values.reshape(-1, 1)
 
-                    # Plot data
-                    plt.figure()
-                    plt.plot(data)
+                    # STEP 2. HMM
+
+                    # Create and train the Hidden Markov Model
+                    print("\nCreating and training the Hidden Markov Model...")
+
+                    model_physiological, hidden_states_physiological = create_model(data, number_of_states, iterations)
+
+                    # Define the file path to save the model
+                    model_path = Path(resultpath) / modality / subject
+
+                    # Create a dataframe with the means and variances of the hidden states
+                    means = model_physiological.means_
+                    variances = model_physiological.covars_
+                    hidden_states_df = pd.DataFrame(
+                        {
+                            "Hidden State": np.arange(1, number_of_states + 1),
+                            "Mean": means.flatten(),
+                            "Variance": variances.flatten(),
+                        }
+                    )
+
+                    # Save the dataframe as tsv file
+                    hidden_states_file = f"sub_{subject}_{physiological_measure}_hmm.tsv"
+                    hidden_states_physiological_file = model_path / hidden_states_file
+                    hidden_states_physiological_file.parent.mkdir(parents=True, exist_ok=True)
+                    hidden_states_df.to_csv(hidden_states_physiological_file, sep="\t", index=False)
+
+                    # Plot the physiological measure with the hidden states marked in color vertically
+                    plot_hidden_states(
+                        data,
+                        hidden_states_physiological,
+                        number_of_states,
+                        f"{physiological_measure} with Hidden States",
+                        physiological_measure,
+                        modalities_scales[modality][physiological_measure],
+                    )
+
+                    # Save the plot
+                    plot_file = f"sub_{subject}_{physiological_measure}_hmm.png"
+                    plot_physiological_file = model_path / plot_file
+                    plt.savefig(plot_physiological_file)
+
+                    # Show the plot
+                    # plt.show()  # noqa: ERA001
+
+                    plt.close()
 
         else:
             # list all files in the annotations folder
@@ -173,28 +238,52 @@ if __name__ == "__main__":
                 # Get the annotations
                 arousal = subject_data["cr_a"].dropna().values.reshape(-1, 1)
 
-                # Plot the annotations
-                plt.figure()
-                plt.plot(arousal)
-                plt.ylim(-1, 1)
-
-
-                # %% STEP 2. HMM
+                # STEP 2. HMM
 
                 # Create and train the Hidden Markov Model
                 print("\nCreating and training the Hidden Markov Model...")
 
                 model_arousal, hidden_states_arousal = create_model(arousal, number_of_states, iterations)
 
-                print("\nMeans and variances of hidden states for arousal:")
-                for i in range(model_arousal.n_components):
-                    print("Hidden state", i+1)
-                    print("Mean = ", round(model_arousal.means_[i][0], 3))
-                    print("Variance = ", np.diag(model_arousal.covars_[i][0], 3))
-                
+                # Define the file path to save the model
+                model_path = Path(resultpath) / modality / subject
+
+                # Create a dataframe with the means and variances of the hidden states
+                means = model_arousal.means_
+                variances = model_arousal.covars_
+                hidden_states_df = pd.DataFrame(
+                    {
+                        "Hidden State": np.arange(1, number_of_states + 1),
+                        "Mean": means.flatten(),
+                        "Variance": variances.flatten(),
+                    }
+                )
+
+                # Save the dataframe as tsv file
+                hidden_states_file = f"sub_{subject}_{modality}_hmm.tsv"
+                hidden_states_annotation_file = model_path / hidden_states_file
+                hidden_states_annotation_file.parent.mkdir(parents=True, exist_ok=True)
+                hidden_states_df.to_csv(hidden_states_annotation_file, sep="\t", index=False)
+
                 # Plot the annotations with the hidden states marked in color vertically
-                plot_hidden_states(arousal, hidden_states_arousal, number_of_states, "Arousal with Hidden States")
-                # TODO: this does not work atm
+                plot_hidden_states(
+                    arousal,
+                    hidden_states_arousal,
+                    number_of_states,
+                    "Arousal with Hidden States",
+                    "Arousal",
+                    modalities_scales[modality],
+                )
+
+                # Save the plot
+                plot_file = f"sub_{subject}_{modality}_hmm.png"
+                plot_annotation_file = model_path / plot_file
+                plt.savefig(plot_annotation_file)
+
+                # Show the plot
+                # plt.show()  # noqa: ERA001
+
+                plt.close()
 
 
 # %%
