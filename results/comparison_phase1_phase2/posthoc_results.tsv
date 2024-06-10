@@ -1,0 +1,81 @@
+	Variable	Group1	Group2	t-statistic	p-value	Significance
+0	Valence Mean	Phase 1 HP	Phase 1 HN	11.5	0.0	True
+1	Valence Mean	Phase 1 HP	Phase 1 LP	-3.32	0.001	False
+2	Valence Mean	Phase 1 HP	Phase 1 LN	6.32	0.0	True
+3	Valence Mean	Phase 1 HP	Phase 2	5.41	0.0	True
+4	Valence Mean	Phase 1 HN	Phase 1 HP	-11.5	0.0	True
+5	Valence Mean	Phase 1 HN	Phase 1 LP	-21.1	0.0	True
+6	Valence Mean	Phase 1 HN	Phase 1 LN	-4.97	0.0	True
+7	Valence Mean	Phase 1 HN	Phase 2	-14.9	0.0	True
+8	Valence Mean	Phase 1 LP	Phase 1 HP	3.32	0.001	False
+9	Valence Mean	Phase 1 LP	Phase 1 HN	21.1	0.0	True
+10	Valence Mean	Phase 1 LP	Phase 1 LN	11.93	0.0	True
+11	Valence Mean	Phase 1 LP	Phase 2	14.47	0.0	True
+12	Valence Mean	Phase 1 LN	Phase 1 HP	-6.32	0.0	True
+13	Valence Mean	Phase 1 LN	Phase 1 HN	4.97	0.0	True
+14	Valence Mean	Phase 1 LN	Phase 1 LP	-11.93	0.0	True
+15	Valence Mean	Phase 1 LN	Phase 2	-4.94	0.0	True
+16	Valence Mean	Phase 2	Phase 1 HP	-5.41	0.0	True
+17	Valence Mean	Phase 2	Phase 1 HN	14.9	0.0	True
+18	Valence Mean	Phase 2	Phase 1 LP	-14.47	0.0	True
+19	Valence Mean	Phase 2	Phase 1 LN	4.94	0.0	True
+20	Valence Standard Deviation	Phase 1 HP	Phase 1 HN	1.62	0.109	False
+21	Valence Standard Deviation	Phase 1 HP	Phase 1 LP	1.58	0.117	False
+22	Valence Standard Deviation	Phase 1 HP	Phase 1 LN	0.35	0.726	False
+23	Valence Standard Deviation	Phase 1 HP	Phase 2	-13.96	0.0	True
+24	Valence Standard Deviation	Phase 1 HN	Phase 1 HP	-1.62	0.109	False
+25	Valence Standard Deviation	Phase 1 HN	Phase 1 LP	0.12	0.903	False
+26	Valence Standard Deviation	Phase 1 HN	Phase 1 LN	-1.34	0.183	False
+27	Valence Standard Deviation	Phase 1 HN	Phase 2	-20.68	0.0	True
+28	Valence Standard Deviation	Phase 1 LP	Phase 1 HP	-1.58	0.117	False
+29	Valence Standard Deviation	Phase 1 LP	Phase 1 HN	-0.12	0.903	False
+30	Valence Standard Deviation	Phase 1 LP	Phase 1 LN	-1.32	0.19	False
+31	Valence Standard Deviation	Phase 1 LP	Phase 2	-18.28	0.0	True
+32	Valence Standard Deviation	Phase 1 LN	Phase 1 HP	-0.35	0.726	False
+33	Valence Standard Deviation	Phase 1 LN	Phase 1 HN	1.34	0.183	False
+34	Valence Standard Deviation	Phase 1 LN	Phase 1 LP	1.32	0.19	False
+35	Valence Standard Deviation	Phase 1 LN	Phase 2	-15.82	0.0	True
+36	Valence Standard Deviation	Phase 2	Phase 1 HP	13.96	0.0	True
+37	Valence Standard Deviation	Phase 2	Phase 1 HN	20.68	0.0	True
+38	Valence Standard Deviation	Phase 2	Phase 1 LP	18.28	0.0	True
+39	Valence Standard Deviation	Phase 2	Phase 1 LN	15.82	0.0	True
+40	Arousal Mean	Phase 1 HP	Phase 1 HN	2.5	0.014	False
+41	Arousal Mean	Phase 1 HP	Phase 1 LP	13.08	0.0	True
+42	Arousal Mean	Phase 1 HP	Phase 1 LN	14.17	0.0	True
+43	Arousal Mean	Phase 1 HP	Phase 2	9.44	0.0	True
+44	Arousal Mean	Phase 1 HN	Phase 1 HP	-2.5	0.014	False
+45	Arousal Mean	Phase 1 HN	Phase 1 LP	8.96	0.0	True
+46	Arousal Mean	Phase 1 HN	Phase 1 LN	9.83	0.0	True
+47	Arousal Mean	Phase 1 HN	Phase 2	5.4	0.0	True
+48	Arousal Mean	Phase 1 LP	Phase 1 HP	-13.08	0.0	True
+49	Arousal Mean	Phase 1 LP	Phase 1 HN	-8.96	0.0	True
+50	Arousal Mean	Phase 1 LP	Phase 1 LN	0.81	0.422	False
+51	Arousal Mean	Phase 1 LP	Phase 2	-6.14	0.0	True
+52	Arousal Mean	Phase 1 LN	Phase 1 HP	-14.17	0.0	True
+53	Arousal Mean	Phase 1 LN	Phase 1 HN	-9.83	0.0	True
+54	Arousal Mean	Phase 1 LN	Phase 1 LP	-0.81	0.422	False
+55	Arousal Mean	Phase 1 LN	Phase 2	-7.22	0.0	True
+56	Arousal Mean	Phase 2	Phase 1 HP	-9.44	0.0	True
+57	Arousal Mean	Phase 2	Phase 1 HN	-5.4	0.0	True
+58	Arousal Mean	Phase 2	Phase 1 LP	6.14	0.0	True
+59	Arousal Mean	Phase 2	Phase 1 LN	7.22	0.0	True
+60	Arousal Standard Deviation	Phase 1 HP	Phase 1 HN	-0.31	0.757	False
+61	Arousal Standard Deviation	Phase 1 HP	Phase 1 LP	3.07	0.003	False
+62	Arousal Standard Deviation	Phase 1 HP	Phase 1 LN	3.76	0.0	True
+63	Arousal Standard Deviation	Phase 1 HP	Phase 2	-10.24	0.0	True
+64	Arousal Standard Deviation	Phase 1 HN	Phase 1 HP	0.31	0.757	False
+65	Arousal Standard Deviation	Phase 1 HN	Phase 1 LP	3.28	0.001	False
+66	Arousal Standard Deviation	Phase 1 HN	Phase 1 LN	3.94	0.0	True
+67	Arousal Standard Deviation	Phase 1 HN	Phase 2	-9.7	0.0	True
+68	Arousal Standard Deviation	Phase 1 LP	Phase 1 HP	-3.07	0.003	False
+69	Arousal Standard Deviation	Phase 1 LP	Phase 1 HN	-3.28	0.001	False
+70	Arousal Standard Deviation	Phase 1 LP	Phase 1 LN	0.89	0.378	False
+71	Arousal Standard Deviation	Phase 1 LP	Phase 2	-13.6	0.0	True
+72	Arousal Standard Deviation	Phase 1 LN	Phase 1 HP	-3.76	0.0	True
+73	Arousal Standard Deviation	Phase 1 LN	Phase 1 HN	-3.94	0.0	True
+74	Arousal Standard Deviation	Phase 1 LN	Phase 1 LP	-0.89	0.378	False
+75	Arousal Standard Deviation	Phase 1 LN	Phase 2	-14.05	0.0	True
+76	Arousal Standard Deviation	Phase 2	Phase 1 HP	10.24	0.0	True
+77	Arousal Standard Deviation	Phase 2	Phase 1 HN	9.7	0.0	True
+78	Arousal Standard Deviation	Phase 2	Phase 1 LP	13.6	0.0	True
+79	Arousal Standard Deviation	Phase 2	Phase 1 LN	14.05	0.0	True

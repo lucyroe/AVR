@@ -1,0 +1,5 @@
+	Value	Num_DF	Den_DF	F-value	p-value	Significance
+Wilks' lambda	0.06	16	874	82.19	0.0	True
+Pillai's trace	1.8	16	1156	59.01	0.0	True
+Hotelling-Lawley trace	4.85	16	566	86.45	0.0	True
+Roy's greatest root	2.53	4	289	182.59	0.0	True

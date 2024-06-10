@@ -1,0 +1,21 @@
+	Group	Variable	Statistic	p-value	Significance
+0	phase1 HP	Mean Valence	0.88	0.0	True
+1	phase1 HP	Standard Deviation Valence	0.98	0.364	False
+2	phase1 HP	Mean Arousal	0.87	0.0	True
+3	phase1 HP	Standard Deviation Arousal	0.95	0.045	True
+4	phase1 HN	Mean Valence	0.74	0.0	True
+5	phase1 HN	Standard Deviation Valence	0.98	0.621	False
+6	phase1 HN	Mean Arousal	0.92	0.003	True
+7	phase1 HN	Standard Deviation Arousal	0.95	0.037	True
+8	phase1 LP	Mean Valence	0.75	0.0	True
+9	phase1 LP	Standard Deviation Valence	0.95	0.028	True
+10	phase1 LP	Mean Arousal	0.8	0.0	True
+11	phase1 LP	Standard Deviation Arousal	0.96	0.071	False
+12	phase1 LN	Mean Valence	0.96	0.102	False
+13	phase1 LN	Standard Deviation Valence	0.98	0.39	False
+14	phase1 LN	Mean Arousal	0.74	0.0	True
+15	phase1 LN	Standard Deviation Arousal	0.94	0.011	True
+16	phase2	Mean Valence	0.99	0.453	False
+17	phase2	Standard Deviation Valence	0.94	0.001	True
+18	phase2	Mean Arousal	0.97	0.043	True
+19	phase2	Standard Deviation Arousal	0.93	0.0	True

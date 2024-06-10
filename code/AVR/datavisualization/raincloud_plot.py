@@ -7,11 +7,14 @@ The following steps are performed:
 3. Save the calculated statistics as a new file
 4. Combine the data for all subjects and all phases (1 and 2) into one dataframe
 5. Plot a raincloud plot for each variable (valence and arousal) and each statistic (mean and standard deviation)
+    To mark the significant differences between the groups, the output statistics from compare_variability_phase1+2.py
+    are used.
+    This script needs to be run before significant differences can be marked.
 6. Save the resulting four raincloud plots as png files
 
 Author: Lucy Roellecke
 Created on: 21 May 2024
-Last updated: 21 May 2024
+Last updated: 10 June 2024
 """
 
 # %% Import
@@ -23,10 +26,10 @@ import numpy as np
 import pandas as pd
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"  # path where data is saved
-resultpath = (
-    "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"  # path where results should be saved
-)
+# path where data is saved
+datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
+# path where results should be saved
+resultpath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/comparison_phase1_phase2/"
 phases = ["phase1", "phase2"]  # phases for which the raincloud plot should be plotted
 quadrants = ["HP", "HN", "LP", "LN"]  # quadrants/videos in phase 1 for which the raincloud plot should be plotted
 # in phase 2, there was only one video
@@ -48,11 +51,12 @@ violin_colors = ["#5fb0b4", "#5f85b4", "#645fb4", "#3f5f87", "#ff9900"]
 # Create a list of colors for the scatter plots
 scatter_colors = ["#5fb0b4", "#5f85b4", "#645fb4", "#3f5f87", "#ff9900"]
 
+mark_significant_differences = True  # if True, significant differences will be marked in the raincloud plot
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 
-def plot_raincloud(data: pd.DataFrame, variable: str, statistic: str) -> plt.figure():
+def plot_raincloud(data: pd.DataFrame, variable: str, statistic: str, significant_differences: list) -> plt.figure():
     """
     Plot a raincloud plot for the given data.
 
@@ -66,8 +70,7 @@ def plot_raincloud(data: pd.DataFrame, variable: str, statistic: str) -> plt.fig
     data: dataframe with the standard deviation for each participant.
     variable: variable for which the raincloud plot should be plotted.
     statistic: statistic for which the raincloud plot should be plotted (mean or std_dev).
-    phases: list of phases for which the raincloud plot should be plotted.
-    quadrants: list of quadrants for which the raincloud plot should be plotted.
+    significant_differences: list of significant differences between the groups.
 
     Returns:
     -------
@@ -126,6 +129,53 @@ def plot_raincloud(data: pd.DataFrame, variable: str, statistic: str) -> plt.fig
     plt.xticks([1, 2, 3, 4, 5], ["Phase 1 HN", "Phase 1 HP", "Phase 1 LN", "Phase 1 LP", "Phase 2"])
     plt.ylabel(f"{statistic_names[statistic]} of {variable_names[variable]}")
     plt.title(f"Comparison of the {statistic_names[statistic]} of {variable_names[variable]} for Phase 1 and Phase 2")
+
+    if mark_significant_differences:
+        # Mark significant differences with an asterisk and a line above the two groups
+        counter = 0
+        # Get distance between lines depending on statistic (mean or standard deviation)
+        distance = 0.3 if statistic == "mean" else 0.1
+
+        for difference in significant_differences:
+            first_group = difference[0]
+            second_group = difference[1]
+            # Get x-tick labels and positions
+            x_tick_labels = [tick.get_text() for tick in axes.get_xticklabels()]
+            xtick_positions = axes.get_xticks()
+
+            # Get position of the label for the first group
+            label_index_first = x_tick_labels.index(first_group)
+            specific_xtick_position_first_group = xtick_positions[label_index_first]
+            # Get position of the label for the second group
+            label_index_second = x_tick_labels.index(second_group)
+            specific_xtick_position_second_group = xtick_positions[label_index_second]
+
+            # Get maximum value of the two groups
+            max_value = max(data_list[label_index_first].max(), data_list[label_index_second].max())
+
+            # The color of line and asterisk should be black if the difference is between phase 1 and phase 2
+            # else it should be grey
+            color = "black" if first_group == "Phase 2" or second_group == "Phase 2" else "grey"
+
+            # Plot a line between the two groups
+            plt.plot(
+                [specific_xtick_position_first_group, specific_xtick_position_second_group],
+                [max_value + distance + counter, max_value + distance + counter],
+                color=color,
+            )
+
+            # Add an asterisk in the middle of the line
+            plt.text(
+                (specific_xtick_position_first_group + specific_xtick_position_second_group) / 2,
+                max_value + distance + counter,
+                "*",
+                fontsize=12,
+                color=color,
+            )
+
+            counter += 0.1
+
+    # Show plot
     plt.show()
 
     return figure
@@ -247,14 +297,44 @@ if __name__ == "__main__":
         # Append data to combined_data
         combined_data = combined_data._append(data)
 
+    # Read in the significant differences
+    data_significant_differences = pd.read_csv(Path(resultpath) / "posthoc_results.tsv", sep="\t")
+
+    # Filter for the significant differences
+    significant_differences_dataframe = data_significant_differences[
+        data_significant_differences["Significance"] == True  # noqa: E712
+    ]
+
     # Create raincloud plot for each variable and each statistic
     for statistic in statistics:
         for variable in variables:
-            figure = plot_raincloud(combined_data, variable, statistic)
+            if mark_significant_differences:
+                # Get significant differences for the current variable and statistic
+                significant_differences_current = significant_differences_dataframe[
+                    significant_differences_dataframe["Variable"]
+                    == f"{variable_names[variable]} {statistic_names[statistic]}"
+                ]
+                # Put the significant differences in a list (pairs of groups)
+                significant_differences = [
+                    [group1, group2]
+                    for group1, group2 in zip(
+                        significant_differences_current["Group1"], significant_differences_current["Group2"],
+                        strict=True
+                    )
+                ]
+                # Delete duplicates (no matter in which order the groups are)
+                significant_differences = [sorted(difference) for difference in significant_differences]
+                significant_differences = list({tuple(difference) for difference in significant_differences})
+                # Sort alphabetically
+                significant_differences = sorted(significant_differences)
+            else:
+                significant_differences = []
+
+            # Plot raincloud plot
+            figure = plot_raincloud(combined_data, variable, statistic, significant_differences)
             # Save figure
             figure.savefig(
-                Path(
-                    resultpath) / f"raincloud_phase1+2_{statistic_names[statistic]}_{variable_names[variable]}.png"
+                Path(resultpath) / f"raincloud_phase1+2_{statistic_names[statistic]}_{variable_names[variable]}.png"
             )
 
 # %%
