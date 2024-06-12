@@ -13,14 +13,14 @@ The following steps are performed:
 3. Create BIDS-compatible files: TODO
     a. Create a _physio.tsv.gz file containing the physiological data.
     b. Create an _events.tsv file containing the event markers.
-4. Save the BIDS-compatible files in the appropriate directory.
+4. Save the BIDS-compatible files in the appropriate directory. TODO
 
 Required packages: pyxdf, mne
 
 Author: Lucy Roellecke (Largely based on Marta Gerosa's script for the BBSIG project)
 Contact: lucy.roellecke[at]fu-berlin.de
 Created on: 30 April 2024
-Last update: 10 June 2024
+Last update: 12 June 2024
 """
 
 # %% Import
@@ -29,12 +29,15 @@ import os
 
 import mne
 import pyxdf
+import matplotlib.pyplot as plt
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-subjects = ["001"]  # Adjust as needed
+subjects = ["001", "002"]  # Adjust as needed
 session = "S001"  # Adjust as needed
 run = "001"  # Adjust as needed
+subject_task_mapping = {"001": "AVR_nomov", "002": "AVR_mov"}  # For pilot data
+# subject 001 and 002 were the same person but once without movement and once with movement
 
 # Specify the data path info (in BIDS format)
 # change with the directory of data storage
@@ -52,10 +55,16 @@ LSLoffset = 0.055  # LSL markers precede the actual stimulus presentation by app
 # TODO: define offset correction after doing Photodiode check  # noqa: FIX002
 
 # Define the streams to be selected for further processing
-selected_streams = ["LiveAmpSN-054206-0127"]  # TODO: define the streams to be selected  # noqa: FIX002
+selected_streams = ["Events", "Rating.CR", "Head.PosRot", "EDIA.Eye.CENTER", "LiveAmpSN-054206-0127"]
+stream_modality_mapping = {"Events": "events", "Rating.CR": "rating", "Head.PosRot": "VR", 
+                            "EDIA.Eye.CENTER": "VR", "LiveAmpSN-054206-0127": "physiological"}
+stream_sampling_rate = {"Rating.CR": 50, "Head.PosRot": 90, "EDIA.Eye.CENTER": 120,
+                        "LiveAmpSN-054206-0127": 500}
+stream_dimensions = {"Rating.CR": {0: "valence", 1:"arousal"}, "Head.PosRot": {0: "PosX", 1: "PosY", 2: "PosZ",
+                    3: "RotX", 4: "RotY", 5: "RotZ", 6: "RotW"}, "EDIA.Eye.CENTER": {0: "PosX", 1: "PosY", 2: "PosZ",
+                    3: "Pitch", 4: "Yaw", 5: "Roll", 6: "PupilDiameter", 7: "Confidence", 8: "TimestampET"}}
 
-physiological_modalities = ["eeg", "ecg"]
-# "ppg", "respiration", "eyetracking"]
+physiological_modalities = ["eeg", "ecg", "ppg", "respiration"]
 
 # Names of the channels for each modalitiey
 channel_names = {
@@ -126,10 +135,8 @@ channel_names = {
         "Iz",
     ],
     "ecg": ["AUX1"],
-    "ppg": ["AUX2"],
-    "respiration": ["AUX3"],
-    "eyetracking": ["AUX4"],
-}
+    "respiration": ["AUX2"],
+    "ppg": ["AUX3"]}
 # TODO: define channel names for each modality  # noqa: FIX002
 
 channel_indices = {
@@ -200,10 +207,8 @@ channel_indices = {
         63,
     ],
     "ecg": [64],
-    "ppg": [65],
-    "respiration": [66],
-    "eyetracking": [67],
-}
+    "respiration": [65],
+    "ppg": [66]}
 
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
@@ -229,6 +234,31 @@ def get_stream_indexes(streams, selected_streams):
 
     return stream_indexes
 
+def plot_raw_data(data, stream_name, sampling_rate, labels=None):
+    """
+    Plot the raw data for quick inspection.
+
+    Parameters
+    ----------
+    data (numpy.ndarray): raw data
+    stream_name (str): name of the stream
+    sampling_rate (float): sampling rate of the data
+    """
+    fig, ax = plt.subplots(1, 1, figsize=(20, 5))
+    # For each dimension defined in labels, plot one line
+    if labels:
+        for key, label in labels.items():
+            ax.plot(data[:, key], label=label)
+    else:
+        ax.plot(data)
+    ax.set_title(f"{stream_name} for {subject_name}")
+    ax.set_xlabel("Time (min)")
+    # Convert time in samples to minutes
+    ax.set_xticklabels([str(round(i / (60 * sampling_rate), 2)) for i in ax.get_xticks()])
+    ax.set_ylabel(stream_modality_mapping[stream_name])
+    ax.legend()
+    plt.show()
+
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -236,7 +266,7 @@ if __name__ == "__main__":
     # Iterate through each participant
     for subject in subjects:
         subject_name = "sub-P" + str(subject)  # participant ID
-        file_name = subject_name + f"_ses-{session}_task-Default_run-{run}_eeg.xdf"
+        file_name = subject_name + f"_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_eeg.xdf"
 
         # Merge information into complete datapath
         physiodata_dir = os.path.join(wd, exp_name, sourcedata_name, file_name)
@@ -250,22 +280,47 @@ if __name__ == "__main__":
         for stream in streams:
             print(stream["info"]["name"])
 
-        # List of the available streams in XDF file (not necessarily in this order):
-        # TODO: list the streams in the XDF file
-
-        # Print length of time series for each stream
-        for stream in streams:
-            print(f"Length of time series for stream '{stream['info']['name'][0]}': {len(stream['time_series'])}")
-
-        # Check whether time stamps are the same
-        # Print first 10 time stamps for each stream
-        for stream in streams:
-            print(f"First 10 time stamps for stream '{stream['info']['name'][0]}': {stream['time_stamps'][:10]}")
-
-        # Check whether the data makes sense
-        # Print first 2 time series points for each stream
-        for stream in streams:
-            print(f"First 2 time series points for stream '{stream['info']['name'][0]}': {stream['time_series'][:2]}")
+        # List of the available streams in XDF file:
+        # 'Head.PosRot':            Head movement from VR HMD
+        #                           7 dimensions (PosX, PosY, PosZ, RotX, RotY, RotZ, RotW)
+        #                           90 Hz, float32
+        #                           Length 145192 samples
+        # 'EDIA.Eye.LEFT':          Eye tracking data from left eye
+        #                           9 dimensions (PosX, PosY, PosZ, Pitch, Yaw, Roll, PupilDiameter, Confidence, TimestampET)
+        #                           120 Hz, float32
+        #                           Length 193546 samples
+        # 'RightHand.PosRot':       Right hand movement from VR controller
+        #                           7 dimensions (PosX, PosY, PosZ, RotX, RotY, RotZ, RotW)
+        #                           90 Hz, float32
+        #                           Length 145191 samples
+        # 'Events':                 Event markers
+        #                           1 dimension
+        #                           string
+        #                           Length 63 samples
+        # 'EDIA.Eye.RIGHT':         Eye tracking data from right eye
+        #                           9 dimensions (PosX, PosY, PosZ, Pitch, Yaw, Roll, PupilDiameter, Confidence, TimestampET)
+        #                           120 Hz, float32
+        #                           Length 193546 samples
+        # 'EDIA.Eye.CENTER':        Eye tracking data from center eye
+        #                           9 dimensions (PosX, PosY, PosZ, Pitch, Yaw, Roll, PupilDiameter, Confidence, TimestampET)
+        #                           120 Hz, float32
+        #                           Length 193546 samples
+        # 'Rating.CR':              Continuous rating data from VR controller
+        #                           2 dimensions (x: valence, y: arousal)
+        #                           50 Hz, float32
+        #                           Length 80631 samples
+        # 'LiveAmpSN-054206-0127':  ExG data from BrainVision LiveAmp
+        #                           70 dimensions (64 EEG channels, 3 AUX channels (ECG, RESP, PPG), ACC_X, ACC_Y, ACC_Z)
+        #                           500 Hz, float32
+        #                           Length 807278 samples
+        # 'Rating.SR':              Summary rating data from VR controller
+        #                           2 dimensions (x: valence, y: arousal)
+        #                           float32
+        #                           Length 2 samples (one rating from training, one from experiment)
+        # 'LeftHand.PosRot':        Left hand movement from VR controller
+        #                           7 dimensions (PosX, PosY, PosZ, RotX, RotY, RotZ, RotW)
+        #                           90 Hz, float32
+        #                           Length 145192 samples
 
         # Extract indexes corresponding to certain streams
         indexes_info = get_stream_indexes(streams, selected_streams)
@@ -277,24 +332,52 @@ if __name__ == "__main__":
             # Extract the stream data
             stream_data = streams[indexes_info[stream]]
 
-            # Loop over physiological modalities
-            for modality in physiological_modalities:
-                # Get channel names for the current modality
-                channels_modality = channel_names[modality]
-                # Get channel indices for the current modality
-                channel_indices_modality = channel_indices[modality]
+            # --------- EVENT MARKERS -----------
+            if stream_modality_mapping[stream] == "events":
+                # Extract the event markers
+                event_markers = stream_data["time_series"]
+                # Print the event markers
+                print(f"Event markers: {event_markers}")
 
-                # Extract the time series data
-                data = stream_data["time_series"][:, channel_indices_modality].T
+                # TODO:Save the event markers in a text file
+            
+            # --------- RATING DATA -----------
+            elif stream_modality_mapping[stream] == "rating":
+                # Extract the rating data
+                rating_data = stream_data["time_series"]
 
-                # Get the sampling frequency
-                sampling_frequency = float(stream_data["info"]["nominal_srate"][0])
-                # Create MNE info object
-                info = mne.create_info(ch_names=channels_modality, sfreq=sampling_frequency)
-                # Create MNE raw object
-                raw = mne.io.RawArray(data, info)
-                # Plot the raw data
-                raw.plot(n_channels=5, title=f"{stream} {modality} data", duration=1, start=14)
+                # Plot the rating data
+                plot_raw_data(rating_data, stream, stream_sampling_rate[stream], stream_dimensions[stream])
+
+            # --------- VR DATA (HEAD MOVEMENT & EYETRACKING) -----------
+            elif stream_modality_mapping[stream] == "VR":
+                # Extract the VR data
+                vr_data = stream_data["time_series"]
+
+                # Plot the VR data
+                plot_raw_data(vr_data, stream, stream_sampling_rate[stream], stream_dimensions[stream])
+                # TODO: eyetracking data looks weird -> check
+
+            # --------- PHYSIOLOGICAL DATA (EEG, ECG, RESPIRATION, PPG) -----------
+            elif stream_modality_mapping[stream] == "physiological":
+                # Loop over physiological modalities
+                for modality in physiological_modalities:
+                    # Get channel names for the current modality
+                    channels_modality = channel_names[modality]
+                    # Get channel indices for the current modality
+                    channel_indices_modality = channel_indices[modality]
+
+                    # Extract the time series data
+                    data = stream_data["time_series"][:, channel_indices_modality].T
+
+                    # Get the sampling frequency
+                    sampling_frequency = float(stream_data["info"]["nominal_srate"][0])
+                    # Create MNE info object
+                    info = mne.create_info(ch_names=channels_modality, sfreq=sampling_frequency)
+                    # Create MNE raw object
+                    raw = mne.io.RawArray(data, info)
+                    # Plot the raw data
+                    raw.plot(n_channels=32, title=f"{stream} {modality} data", duration=20, start=14)
 
         # %% STEP 3a: CREATE BIDS _PHYSIO.TSV.GZ FILE
 
