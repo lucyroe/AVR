@@ -27,13 +27,14 @@ Last update: 12 June 2024
 
 import os
 
+import matplotlib.pyplot as plt
 import mne
 import pyxdf
-import matplotlib.pyplot as plt
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-subjects = ["001", "002"]  # Adjust as needed
+subjects = ["001"]  # Adjust as needed
+# "002"
 session = "S001"  # Adjust as needed
 run = "001"  # Adjust as needed
 subject_task_mapping = {"001": "AVR_nomov", "002": "AVR_mov"}  # For pilot data
@@ -137,75 +138,9 @@ channel_names = {
     "ecg": ["AUX1"],
     "respiration": ["AUX2"],
     "ppg": ["AUX3"]}
-# TODO: define channel names for each modality  # noqa: FIX002
 
 channel_indices = {
-    "eeg": [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-        18,
-        19,
-        20,
-        21,
-        22,
-        23,
-        24,
-        25,
-        26,
-        27,
-        28,
-        29,
-        30,
-        31,
-        32,
-        33,
-        34,
-        35,
-        36,
-        37,
-        38,
-        39,
-        40,
-        41,
-        42,
-        43,
-        44,
-        45,
-        46,
-        47,
-        48,
-        49,
-        50,
-        51,
-        52,
-        53,
-        54,
-        55,
-        56,
-        57,
-        58,
-        59,
-        60,
-        61,
-        62,
-        63,
-    ],
+    "eeg": range(0, 64),
     "ecg": [64],
     "respiration": [65],
     "ppg": [66]}
@@ -234,7 +169,7 @@ def get_stream_indexes(streams, selected_streams):
 
     return stream_indexes
 
-def plot_raw_data(data, stream_name, sampling_rate, labels=None):
+def plot_raw_data(data, stream_name, sampling_rate, labels):
     """
     Plot the raw data for quick inspection.
 
@@ -246,11 +181,8 @@ def plot_raw_data(data, stream_name, sampling_rate, labels=None):
     """
     fig, ax = plt.subplots(1, 1, figsize=(20, 5))
     # For each dimension defined in labels, plot one line
-    if labels:
-        for key, label in labels.items():
-            ax.plot(data[:, key], label=label)
-    else:
-        ax.plot(data)
+    for key, label in labels.items():
+        ax.plot(data[:, key], label=label)
     ax.set_title(f"{stream_name} for {subject_name}")
     ax.set_xlabel("Time (min)")
     # Convert time in samples to minutes
