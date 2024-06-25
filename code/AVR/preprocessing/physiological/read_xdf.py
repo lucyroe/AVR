@@ -32,7 +32,7 @@ Required packages: pyxdf, mne, pyEDFlib
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]fu-berlin.de
 Created on: 30 April 2024
-Last update: 24 June 2024
+Last update: 25 June 2024
 """
 
 # %% Import
@@ -694,18 +694,18 @@ if __name__ == "__main__":
             # STEP 3e: --------- EEG -----------
             elif datatype == "eeg":
 
-                # Create a *_eeg.edf.gz file containing the EEG data
+                # Create a *_eeg.edf file containing the EEG data
                 signal_headers = highlevel.make_signal_headers(
                     channel_names["eeg"], sample_frequency=stream_sampling_rate["LiveAmpSN-054206-0127"]
                 )
                 header = highlevel.make_header(patientname=subject_name),
                 highlevel.write_edf(
-                    f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_eeg.edf.gz",
-                    eeg_data,
+                    f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_eeg.edf",
+                    eeg_data[channel_names["eeg"]].values.T,
                     signal_headers,
-                    header,
+                    header[0],
                 )
-                # TODO: does not work atm
+                # TODO: does not work atm: units don't align (min value -200 and is -200.000 roughly)
 
                 # Separate the EOG channels from the EEG channels
                 eog_channels = [channel for channel in channel_names["eeg"].items() if channel in eog_channel_mapping.keys()]
