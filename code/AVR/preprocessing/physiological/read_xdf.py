@@ -54,7 +54,8 @@ from matplotlib import cm
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-subjects = ["pilot001", "pilot002"]  # Adjust as needed
+subjects = ["pilot003"]  # Adjust as needed
+# "pilot001", "pilot002"
 subject_task_mapping = {subject: "AVRnomov" if subject == "pilot001" else "AVR" for subject in subjects}
 # pilot subject 001 and 002 were the same person but once without movement and once with movement
 
@@ -104,9 +105,8 @@ stream_modality_mapping = {
     "EDIA.Eye.CENTER": "eyetrack",
     "LiveAmpSN-054206-0127": "eeg",
 }
-# TODO: change rating frequency to 90 Hz
-stream_sampling_rate = {"Rating.CR": 50, "Head.PosRot": 90, "EDIA.Eye.CENTER": 120, "LiveAmpSN-054206-0127": 500}
-# TODO: adapt quaternion labels when switched to Euler angles
+stream_sampling_rate = {"Rating.CR": 90, "Head.PosRot": 90, "EDIA.Eye.CENTER": 120, "LiveAmpSN-054206-0127": 500}
+# TODO: adapt quaternion labels when switched to Euler angles  # noqa: FIX002
 stream_dimensions = {
     "Rating.CR": {0: "valence", 1: "arousal"},
     "Head.PosRot": {0: "PosX", 1: "PosY", 2: "PosZ", 3: "RotX", 4: "RotY", 5: "RotZ", 6: "RotW"}
@@ -324,7 +324,7 @@ if __name__ == "__main__":
         for stream in streams:
             print(stream["info"]["name"])
 
-        # List of the available streams in XDF file:    TODO: adapt to streams in real data
+        # List of the available streams in XDF file:
         # 'Head.PosRot':            Head movement from VR HMD
         #                           7 dimensions (PosX, PosY, PosZ, RotX, RotY, RotZ, RotW)
         #                           90 Hz, float32
@@ -354,7 +354,7 @@ if __name__ == "__main__":
         #                           Length 193546 samples
         # 'Rating.CR':              Continuous rating data from VR controller
         #                           2 dimensions (x: valence, y: arousal)
-        #                           50 Hz, float32
+        #                           90 Hz, float32
         #                           Length 80631 samples
         # 'LiveAmpSN-054206-0127':  ExG data from BrainVision LiveAmp
         #                           70 dimensions (64 EEG channels, 3 AUX channels (ECG, RESP, PPG), ACC_X, ACC_Y,
@@ -369,6 +369,9 @@ if __name__ == "__main__":
         #                           7 dimensions (PosX, PosY, PosZ, RotX, RotY, RotZ, RotW)
         #                           90 Hz, float32
         #                           Length 145192 samples
+        # 'UnityFloats':            Unity data  # TODO: check what is in this stream  # noqa: FIX002
+        #                           4 dimensions (newValuesX, newValuesY, timeStepSize, scale)
+        #                           50 Hz, float32
 
         # Extract indexes corresponding to certain streams
         indexes_info = get_stream_indexes(streams, selected_streams)
@@ -755,7 +758,8 @@ if __name__ == "__main__":
                     data={
                         "name": list(motion_bids_labels.keys()),
                         "component": list(motion_bids_labels.values()),
-                        "type": ["POS", "POS", "POS", "ORNT", "ORNT", "ORNT", "ORNT"],  # TODO: adapt to Euler angles
+                        "type": ["POS", "POS", "POS", "ORNT", "ORNT", "ORNT", "ORNT"],
+                        # TODO: adapt to Euler angles  # noqa: FIX002
                         "tracked_point": ["Head", "Head", "Head", "Head", "Head", "Head", "Head"],
                         "units": ["m", "m", "m", "n/a", "n/a", "n/a", "n/a"],
                     }
