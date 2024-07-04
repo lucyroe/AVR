@@ -486,9 +486,7 @@ if __name__ == "__main__":
 
                     if modality == "eeg":
                         # Separate the EOG channels from the EEG channels
-                        eog_channels = [
-                            channel for channel in channel_names["eeg"] if channel in eog_channel_mapping
-                        ]
+                        eog_channels = [channel for channel in channel_names["eeg"] if channel in eog_channel_mapping]
                         # Set the channel types to "eog" for the EOG channels
                         raw.set_channel_types({channel: "eog" for channel in eog_channels})
                         # Set the channel types to "eeg" for the EEG channels
@@ -525,8 +523,10 @@ if __name__ == "__main__":
                     results_motion_dir = Path(results_dir) / exp_name / f"sub-{subject}" / "motion"
 
                     # Save the plot as a .png file
-                    vr_plot_file = (results_motion_dir /
-                        f"{subject_name}_task-{subject_task_mapping[subject]}_tracksys-headmovement_motion.png")
+                    vr_plot_file = (
+                        results_motion_dir
+                        / f"{subject_name}_task-{subject_task_mapping[subject]}_tracksys-headmovement_motion.png"
+                    )
                     plt.savefig(vr_plot_file)
 
                     if show_plots:
@@ -535,9 +535,7 @@ if __name__ == "__main__":
                 else:  # stream_modality_mapping[stream] == "eyetrack"
                     # Exclude the timestamp and confidence dimension for the eyetracking data
                     vr_data = vr_data[:, :-2]
-                    values_to_keep = sorted(stream_dimensions[stream].keys())[
-                        :-2
-                    ]  # Get all keys except the last two
+                    values_to_keep = sorted(stream_dimensions[stream].keys())[:-2]  # Get all keys except the last two
                     stream_dimensions[stream] = {key: stream_dimensions[stream][key] for key in values_to_keep}
 
                     # Combine VR data and timestamps into a dataframe in BIDS format
@@ -552,8 +550,10 @@ if __name__ == "__main__":
                     results_eyetrack_dir = Path(results_dir) / exp_name / f"sub-{subject}" / "eyetrack"
 
                     # Save the plot as a .png file
-                    vr_plot_file = (results_eyetrack_dir/
-                        f"{subject_name}_task-{subject_task_mapping[subject]}_recording-eye_physio.png")
+                    vr_plot_file = (
+                        results_eyetrack_dir
+                        / f"{subject_name}_task-{subject_task_mapping[subject]}_recording-eye_physio.png"
+                    )
                     plt.savefig(vr_plot_file)
 
                     if show_plots:
@@ -595,16 +595,19 @@ if __name__ == "__main__":
                     axis.set_xlabel("Time (min)")
 
                     # Save the plot as a .png file
-                    eye_tracking_plot_file = (results_eyetrack_dir/
-                        f"{subject_name}_task-{subject_task_mapping[subject]}_recording-eye_whiteflash.png")
+                    eye_tracking_plot_file = (
+                        results_eyetrack_dir
+                        / f"{subject_name}_task-{subject_task_mapping[subject]}_recording-eye_whiteflash.png"
+                    )
                     plt.savefig(eye_tracking_plot_file)
 
                     if show_plots:
                         plt.show()
 
                     # Create a separate plot for each white flash event and 5s before and after
-                    for i, (start, stop) in enumerate(zip(white_flash_timestamps_start, white_flash_timestamps_stop,
-                     strict=True)):
+                    for i, (start, stop) in enumerate(
+                        zip(white_flash_timestamps_start, white_flash_timestamps_stop, strict=True)
+                    ):
                         # Get the eye tracking data for the current flash event
                         flash_data = eyetrack_data_dataframe[
                             (eyetrack_data_dataframe["timestamp"] >= start - 5)
@@ -626,8 +629,10 @@ if __name__ == "__main__":
                         axis.set_xlabel("Time (min)")
 
                         # Save the plot as a .png file
-                        eye_tracking_plot_file = (results_eyetrack_dir/
-                            f"{subject_name}_task-{subject_task_mapping[subject]}_recording-eye_whiteflash_{i+1}.png")
+                        eye_tracking_plot_file = (
+                            results_eyetrack_dir
+                            / f"{subject_name}_task-{subject_task_mapping[subject]}_recording-eye_whiteflash_{i+1}.png"
+                        )
                         plt.savefig(eye_tracking_plot_file)
                         if show_plots:
                             plt.show()
@@ -702,7 +707,7 @@ if __name__ == "__main__":
                     Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / rating_metadata_filename
                 )
                 # Save the rating metadata in a json file
-                with rating_metadata_file.open( "w") as f:
+                with rating_metadata_file.open("w") as f:
                     json.dump(rating_metadata, f, indent=4)
 
             # STEP 3c: --------- HEADMOVEMENT -----------
