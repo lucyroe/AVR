@@ -16,11 +16,11 @@ The following steps are performed:
 3. Create BIDS-compatible files & save them in the appropriate directory.
     a.  Create a *_events.tsv file containing the event markers, and a _events.json file containing the event metadata.
         Save in rawdata/sub-<participant>/beh/.
-    b.  Create a *_beh.tsv file containing the rating data, and a _beh.json file containing the metadata.
+    b.  Create a *_beh.tsv.gz file containing the rating data, and a _beh.json file containing the metadata.
         Save in rawdata/sub-<participant>/beh/.
-    c.  Create a *tracksys-headmovement_motion.tsv file containing the headmovement data, a *tracksys-headmovement_motion.json file containing the metadata, and a *tracksys-headmovement_channels.tsv file containing the channel information.
+    c.  Create a *tracksys-headmovement_motion.tsv.gz file containing the headmovement data, a *tracksys-headmovement_motion.json file containing the metadata, and a *tracksys-headmovement_channels.tsv file containing the channel information.
         Save in rawdata/sub-<participant>/motion/.
-    d.  Create a *_recording_eye1_physio.tsv file containing the eye tracking data from each eye separately (cyclopean: 1, left: 2, right: 3), and a *_recording_eye1_physio.json file containing the metadata.
+    d.  Create a *_recording_eye1_physio.tsv.gz file containing the eye tracking data from each eye separately (cyclopean: 1, left: 2, right: 3), and a *_recording_eye1_physio.json file containing the metadata.
         Save in rawdata/sub-<participant>/eyetrack/.
     e.  Create a *_eeg.edf.gz file containing the EEG data, a _eeg.json file containing the metadata, and a *_channels.tsv file containing the channel information.
         Save in rawdata/sub-<participant>/eeg/.
@@ -32,7 +32,7 @@ Required packages: pyxdf, mne, pyEDFlib
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]fu-berlin.de
 Created on: 30 April 2024
-Last update: 25 June 2024
+Last update: 4 July 2024
 """
 
 # %% Import
@@ -47,7 +47,6 @@ import numpy as np
 import pandas as pd
 import pyxdf
 from matplotlib import cm
-from pyedflib import highlevel
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -56,6 +55,9 @@ session = "S001"  # Adjust as needed
 run = "001"  # Adjust as needed
 subject_task_mapping = {"pilot001": "AVRnomov", "pilot002": "AVRmov"}  # For pilot data
 # subject 001 and 002 were the same person but once without movement and once with movement
+
+# Show plots
+show_plots = False  # Set to "True" to show the plots
 
 # Specify the data path info (in BIDS format)
 # change with the directory of data storage
@@ -121,7 +123,7 @@ eyetracking_bids_labels = {"PosX": "x_coordinate", "PosY": "y_coordinate", "PosZ
 physiological_modalities = ["eeg", "cardiac", "respiratory", "ppg"]
 
 # EOG channels
-eog_channel_mapping = {"HEOG_left": "FT9", "VEOG_up": "Fp1", "VEOG_down": "Fp2", "HEOG_right": "FT10"}
+eog_channel_mapping = {"FT9": "HEOG_left", "Fp1": "VEOG_up", "Fp2": "VEOG_down", "FT10": "HEOG_right"}
 
 # Names of the channels for each modality
 channel_names = {
@@ -385,7 +387,6 @@ if __name__ == "__main__":
                 plt.title("Event Markers")
                 axis.set_yticks([])
                 axis.set_xlabel("Time Stamp")
-                plt.show()
 
                 results_behav_dir = Path(results_dir) / exp_name / f"sub-{subject}" / "beh"
 
@@ -393,6 +394,9 @@ if __name__ == "__main__":
                 event_plot_name = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_events.png"
                 event_plot_file = results_behav_dir / event_plot_name
                 plt.savefig(event_plot_file)
+
+                if show_plots:
+                    plt.show()
 
             # STEP 2b: --------- RATING DATA -----------
             elif stream_modality_mapping[stream] == "beh":
@@ -410,13 +414,16 @@ if __name__ == "__main__":
 
                 # Plot the rating data
                 plot_raw_data(rating_data, stream, stream_sampling_rate[stream], stream_dimensions[stream])
-
+                
                 results_behav_dir = Path(results_dir) / exp_name / f"sub-{subject}" / "beh"
 
                 # Save the plot as a .png file
                 rating_plot_name = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_beh.png"
                 rating_plot_file = results_behav_dir / rating_plot_name
                 plt.savefig(rating_plot_file)
+
+                if show_plots:
+                    plt.show()
             
             # STEP 2c: --------- PHYSIOLOGICAL DATA (EEG, ECG, RESPIRATION, PPG) -----------
             elif stream_modality_mapping[stream] == "eeg":
@@ -444,17 +451,29 @@ if __name__ == "__main__":
                     info = mne.create_info(ch_names=channels_modality, sfreq=sampling_frequency)
                     # Create MNE raw object
                     raw = mne.io.RawArray(data, info)
-                    # Plot the raw data
-                    raw.plot(n_channels=32, title=f"{stream} {modality} data", duration=20, start=14)
+
+                    if show_plots:
+                        # Plot the raw data
+                        raw.plot(n_channels=32, title=f"{stream} {modality} data", duration=20, start=14)
 
                     if modality == "eeg":
-                        eeg_data = dataframe
+                        # Separate the EOG channels from the EEG channels
+                        eog_channels = [channel for channel in channel_names["eeg"] if channel in eog_channel_mapping.keys()]
+                        # Set the channel types to "eog" for the EOG channels
+                        raw.set_channel_types({channel: "eog" for channel in eog_channels})
+                        # Set the channel types to "eeg" for the EEG channels
+                        raw.set_channel_types({channel: "eeg" for channel in channel_names["eeg"] if channel not in eog_channels})
+                        eeg_data_raw = raw
+                        eeg_dataframe = dataframe
                     elif modality == "cardiac":
-                        cardiac_data = dataframe
+                        cardiac_data_raw = raw
+                        cardiac_dataframe = dataframe
                     elif modality == "respiratory":
-                        respiratory_data = dataframe
+                        respiratory_data_raw = raw
+                        respiratory_dataframe = dataframe
                     elif modality == "ppg":
-                        ppg_data = dataframe
+                        ppg_data_raw = raw
+                        ppg_dataframe = dataframe
 
             # STEP 2d: --------- VR DATA (HEAD MOVEMENT & EYETRACKING) -----------
             elif stream_modality_mapping[stream] == "motion" or "eyetrack":
@@ -479,6 +498,9 @@ if __name__ == "__main__":
                     )
                     plt.savefig(vr_plot_file)
 
+                    if show_plots:
+                        plt.show()
+
                 else:    # stream_modality_mapping[stream] == "eyetrack"
                     # Exclude the timestamp and confidence dimension for the eyetracking data
                     vr_data = vr_data[:, :-2]
@@ -502,6 +524,8 @@ if __name__ == "__main__":
                     )
                     plt.savefig(vr_plot_file)
 
+                    if show_plots:
+                        plt.show()
 
                     # ------------ Sanity Check for Eye Tracking Data ------------
                     # Get the timestamps of the White Flash event markers
@@ -536,7 +560,9 @@ if __name__ == "__main__":
                         f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_recording-eye3_whiteflash.png",
                     )
                     plt.savefig(eye_tracking_plot_file)
-                    plt.show()
+
+                    if show_plots:
+                        plt.show()
 
                     # Create a separate plot for each white flash event and 5s before and after
                     for i, (start, stop) in enumerate(zip(white_flash_timestamps_start, white_flash_timestamps_stop)):
@@ -565,7 +591,8 @@ if __name__ == "__main__":
                             f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_recording-eye3_whiteflash_{i+1}.png",
                         )
                         plt.savefig(eye_tracking_plot_file)
-                        plt.show()
+                        if show_plots:
+                            plt.show()
             else:
                 print(f"Stream {stream} not recognized")
 
@@ -599,8 +626,8 @@ if __name__ == "__main__":
                     json.dump(events_metadata, f, indent=4)
 
                 # STEP 3b: --------- RATING DATA -----------
-                # Create a *_beh.tsv file containing the rating data
-                rating_filename = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_beh.tsv"
+                # Create a *_beh.tsv.gz file containing the rating data
+                rating_filename = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_beh.tsv.gz"
                 rating_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / rating_filename
                 # Save the rating data in a tsv file
                 rating_data_dataframe.to_csv(rating_file, sep="\t", index=False)
@@ -632,8 +659,8 @@ if __name__ == "__main__":
 
             # STEP 3c: --------- HEADMOVEMENT -----------
             elif datatype == "motion":
-                # Create a *tracksys-headmovement_motion.tsv file containing the headmovement data
-                headmovement_filename = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_tracksys-headmovement_run-{run}_motion.tsv"
+                # Create a *tracksys-headmovement_motion.tsv.gz file containing the headmovement data
+                headmovement_filename = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_tracksys-headmovement_run-{run}_motion.tsv.gz"
                 headmovement_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / headmovement_filename
                 # Save the headmovement data in a tsv file
                 head_movement_data_dataframe.to_csv(headmovement_file, sep="\t", index=False)
@@ -652,7 +679,7 @@ if __name__ == "__main__":
                 # Save the headmovement metadata in a json file
                 with open(headmovement_metadata_file, "w") as f:
                     json.dump(headmovement_metadata, f, indent=4)
-                    
+
                 # Create a *tracksys-headmovement_channels.tsv file containing the channel information
                 headmovement_channels_filename = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_tracksys-headmovement_run-{run}_channels.tsv"
                 headmovement_channels_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / headmovement_channels_filename
@@ -690,25 +717,13 @@ if __name__ == "__main__":
                 # Save the eye tracking metadata in a json file
                 with open(eyetrack_metadata_file, "w") as f:
                     json.dump(eyetrack_metadata, f, indent=4)
-                    
+
             # STEP 3e: --------- EEG -----------
             elif datatype == "eeg":
 
                 # Create a *_eeg.edf file containing the EEG data
-                signal_headers = highlevel.make_signal_headers(
-                    channel_names["eeg"], sample_frequency=stream_sampling_rate["LiveAmpSN-054206-0127"]
-                )
-                header = highlevel.make_header(patientname=subject_name),
-                highlevel.write_edf(
-                    f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_eeg.edf",
-                    eeg_data[channel_names["eeg"]].values.T,
-                    signal_headers,
-                    header[0],
-                )
-                # TODO: does not work atm: units don't align (min value -200 and is -200.000 roughly)
-
-                # Separate the EOG channels from the EEG channels
-                eog_channels = [channel for channel in channel_names["eeg"].items() if channel in eog_channel_mapping.keys()]
+                eeg_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_eeg.edf"
+                mne.export.export_raw(eeg_file, eeg_data_raw, overwrite=True)
 
                 # Create a *_eeg.json file containing the metadata
                 eeg_metadata = {
@@ -719,12 +734,12 @@ if __name__ == "__main__":
                     "TaskDescription": "VR task with head movement" if "mov" in subject_task_mapping[subject] else "VR task without head movement",
                     "CapManufacturer": "Brain Products",
                     "CapManufacturersModelName": "ActiCap snap 64 channels",
-                    "EEGChannelCount": len(channel_names["eeg"]),
+                    "EEGChannelCount": len(channel_names["eeg"]) - len(eog_channels),
                     "ECGChannelCount": len(channel_names["cardiac"]),
                     "EOGChannelCount": len(eog_channels),
                     "MiscChannelCount": len(channel_names["respiratory"]) + len(channel_names["ppg"]),
                     "EEGReference": "Cz",
-                    "RecordingDuration": len(eeg_data) / stream_sampling_rate["LiveAmpSN-054206-0127"],
+                    "RecordingDuration": len(eeg_dataframe) / stream_sampling_rate["LiveAmpSN-054206-0127"],
                     "RecordingType": "continuous",
                     "EEGGround": "AFz",
                     "EEGPlacementScheme": "10-20",
@@ -740,12 +755,17 @@ if __name__ == "__main__":
                 eeg_channels_filename = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_channels.tsv"
                 eeg_channels_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eeg_channels_filename
 
+                # Create list with channel types
+                list_types = list({channel: "EEG" if channel not in eog_channels else eog_channel_mapping[channel].split("_")[0] for channel in channel_names["eeg"]}.values())
+                # Create list with channel descriptions
+                list_descriptions = list({channel: f"channel {channel} of the EEG cap" if channel not in eog_channels else f"channel {channel} of the EOG ({eog_channel_mapping[channel]})" for channel in channel_names["eeg"]}.values())
                 # Create a dataframe with the channel information
-                channels_metadata = {
+                channels_metadata = pd.DataFrame(data={
                     "name": channel_names["eeg"],
-                    "type_mapping": {channel: "EEG" if channel not in eog_channels else eog_channel_mapping[channel] for channel in channel_names["eeg"]},
-                    "units": "uV",
-                }
+                    "type": list_types,
+                    "units": ["uV" for channel in channel_names["eeg"]],
+                    "description": list_descriptions,}
+                )
 
                 # Save the channel information in a tsv file
                 channels_metadata.to_csv(eeg_channels_file, sep="\t", index=False)
@@ -754,10 +774,11 @@ if __name__ == "__main__":
                 # Create a *_physio.tsv.gz file containing the physiological data (ECG, respiration, PPG)
                 physio_filename = f"{subject_name}_ses-{session}_task-{subject_task_mapping[subject]}_run-{run}_physio.tsv.gz"
                 physio_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / physio_filename
+                # Remove the timestamp column from the respiratory and ppg dataframes
+                respiratory_dataframe = respiratory_dataframe.drop(columns=["timestamp"])
+                ppg_dataframe = ppg_dataframe.drop(columns=["timestamp"])
                 # Combine the physiological data into a single dataframe
-                physio_data = pd.concat([cardiac_data, respiratory_data, ppg_data], axis=1)
-                # Make the timestamps column the first column
-                physio_data.insert(0, "timestamp", cardiac_data["timestamp"])
+                physio_data = pd.concat([cardiac_dataframe, respiratory_dataframe, ppg_dataframe], axis=1)
                 # Name the columns
                 physio_data.columns = ["timestamp", "cardiac", "respiratory", "ppg"]
                 # Save the physiological data in a tsv file
