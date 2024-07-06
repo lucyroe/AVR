@@ -62,9 +62,9 @@ avg_preprocessed_folder.mkdir(parents=True, exist_ok=True)
 avg_results_folder = results_dir / exp_name / averaged_name / datatype_name
 avg_results_folder.mkdir(parents=True, exist_ok=True)
 
-# Define if the first and last 5 seconds of the data should be cut off
+# Define if the first and last 2.5 seconds of the data should be cut off
 # To avoid any potential artifacts at the beginning and end of the experiment
-cut_off_seconds = 5
+cut_off_seconds = 2.5
 
 # Only analyze one subject when debug mode is on
 debug = True
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         end_time = event_markers[event_markers["trial_type"] == end_marker]["onset"].iloc[0]
 
         # Cut data to start and end time
-        # And remove first and last 5 seconds of data (if specified above)
+        # And remove first and last 2.5 seconds of data (if specified above)
         if cut_off_seconds > 0:
             data = data[
                 (data["onset"] >= start_time + cut_off_seconds) & (data["onset"] <= end_time - cut_off_seconds)
