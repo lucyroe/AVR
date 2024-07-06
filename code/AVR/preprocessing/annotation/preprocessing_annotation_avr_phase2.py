@@ -1,11 +1,11 @@
 ########################################################################################################################
-# Script to preprocess CR data from Affective VR phase 2 or 3
+# Script to preprocess CR data from Affective VR phase 2
 
-# Inputs:       Raw data from Affective VR phase 2 or 3
+# Inputs:       Raw data from Affective VR phase 2
 # Outputs:      Preprocessed data from AVR data for each participant as csv files in "Preprocessed" directory
 #
 # Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
-# Last version: 17.01.2023
+# Last version: 06.07.2024
 ########################################################################################################################
 
 # -------------------- IMPORT PACKAGES -------------------------

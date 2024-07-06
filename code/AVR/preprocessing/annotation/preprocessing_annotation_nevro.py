@@ -1,5 +1,5 @@
 """
-Script to preprocess annotation data for a given dataset (atm: NeVRo).
+Script to preprocess annotation data for NeVRo dataset.
 
 Inputs: Raw annotation data
 
@@ -22,7 +22,7 @@ Steps:
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke@fu-berlin.de
-Last update: May 23rd, 2024
+Last update: July 6th, 2024
 """
 
 # %% Import
