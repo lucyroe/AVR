@@ -644,9 +644,8 @@ if __name__ == "__main__":
                     "flubber_amplitude": {
                         "LongName": "Flubber amplitude",
                         "Description": "Amplitude of the flubber pulses (visual feedback for participant)",
-                        "Range": [0.2, 0.8], # TODO: check with A.
+                        "Range": [0.07, 0.0875],
                         "SamplingRate": stream_sampling_rate["RatingCR"],
-                        "Units": "??",  # TODO: check with A.
                     },
                 }
 
