@@ -22,11 +22,12 @@ Required packages: mne, neurokit
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
-Created on: July 6th, 2024
+Created on: July 8th, 2024
 Last update: July 6th, 2024
 """
 # %% Import
 import gzip
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -144,10 +145,11 @@ if __name__ == "__main__":
         subject_data_path = data_dir / exp_name / rawdata_name / f"sub-{subject}" / datatype_name
 
         # Get the info json files
-        info_eeg = pd.read_json(subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_eeg.json", orient='split')
+        info_eeg_file = open(subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_eeg.json")
+        info_eeg = json.load(info_eeg_file)
         info_channels = pd.read_csv(subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_channels.tsv", sep="\t")
-        info_physio = pd.read_json(subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_physio.json", orient='split')
-        # TODO: problem with loading json files -> fix next time
+        info_physio_file = open(subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_physio.json")
+        info_physio = json.load(info_physio_file)
 
         # Get the EOG channels
         eog_channels = info_channels[info_channels["type"] != "EEG"]["name"].to_list()
