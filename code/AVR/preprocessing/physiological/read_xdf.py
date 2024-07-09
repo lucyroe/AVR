@@ -63,7 +63,7 @@ if debug:
     subjects = subjects[0]
 
 # Show plots
-show_plots = True  # Set to "True" to show the plots
+show_plots = False  # Set to "True" to show the plots
 
 # Specify the data path info (in BIDS format)
 # change with the directory of data storage
@@ -633,6 +633,20 @@ if __name__ == "__main__":
                         "Description": "Arousal rating from the VR controller",
                         "Range": [-1, 1],
                         "SamplingRate": stream_sampling_rate["RatingCR"],
+                    },
+                    "flubber_frequency": {
+                        "LongName": "Flubber pulse frequency",
+                        "Description": "Frequency of the flubber pulses (visual feedback for participant)",
+                        "Range": [0.5, 2.5],
+                        "SamplingRate": stream_sampling_rate["RatingCR"],
+                        "Units": "Hz",
+                    },
+                    "flubber_amplitude": {
+                        "LongName": "Flubber amplitude",
+                        "Description": "Amplitude of the flubber pulses (visual feedback for participant)",
+                        "Range": [0.2, 0.8], # TODO: check with A.
+                        "SamplingRate": stream_sampling_rate["RatingCR"],
+                        "Units": "??",  # TODO: check with A.
                     },
                 }
 
