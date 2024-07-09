@@ -57,6 +57,11 @@ from matplotlib import cm
 subjects = ["001", "002", "003"]  # Adjust as needed
 task = "AVR"  # Task name
 
+# Debug mode: Only process the one subject
+debug = False
+if debug:
+    subjects = subjects[0]
+
 # Show plots
 show_plots = True  # Set to "True" to show the plots
 
