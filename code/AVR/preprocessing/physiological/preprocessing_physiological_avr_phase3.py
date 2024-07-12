@@ -6,24 +6,22 @@ Inputs: Raw EEG data in .edf files, ECG and PPG data in tsv.gz files
 Outputs: Preprocessed data (EEG, ECG, PPG) in tsv files
 
 Functions:
-    crop_data(raw_data, markers, sampling_rate) -> mne.io.Raw:
-                        Crops the raw data to the given markers.
     plot_ecgpeaks(ecg_clean, rpeaks_info, min_time, max_time, plot_title, ecg_sampling_rate):
                         Plot ECG signal with R-peaks
 
 Steps:
 1. LOAD DATA TODO: update steps
-    1a. 
+    1a.
 2. PREPROCESS DATA
-    2a. 
+    2a.
 3. AVERAGE OVER ALL PARTICIPANTS
     3a.
 Required packages: mne, neurokit
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
-Created on: July 8th, 2024
-Last update: July 6th, 2024
+Created on: 6 July 2024
+Last update: 11 July 2024
 """
 # %% Import
 import gzip
@@ -39,10 +37,13 @@ import seaborn as sns
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-subjects = ["pilot003"]  # Adjust as needed
-# "pilot001", "pilot002"
-subject_task_mapping = {subject: "AVRnomov" if subject == "pilot001" else "AVR" for subject in subjects}
-# pilot subject 001 and 002 were the same person but once without movement and once with movement
+subjects = ["001", "002", "003"]  # Adjust as needed
+task = "AVR"
+
+# Only analyze one subject when debug mode is on
+debug = True
+if debug:
+    subjects = [subjects[0]]
 
 # Specify the data path info (in BIDS format)
 # Change with the directory of data storage
@@ -70,28 +71,7 @@ avg_results_folder.mkdir(parents=True, exist_ok=True)
 # To avoid any potential artifacts at the beginning and end of the experiment
 cut_off_seconds = 2.5
 
-# Only analyze one subject when debug mode is on
-debug = True
-if debug:
-    subjects = [subjects[0]]
-
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-def crop_data(raw_data, markers, sampling_rate) -> mne.io.Raw:
-    """Crops the raw data to the given markers."""
-    # Get events from annotations
-    events = mne.events_from_annotations(raw_data)
-
-    # Get index of the markers in the events
-    markers_indeces = [events[1][marker] for marker in markers]
-
-    # Get corresponding times for the markers and transform them to seconds
-    start_time = events[0][markers_indeces[0]][0] / sampling_rate
-    end_time = events[0][markers_indeces[1]][0] / sampling_rate
-
-    # Get the data for the current condition
-    return raw_data.copy().crop(tmin=start_time, tmax=end_time)
-
-
 def plot_ecgpeaks(ecg_clean, rpeaks_info, min_time, max_time, plot_title, ecg_sampling_rate):
     """
     Plot ECG signal with R-peaks.
@@ -145,29 +125,32 @@ if __name__ == "__main__":
         subject_data_path = data_dir / exp_name / rawdata_name / f"sub-{subject}" / datatype_name
 
         # Get the info json files
-        info_eeg_file = open(subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_eeg.json")
+        info_eeg_file = open(subject_data_path / f"sub-{subject}_task-{task}_eeg.json")
         info_eeg = json.load(info_eeg_file)
-        info_channels = pd.read_csv(subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_channels.tsv", sep="\t")
-        info_physio_file = open(subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_physio.json")
+        info_channels = pd.read_csv(subject_data_path / f"sub-{subject}_task-{task}_channels.tsv", sep="\t")
+        info_physio_file = open(subject_data_path / f"sub-{subject}_task-{task}_physio.json")
         info_physio = json.load(info_physio_file)
 
         # Get the EOG channels
-        eog_channels = info_channels[info_channels["type"] != "EEG"]["name"].to_list()
+        eog_channels = []
+        for channel in info_channels.iterrows():
+            if "EOG" in channel[1]["type"]:
+                eog_channels.append(channel[1]["name"])
 
         # Read in EEG data
         raw_eeg_data = mne.io.read_raw_edf(
-            subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_eeg.edf",
+            subject_data_path / f"sub-{subject}_task-{task}_eeg.edf",
             eog=eog_channels,
             preload=True
         )
 
         # Unzip and read in other physiological data (ECG, PPG)
-        file = subject_data_path / f"sub-{subject}_task-{subject_task_mapping[subject]}_physio.tsv.gz"
+        file = subject_data_path / f"sub-{subject}_task-{task}_physio.tsv.gz"
         with gzip.open(file, "rt") as f:
             raw_physio_data = pd.read_csv(f, sep="\t")
         # Separate ECG and PPG data
-        raw_ecg_data = raw_physio_data["timestamp"] + raw_physio_data["cardiac"]
-        raw_ppg_data = raw_physio_data["timestamp"] + raw_physio_data["ppg"]
+        raw_ecg_data = pd.DataFrame(data = raw_physio_data, columns=["timestamp", "cardiac"])
+        raw_ppg_data = pd.DataFrame(data = raw_physio_data, columns=["timestamp", "ppg"])
 
         # Get the sampling rates of the data from info json files
         sampling_rates = {"eeg": info_eeg["SamplingFrequency"],
@@ -177,107 +160,69 @@ if __name__ == "__main__":
         # Load event markers for subject
         event_markers = pd.read_csv(
             data_dir / exp_name / rawdata_name / f"sub-{subject}" / "beh" /
-            f"sub-{subject}_task-{subject_task_mapping[subject]}_events.tsv", sep="\t"
+            f"sub-{subject}_task-{task}_events.tsv", sep="\t"
         )
 
         # Load mapping for event markers to real events
         event_mapping = pd.read_csv(data_dir / exp_name / rawdata_name / "events_mapping.tsv", sep="\t")
-        # TODO: update event_mapping.tsv with correct mapping when markers are finalized  # noqa: FIX002
+
+        # Drop column with trial type
+        event_mapping = event_mapping.drop(columns=["trial_type"])
+
+        # Add column with event names to event markers
+        events = pd.concat([event_markers, event_mapping], axis=1)
+
+        # Drop unnecessary columns
+        events = events.drop(columns=["duration"])
+
+        # Set event time to start at delay of first event after beginning of recording
+        events["onset"] = events["onset"] - raw_ecg_data["timestamp"].iloc[0]
+
+        # Set time to start at 0
+        # EEG data already starts at 0
+        raw_ecg_data["timestamp"] = raw_ecg_data["timestamp"] - raw_ecg_data["timestamp"].iloc[0]
+        raw_ppg_data["timestamp"] = raw_ppg_data["timestamp"] - raw_ppg_data["timestamp"].iloc[0]
 
         # %% STEP 2. PREPROCESS DATA
         # 2a. Cutting data
         # Get start and end time of the experiment
-        start_marker = event_mapping[event_mapping["event_name"] == "start_experiment"]["trial_type"].iloc[0]
-        start_time = event_markers[event_markers["trial_type"] == start_marker]["onset"].iloc[1]
-        end_marker = event_mapping[event_mapping["event_name"] == "end_experiment"]["trial_type"].iloc[0]
-        end_time = event_markers[event_markers["trial_type"] == end_marker]["onset"].iloc[0]
+        start_time = events[events["event_name"] == "start_experiment"]["onset"].iloc[0]
+        end_time = events[events["event_name"] == "end_experiment"]["onset"].iloc[0]
+
+        # Get events for experiment (from start to end of experiment)
+        events_experiment = events[(events["onset"] >= start_time) & (events["onset"] <= end_time)]
 
         # Cut data to start and end time
         # And remove first and last 2.5 seconds of data (if specified above)
+        if cut_off_seconds > 0:
+            cropped_eeg_data = raw_eeg_data.copy().crop(tmin=(start_time + cut_off_seconds), tmax=(end_time - cut_off_seconds))
+            cropped_ecg_data = raw_ecg_data[(raw_ecg_data["timestamp"] >= (start_time + cut_off_seconds)) & (raw_ecg_data["timestamp"] <= (end_time - cut_off_seconds))]
+            cropped_ppg_data = raw_ppg_data[(raw_ppg_data["timestamp"] >= (start_time + cut_off_seconds)) & (raw_ppg_data["timestamp"] <= (end_time - cut_off_seconds))]
+        else:
+            cropped_eeg_data = raw_eeg_data.copy().crop(tmin=(start_time), tmax=(end_time))
+            cropped_ecg_data = raw_ecg_data[(raw_ecg_data["timestamp"] >= (start_time)) & (raw_ecg_data["timestamp"] <= (end_time))]
+            cropped_ppg_data = raw_ppg_data[(raw_ppg_data["timestamp"] >= (start_time)) & (raw_ppg_data["timestamp"] <= (end_time))]
 
-            # Crop data to the current condition
-            data_condition = crop_data(raw_data, markers_condition, sampling_rates["EEG"])
+        # %%
+        # 2b. Format data
+        # Set time to start at 0
+        # EEG data already starts at 0
+        cropped_ecg_data["timestamp"] = cropped_ecg_data["timestamp"] - cropped_ecg_data["timestamp"].iloc[0]
+        cropped_ppg_data["timestamp"] = cropped_ppg_data["timestamp"] - cropped_ppg_data["timestamp"].iloc[0]
 
-            # Loop over sections
-            for section in sections:
-                # Get markers for the current section
-                markers_section = markers_sections[condition][section]
+        # Adjust event time so first marker starts at - cut_off_seconds
+        
+        # Round onset column to 3 decimal places (1 ms accuracy)
+        # To account for small differences in onset times between participants
+        cropped_ecg_data.times = cropped_eeg_data.times.round(2)
+        cropped_ecg_data["timestamp"] = cropped_ecg_data["timestamp"].round(3)
+        cropped_ppg_data["timestamp"] = cropped_ppg_data["timestamp"].round(3)
 
-                # Crop data to the current section
-                data_section = crop_data(raw_data, markers_section, sampling_rates["EEG"])
+        # Reset index
+        cropped_ecg_data = cropped_ecg_data.reset_index(drop=True)
+        cropped_ppg_data = cropped_ppg_data.reset_index(drop=True)
 
-                # TODO: problem: dataframes have different lengths for each participant  # noqa: FIX002
-                # but should be 74.000 samples = 148s
-                # exclude participants with different lengths for now
-                # but sth is wrong with the markers (different markers for different participants?)
-                # so cropping data for the current section results in different lengths
-
-                # Check if the section differentiates from the defined length
-                if round(data_section.times[-1]) - round(data_section.times[0]) != section_lengths[section]:
-                    print(
-                        "Section "
-                        + section
-                        + " of Participant "
-                        + subject
-                        + " is too short or too long. Participant will be excluded."
-                    )
-                    continue
-                else:
-                    print("Section " + section + " of Participant " + subject + " is the correct length.")
-
-                # Trim trim_seconds from the beginning and end of the data
-                data_section_trimmed = data_section.copy().crop(
-                    tmin=trim_seconds, tmax=round(data_section.times[-1]) - trim_seconds
-                )
-
-                # Separate EEG and ECG data
-                if "ECG" in modalities:
-                    # select only the ECG channel
-                    data_section_ecg = data_section_trimmed.copy().pick(["ECG"])
-                if "EEG" in modalities:
-                    # exclude GSR, ECG, and EOG channels
-                    data_section_eeg = data_section_trimmed.copy().pick(
-                        [
-                            "Fp1",
-                            "Fz",
-                            "F3",
-                            "F7",
-                            "FC5",
-                            "FC1",
-                            "C3",
-                            "T7",
-                            "TP9",
-                            "CP5",
-                            "CP1",
-                            "Pz",
-                            "P3",
-                            "P7",
-                            "O1",
-                            "Oz",
-                            "O2",
-                            "P4",
-                            "P8",
-                            "TP10",
-                            "CP6",
-                            "CP2",
-                            "Cz",
-                            "C4",
-                            "T8",
-                            "FC6",
-                            "FC2",
-                            "F4",
-                            "F8",
-                            "Fp2",
-                        ]
-                    )
-
-                # %% STEP 2. PREPROCESS DATA
-
-                # Downsample data if downsample is True
-                if downsample:
-                    data_section_eeg.resample(sfreq=downsample_rate)
-                    data_section_ecg.resample(sfreq=downsample_rate)
-
+        # %%
                 # plot ECG data for manual inspection
                 # data_section_ecg.plot()  # noqa: ERA001
 
