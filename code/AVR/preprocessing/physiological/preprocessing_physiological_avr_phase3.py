@@ -6,22 +6,29 @@ Inputs: Raw EEG data in .edf files, ECG and PPG data in tsv.gz files
 Outputs: Preprocessed data (EEG, ECG, PPG) in tsv files
 
 Functions:
-    plot_ecgpeaks(ecg_clean, rpeaks_info, min_time, max_time, plot_title, ecg_sampling_rate):
+    plot_peaks(cleaned_signal
+, rpeaks_info, min_time, max_time, plot_title, sampling_rate):
                         Plot ECG signal with R-peaks
 
 Steps:
-1. LOAD DATA TODO: update steps
-    1a.
+1. LOAD DATA
+    1a. Load EEG data
+    1b. Load ECG and PPG data
+    1c. Load event markers
+    1d. Load event mapping
 2. PREPROCESS DATA
-    2a.
+    2a. Cutting data
+    2b. Format data
+    2c. Preprocess ECG and PPG data
+    2d. Preprocess EEG data
 3. AVERAGE OVER ALL PARTICIPANTS
     3a.
-Required packages: mne, neurokit
+Required packages: mne, neurokit, systole
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 11 July 2024
+Last update: 14 July 2024
 """
 # %% Import
 import gzip
@@ -34,6 +41,9 @@ import neurokit2 as nk
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from systole.interact import Editor
+from IPython.display import display
+from bokeh.plotting import figure, show, output_notebook
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -44,6 +54,16 @@ task = "AVR"
 debug = True
 if debug:
     subjects = [subjects[0]]
+
+# Define if plots for sanity checks should be shown
+show_plots = True
+
+# Define whether manual cleaning of R-peaks should be done
+manual_cleaning = False
+
+# Define whether scaling of the data should be done
+scaling = True
+scale_factor = 0.01
 
 # Specify the data path info (in BIDS format)
 # Change with the directory of data storage
@@ -72,41 +92,40 @@ avg_results_folder.mkdir(parents=True, exist_ok=True)
 cut_off_seconds = 2.5
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-def plot_ecgpeaks(ecg_clean, rpeaks_info, min_time, max_time, plot_title, ecg_sampling_rate):
+def plot_peaks(cleaned_signal, peaks, min_time, max_time, plot_title, sampling_rate):
     """
-    Plot ECG signal with R-peaks.
+    Plot ECG or PPG signal with peaks.
 
     Arguments:
     ---------
-    - ecg_clean = dict or ndarray
-    - rpeaks_info = dict obtained from nk.ecg_peaks() function
+    - cleaned_signal = dict or ndarray
+    - peaks = peaks
     - min_time = starting time of the to-be-plotted interval
     - max_time = final time of the to-be-plotted interval
     - plot_title = general title of the plot (optional)
-    - ecg_sampling_rate = sampling rate of the ECG signal
+    - sampling_rate = sampling rate of the signal
 
     """
     # Transform min_time and max_time to samples
-    min_sample = int(min_time * ecg_sampling_rate)
-    max_sample = int(max_time * ecg_sampling_rate)
+    min_sample = int(min_time * sampling_rate)
+    max_sample = int(max_time * sampling_rate)
     # Create a time vector (samples)
     time = np.arange(min_sample, max_sample)
     fig, axs = plt.subplots(figsize=(10, 5))
 
-    # Select ECG signal and R-Peaks interval to plot
-    ecg_select = ecg_clean[min_sample:max_sample]
-    rpeaks = rpeaks_info["ECG_R_Peaks"]
-    rpeaks_select = rpeaks[(rpeaks < max_sample) & (rpeaks >= min_sample)]
+    # Select signal and peaks interval to plot
+    selected_signal = cleaned_signal[min_sample:max_sample]
+    selected_peaks = peaks[(peaks < max_sample) & (peaks >= min_sample)]
 
-    axs.plot(time, ecg_select, linewidth=1, label="ECG signal")
-    axs.scatter(rpeaks_select, ecg_select[rpeaks_select - min_sample], color="gray", edgecolor="k", alpha=0.6)
-    axs.set_ylabel("ECG (mV)")
-    axs.set_ylim(-0.015, 0.02)  # set y-axis range in V
-    # transform y-axis ticks from V to mV
-    axs.set_yticklabels([f"{round(x,3)*100}" for x in axs.get_yticks()])
+    # Transform data from mV to V
+    selected_signal = selected_signal / 1000
+
+    axs.plot(time, selected_signal, linewidth=1, label="Signal")
+    axs.scatter(selected_peaks, selected_signal[selected_peaks - min_sample], color="gray", edgecolor="k", alpha=0.6)
+    axs.set_ylabel("ECG" if "ECG" in plot_title else "PPG")
     axs.set_xlabel("Time (s)")
     # transform x-axis to seconds
-    axs.set_xticklabels([f"{x/ecg_sampling_rate}" for x in axs.get_xticks()])
+    axs.set_xticklabels([f"{x/sampling_rate}" for x in axs.get_xticks()])
     if plot_title:
         axs.set_title(plot_title)
 
@@ -183,14 +202,16 @@ if __name__ == "__main__":
         raw_ecg_data["timestamp"] = raw_ecg_data["timestamp"] - raw_ecg_data["timestamp"].iloc[0]
         raw_ppg_data["timestamp"] = raw_ppg_data["timestamp"] - raw_ppg_data["timestamp"].iloc[0]
 
-        # %% STEP 2. PREPROCESS DATA
-        # 2a. Cutting data
+# %% STEP 2. PREPROCESS DATA
+        # ---------------------- 2a. Cutting data ----------------------
         # Get start and end time of the experiment
-        start_time = events[events["event_name"] == "start_experiment"]["onset"].iloc[0]
-        end_time = events[events["event_name"] == "end_experiment"]["onset"].iloc[0]
+        start_time = events[events["event_name"] == "start_spaceship"]["onset"].iloc[0]
+        end_time = events[events["event_name"] == "end_spaceship"]["onset"].iloc[-1]
 
         # Get events for experiment (from start to end of experiment)
         events_experiment = events[(events["onset"] >= start_time) & (events["onset"] <= end_time)]
+        # Delete unnecessary column trial_type
+        events_experiment = events_experiment.drop(columns=["trial_type"])
 
         # Cut data to start and end time
         # And remove first and last 2.5 seconds of data (if specified above)
@@ -203,101 +224,183 @@ if __name__ == "__main__":
             cropped_ecg_data = raw_ecg_data[(raw_ecg_data["timestamp"] >= (start_time)) & (raw_ecg_data["timestamp"] <= (end_time))]
             cropped_ppg_data = raw_ppg_data[(raw_ppg_data["timestamp"] >= (start_time)) & (raw_ppg_data["timestamp"] <= (end_time))]
 
-        # %%
-        # 2b. Format data
+        # ---------------------- 2b. Format data ----------------------
         # Set time to start at 0
         # EEG data already starts at 0
         cropped_ecg_data["timestamp"] = cropped_ecg_data["timestamp"] - cropped_ecg_data["timestamp"].iloc[0]
         cropped_ppg_data["timestamp"] = cropped_ppg_data["timestamp"] - cropped_ppg_data["timestamp"].iloc[0]
 
-        # Adjust event time so first marker starts at - cut_off_seconds
-        
+        # Adjust event time so first marker starts not at 0 but at - cut_off_seconds
+        events_experiment["onset"] = events_experiment["onset"] - start_time - cut_off_seconds
+
         # Round onset column to 3 decimal places (1 ms accuracy)
         # To account for small differences in onset times between participants
         cropped_ecg_data.times = cropped_eeg_data.times.round(2)
         cropped_ecg_data["timestamp"] = cropped_ecg_data["timestamp"].round(3)
         cropped_ppg_data["timestamp"] = cropped_ppg_data["timestamp"].round(3)
+        events_experiment["onset"] = events_experiment["onset"].round(3)
 
         # Reset index
+        events_experiment = events_experiment.reset_index(drop=True)
         cropped_ecg_data = cropped_ecg_data.reset_index(drop=True)
         cropped_ppg_data = cropped_ppg_data.reset_index(drop=True)
 
-        # %%
-                # plot ECG data for manual inspection
-                # data_section_ecg.plot()  # noqa: ERA001
+        # Scale ECG and PPG data
+        if scaling:
+            cropped_ecg_data["cardiac"] = cropped_ecg_data["cardiac"] * scale_factor
+            cropped_ppg_data["ppg"] = cropped_ppg_data["ppg"] * scale_factor
 
-                # plot EEG data for manual inspection
-                # data_section_eeg.plot()  # noqa: ERA001
+        # ---------------------- 2c. Preprocess ECG and PPG data ----------------------
+        # Flip ECG signal (as it is inverted)
+        ecg_data_flipped = nk.ecg_invert(cropped_ecg_data["cardiac"], sampling_rate=sampling_rates["ecg"], force=True)[0]
 
-                # ------------------------ ECG ------------------------
-                # get data as numpy array
-                ecg_data = data_section_ecg.get_data()[0]
-                # get sampling rate
-                ecg_sampling_rate = data_section_ecg.info["sfreq"]
+        # Data Cleaning using NeuroKit for ECG data
+        # A 50 Hz powerline filter and
+        # 4th-order Butterworth filters (0.5 Hz high-pass, 30 Hz low-pass)
+        # are applied to the ECG signal.
+        cleaned_ecg = nk.signal_filter(
+            ecg_data_flipped,
+            sampling_rate=sampling_rates["ecg"],
+            lowcut=0.5,
+            highcut=30,
+            method="butterworth",
+            order=4,
+            powerline=50,
+            show=False,
+            )
+        # R-peaks detection using NeuroKit for ECG data
+        r_peaks_ecg, info_ecg = nk.ecg_peaks(cleaned_ecg, sampling_rate=sampling_rates["ecg"])
 
-                # flip ECG signal (as it is inverted)
-                ecg_data_flipped = nk.ecg_invert(ecg_data, sampling_rate=ecg_sampling_rate, force=True)[0]
+        # Data Cleaning using NeuroKit for PPG data
+        # Uses the preprocessing pipeline "elgendi" and "templatematch" to asses quality of method
+        # R-peaks detection using NeuroKit for PPG data
+        signals_ppg, info_ppg = nk.ppg_process(cropped_ppg_data["ppg"], sampling_rate=sampling_rates["ppg"], method="elgendi",
+            method_quality="templatematch")
 
-                # Data Cleaning using NeuroKit
-                # A 50 Hz powerline filter and
-                # 4th-order Butterworth filters (0.5 Hz high-pass, 30 Hz low-pass)
-                # are applied to the ECG signal.
-                ecg_cleaned = nk.signal_filter(
-                    ecg_data_flipped,
-                    sampling_rate=ecg_sampling_rate,
-                    lowcut=0.5,
-                    highcut=30,
-                    method="butterworth",
-                    order=4,
-                    powerline=50,
-                    show=False,
-                )
+        # Plot cleaned ECG data and R-peaks for the first 10s
+        if show_plots:
+            plot_peaks(cleaned_signal=cleaned_ecg, peaks=info_ecg["ECG_R_Peaks"], min_time=0, max_time=10,
+                plot_title="Cleaned ECG signal with R-peaks", sampling_rate=sampling_rates["ecg"])
 
-                # R-peaks detection using NeuroKit
-                r_peaks, info = nk.ecg_peaks(ecg_cleaned, sampling_rate=ecg_sampling_rate)
+        # Plot PPG data and PPG-peaks for the first 10s
+        if show_plots:
+            plot_peaks(cleaned_signal=signals_ppg["PPG_Clean"], peaks=info_ppg["PPG_Peaks"], min_time=0, max_time=10,
+                plot_title="Cleaned PPG signal with PPG-peaks", sampling_rate=sampling_rates["ppg"])
 
-                # Plot cleaned ECG data and R-peaks for the first 10s
-                # plot_ecgpeaks(ecg_clean=ecg_cleaned, rpeaks_info=info, min_time=0, max_time=10,
-                # plot_title="Cleaned ECG signal with R-peaks", ecg_sampling_rate=ecg_sampling_rate)
+        # Perform manual cleaning of peaks if specified
+        if manual_cleaning:
+            # Manual correction of R-peaks
+            # Save JSON file with corrected R-peaks and bad segments indices
+            ecg_corr_fname = f'sub-{subject}_task-{exp_name}_rpeaks-corrected.json'
+            ecg_corr_fpath = Path(subject_preprocessed_folder) / ecg_corr_fname
 
-                # TODO: manually check R-peaks and adjust if necessary  # noqa: FIX002
+            # Transform array of R-peaks marked as 1s in a list of 0s to a boolean array
+            r_peaks_ecg_boolean = r_peaks_ecg["ECG_R_Peaks"].astype(bool)
 
-                # IBI Calculation
-                # Calculate inter-beat-intervals (IBI) from R-peaks
-                r_peaks_indices = info["ECG_R_Peaks"]
-                ibi = nk.signal_period(peaks=r_peaks_indices, sampling_rate=ecg_sampling_rate)
+            # Display interactive plot
+            # TODO: make this better by scaling it to 10 seconds for each window and then clicking through them
+            # Also, how do I actually correct anything?!
+            %matplotlib ipympl
 
-                # Calculate heart rate (HR) from R-peaks
-                heart_rate = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=ecg_sampling_rate)
+            editor_ecg = Editor(signal=cleaned_ecg,
+                        corrected_json=ecg_corr_fpath,
+                        sfreq=sampling_rates["ecg"], corrected_peaks=r_peaks_ecg_boolean,
+                        signal_type="ECG", figsize=(10, 6))
 
-                # TODO: exclude participants with 40 < HR < 90 ? (as resting state)  # noqa: FIX002
-                # TODO: relate HR to resting HR ?  # noqa: FIX002
+            display(editor_ecg.commands_box)
 
-                # plot IBI
-                plt.plot(ibi)
+            # Manual correction of PPG-peaks
+            # Save JSON file with corrected PPG-peaks and bad segments indices
+            ppg_corr_fname = f'sub-{subject}_task-{exp_name}_ppg-peaks-corrected.json'
+            ppg_corr_fpath = Path(subject_preprocessed_folder) / ppg_corr_fname
 
-                # plot HR
-                plt.plot(heart_rate)
+            # Transform array of PPG-peaks marked as 1s in a list of 0s to a boolean array
+            ppg_peaks_boolean = signals_ppg["PPG_Peaks"].astype(bool)
 
-                # create dataframe with cleaned ECG data, R-peaks, IBI, and HR
-                ecg_data_df = pd.DataFrame({"ECG": ecg_cleaned})
-                ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices)
-                ecg_data_df["IBI"] = pd.Series(ibi)
-                ecg_data_df["HR"] = pd.Series(heart_rate)
-                ecg_data_df["sampling_rate"] = pd.Series(ecg_sampling_rate)
-                # create array with subject id that has the same length as the other series
-                subject_array = [subject] * len(r_peaks_indices)
-                ecg_data_df["sj_id"] = pd.Series(subject_array)
+            editor_ppg = Editor(signal=signals_ppg["PPG_Clean"],
+                        corrected_json=ppg_corr_fpath,
+                        sfreq=sampling_rates["ppg"], corrected_peaks=ppg_peaks_boolean,
+                        signal_type="PPG", figsize=(10, 6))
 
-                # save ECG data to tsv file
-                ecg_data_df.to_csv(
-                    preprocessed_path + f"sub_{subject}_{condition}_{section}_ECG_preprocessed.tsv", sep="\t"
-                )
-                # ------------------------ EEG ------------------------
-                # PREP Pipeline (MATLAB) #TODO  # noqa: FIX002, TD004
+            display(editor_ppg.commands_box)
+
+        # Execute only when manual peak correction is done
+        if manual_cleaning:
+            editor_ecg.save()
+            editor_ppg.save()
+        
+        # Load corrected R-peaks and PPG-peaks if manual cleaning was done
+        if manual_cleaning:
+            # Load corrected R-peaks
+            with open(ecg_corr_fpath, "r") as f:
+                corrected_rpeaks = json.load(f)
+            # Load corrected PPG-peaks
+            with open(ppg_corr_fpath, "r") as f:
+                corrected_ppg_peaks = json.load(f)
+
+        # Calculate inter-beat-intervals (IBI) from peaks
+        r_peaks_indices = corrected_rpeaks["ecg"]["corrected_peaks"] if manual_cleaning else info_ecg["ECG_R_Peaks"]
+        ibi_ecg = nk.signal_period(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
+
+        ppg_peaks_indices = corrected_ppg_peaks["ppg"]["corrected_peaks"] if manual_cleaning else info_ppg["PPG_Peaks"]
+        ibi_ppg = nk.signal_period(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
+
+        # Calculate heart rate (HR) from peaks
+        heart_rate_ecg = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
+        heart_rate_ppg = nk.ppg_rate(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
+
+        # Plot IBI and HR for ECG and PPG data
+        if show_plots:
+            fig, axs = plt.subplots(2, 2, figsize=(20, 10))
+            axs[0, 0].plot(ibi_ecg)
+            axs[0, 0].set_title("IBI from ECG")
+            axs[0, 1].plot(heart_rate_ecg)
+            axs[0, 1].set_title("HR from ECG")
+            axs[1, 0].plot(ibi_ppg)
+            axs[1, 0].set_title("IBI from PPG")
+            axs[1, 1].plot(heart_rate_ppg)
+            axs[1, 1].set_title("HR from PPG")
+            plt.show()
+        
+        # Create dataframe with cleaned ECG data, R-peaks, IBI, and HR
+        ecg_data_df = pd.DataFrame({"ECG": cleaned_ecg})
+        ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices)
+        ecg_data_df["IBI"] = pd.Series(ibi_ecg)
+        ecg_data_df["HR"] = pd.Series(heart_rate_ecg)
+        # Create array with subject id that has the same length as the other series
+        subject_array = [subject] * len(cleaned_ecg)
+        ecg_data_df["subject"] = pd.Series(subject_array)
+        # Make the subject column the first column
+        ecg_data_df = ecg_data_df[["subject", "ECG", "R-peaks", "IBI", "HR"]]
+
+        # Save ECG data to tsv file
+        ecg_data_df.to_csv(
+            subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_ecg_preprocessed.tsv", sep="\t", index=False
+        )
+
+        # Create dataframe with cleaned PPG data, PPG-peaks, IBI, and HR
+        ppg_data_df = pd.DataFrame({"PPG": signals_ppg["PPG_Clean"]})
+        ppg_data_df["PPG-peaks"] = pd.Series(ppg_peaks_indices)
+        ppg_data_df["IBI"] = pd.Series(ibi_ppg)
+        ppg_data_df["HR"] = pd.Series(heart_rate_ppg)
+        # Create array with subject id that has the same length as the other series
+        subject_array = [subject] * len(signals_ppg["PPG_Clean"])
+        ppg_data_df["subject"] = pd.Series(subject_array)
+        # Make the subject column the first column
+        ppg_data_df = ppg_data_df[["subject", "PPG", "PPG-peaks", "IBI", "HR"]]
+
+        # Save PPG data to tsv file
+        ppg_data_df.to_csv(
+            subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_ppg_preprocessed.tsv", sep="\t", index=False
+        )
+
+        # ---------------------- 2d. Preprocess EEG data ----------------------
+
 
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
-    # TODO: this does not make sense atm  # noqa: FIX002
+
+    # TODO: THIS IS FROM OLD SCRIPT, NEEDS TO BE ADAPTED TO NEW SCRIPT  # noqa: FIX002
+
     # Loop over conditions
     for condition in conditions:
         # Loop over sections
@@ -327,14 +430,14 @@ if __name__ == "__main__":
             r_peaks, info = nk.ecg_peaks(data_avg, sampling_rate=ecg_data["sampling_rate"][0])
 
             # Plot cleaned ECG data and R-peaks for the first 10s
-            plot_ecgpeaks(
-                ecg_clean=data_avg,
+            plot_peaks(
+                cleaned_signal
+            =data_avg,
                 rpeaks_info=info,
                 min_time=0,
                 max_time=10,
                 plot_title="Cleaned ECG signal with R-peaks",
-                ecg_sampling_rate=ecg_data["sampling_rate"][0],
-            )
+                sampling_rate=ecg_data["sampling_rate"][0])
 
             # TODO: manually check R-peaks and adjust if necessary  # noqa: FIX002
 
@@ -356,6 +459,5 @@ if __name__ == "__main__":
             # Save ECG data to tsv file
             ecg_data_df.to_csv(preprocessed_path + f"avg_{condition}_{section}_ECG_preprocessed.tsv", sep="\t")
             # Average over all participants' EEG & save to .tsv file
-            # TODO  # noqa: FIX002, TD004
 
 # %%
