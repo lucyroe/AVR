@@ -64,7 +64,7 @@ if debug:
     subjects = subjects[0]
 
 # Show plots
-show_plots = False  # Set to "True" to show the plots
+show_plots = True  # Set to "True" to show the plots
 
 # Specify the data path info (in BIDS format)
 # change with the directory of data storage
@@ -390,6 +390,13 @@ if __name__ == "__main__":
         if len(streams) != 10:
             print(f"Not all streams are available in the XDF file of subject {subject}.")
             print("Please check the streams and their names.")
+            # Delete subject folder
+            subject_folder = data_dir / exp_name / rawdata_name / f"sub-{subject}"
+            for datatype_name in datatype_names:
+                datatype_folder = subject_folder / datatype_name
+                datatype_folder.rmdir()
+            subject_folder.rmdir()
+
             print("Continuing with the next subject...")
             continue
 
