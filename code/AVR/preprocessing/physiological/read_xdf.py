@@ -95,10 +95,10 @@ for subject in subjects:
         # Create the datatype folder if it does not exist
         datatype_folder_results.mkdir(parents=True, exist_ok=True)
 
-# Offset correction for LSL-BrainAmp fixed delay of 20 ms
+# Offset correction for LSL-BrainAmp fixed delay of 10 ms
 # Set to "False" if no offset correction is needed
 LSLoffset_corr = True
-LSLoffset = 0.020  # LSL markers precede the actual stimulus presentation by approx. 20 ms
+LSLoffset = 0.010  # LSL markers precede the actual stimulus presentation by approx. 10 ms
 
 # Define the streams to be selected for further processing
 selected_streams = ["Events", "RatingCR", "Head.PosRot", "EDIA.Eye.CENTER", "LiveAmpSN-054206-0127"]
