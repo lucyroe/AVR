@@ -68,8 +68,10 @@ show_plots = False  # Set to "True" to show the plots
 
 # Specify the data path info (in BIDS format)
 # change with the directory of data storage
-data_dir = Path("/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/")
-results_dir = Path("/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/")
+#data_dir = Path("/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/")
+#results_dir = Path("/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/")
+data_dir = Path("E:/AffectiveVR/Phase_3/Data/")
+results_dir = Path("E:/AffectiveVR/Phase_3/Results/")
 exp_name = "AVR"
 sourcedata_name = "sourcedata"  # sourcedata folder
 rawdata_name = "rawdata"  # rawdata folder
@@ -330,7 +332,7 @@ if __name__ == "__main__":
         # Merge information into complete datapath
         sourcedata_dir = Path(data_dir) / exp_name / sourcedata_name / subject_name / "ses-S001" / "eeg" / file_name
 
-        # %% STEP 1: LOAD XDF FILE & CHECK STREAMS
+        # STEP 1: LOAD XDF FILE & CHECK STREAMS
         # Load XDF file
         streams, header = pyxdf.load_xdf(sourcedata_dir)
 
@@ -397,7 +399,7 @@ if __name__ == "__main__":
         indexes_info = get_stream_indexes(streams, selected_streams)
         selected_indexes = list(indexes_info.values())
 
-        # %% STEP 2: PLOT RAW DATA FOR QUICK INSPECTION
+        # STEP 2: PLOT RAW DATA FOR QUICK INSPECTION
         for stream in selected_streams:
             # Extract the stream data
             stream_data = streams[indexes_info[stream]]
