@@ -6,8 +6,7 @@ Inputs: Raw EEG data in .edf files, ECG and PPG data in tsv.gz files
 Outputs: Preprocessed data (EEG, ECG, PPG) in tsv files
 
 Functions:
-    plot_peaks(cleaned_signal
-, rpeaks_info, min_time, max_time, plot_title, sampling_rate):
+    plot_peaks(cleaned_signal, rpeaks_info, min_time, max_time, plot_title, sampling_rate):
                         Plot ECG signal with R-peaks
 
 Steps:
@@ -28,7 +27,7 @@ Required packages: mne, neurokit, systole
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 14 July 2024
+Last update: 15 July 2024
 """
 # %% Import
 import gzip
@@ -59,7 +58,7 @@ if debug:
 show_plots = True
 
 # Define whether manual cleaning of R-peaks should be done
-manual_cleaning = False
+manual_cleaning = True
 
 # Define whether scaling of the data should be done
 scaling = True
@@ -300,7 +299,7 @@ if __name__ == "__main__":
             # Display interactive plot
             # TODO: make this better by scaling it to 10 seconds for each window and then clicking through them
             # Also, how do I actually correct anything?!
-            %matplotlib ipympl
+            %matplotlib qt
 
             editor_ecg = Editor(signal=cleaned_ecg,
                         corrected_json=ecg_corr_fpath,
@@ -395,6 +394,21 @@ if __name__ == "__main__":
         )
 
         # ---------------------- 2d. Preprocess EEG data ----------------------
+        # High-pass filter EEG data (0.5 Hz)
+
+        # Import channel locations
+
+        # Rereference EOG
+
+        # Subtract pre-stimulus baseline
+
+        # Mark bad electrodes
+
+        # Average reference EEG channels
+
+        # Run ICA to clean data
+
+        # Artifact rejection
 
 
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS

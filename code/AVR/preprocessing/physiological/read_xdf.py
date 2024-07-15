@@ -37,7 +37,7 @@ Required packages: pyxdf, mne
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 30 April 2024
-Last update: 9 July 2024
+Last update: 15 July 2024
 """
 
 # %% Import
@@ -54,7 +54,8 @@ from matplotlib import cm
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-subjects = ["001", "002", "003"]  # Adjust as needed
+subjects = ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010",
+            "011", "012", "013", "014", "015"]  # Adjust as needed
 task = "AVR"  # Task name
 
 # Debug mode: Only process the one subject
@@ -321,22 +322,23 @@ def plot_raw_data(data, stream_name, sampling_rate, labels):
 
 if __name__ == "__main__":
     # Iterate through each participant
-    for subject in subjects:
+    for index_subject, subject in enumerate(subjects):
+        print(f"Processing data for subject {index_subject + 1} (ID {subject}) of {len(subjects)}...")
         subject_name = "sub-" + subject  # participant ID
         file_name = f"{subject_name}_ses-S001_task-{task}_run-001_eeg.xdf"
 
         # Merge information into complete datapath
-        sourcedata_dir = Path(data_dir) / exp_name / sourcedata_name / subject_name / file_name
+        sourcedata_dir = Path(data_dir) / exp_name / sourcedata_name / subject_name / "ses-S001" / "eeg" / file_name
 
         # %% STEP 1: LOAD XDF FILE & CHECK STREAMS
         # Load XDF file
         streams, header = pyxdf.load_xdf(sourcedata_dir)
 
         # Print available streams in the XDF file
-        print("Available streams in the XDF file:")
+        print(f"Available streams in the XDF file of subject {subject}:")
         for stream in streams:
             print(stream["info"]["name"])
-
+        
         # List of the available streams in XDF file:
         # 'Head.PosRot':            Head movement from VR HMD
         #                           6 dimensions (PosX, PosY, PosZ, Pitch, Yaw, Roll)
@@ -384,6 +386,13 @@ if __name__ == "__main__":
         #                           90 Hz, float32
         #                           Length 145192 samples
 
+        # Check if all streams are there
+        if len(streams) != 10:
+            print(f"Not all streams are available in the XDF file of subject {subject}.")
+            print("Please check the streams and their names.")
+            print("Continuing with the next subject...")
+            continue
+
         # Extract indexes corresponding to certain streams
         indexes_info = get_stream_indexes(streams, selected_streams)
         selected_indexes = list(indexes_info.values())
@@ -412,9 +421,6 @@ if __name__ == "__main__":
                         "trial_type": (marker[0] for marker in event_markers),
                     }
                 )
-
-                # Print the event markers and timestamps
-                print(event_data)
 
                 # Plot the event markers and timestamps as a vertical lines
                 figure, axis = plt.subplots(1, 1, figsize=(20, 2))
