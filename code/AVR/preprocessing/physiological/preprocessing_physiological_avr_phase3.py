@@ -58,7 +58,7 @@ if debug:
 show_plots = True
 
 # Define whether manual cleaning of R-peaks should be done
-manual_cleaning = True
+manual_cleaning = False
 
 # Define whether scaling of the data should be done
 scaling = True
@@ -89,6 +89,9 @@ avg_results_folder.mkdir(parents=True, exist_ok=True)
 # Define if the first and last 2.5 seconds of the data should be cut off
 # To avoid any potential artifacts at the beginning and end of the experiment
 cut_off_seconds = 2.5
+
+# Get rid of the sometimes excessive logging of MNE
+mne.set_log_level('error')
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 def plot_peaks(cleaned_signal, peaks, min_time, max_time, plot_title, sampling_rate):
@@ -130,6 +133,84 @@ def plot_peaks(cleaned_signal, peaks, min_time, max_time, plot_title, sampling_r
 
     sns.despine()
     plt.show()
+
+def preprocess_eeg(raw_data: Raw,
+    low_frequency: float,
+    high_frequency: int,
+    resample_rate: float,
+    sampling_frequency: int,
+    detrend: bool,
+    ransac: bool,
+    autoreject: bool):
+    """
+    Preprocess EEG data using the MNE toolbox.
+
+    As implemented in MNE, add channel locations according to the 10/10 system,
+    inspect data for bad channels using RANSAC from the autoreject package. To
+    ensure the same amount of channels for all subjects, we interpolate bad channels.
+
+    Args:
+    ----
+    low_frequency: float
+        Low cut-off frequency in Hz.
+    high_frequency: int
+        High cut-off frequency in Hz.
+    resample_rate: float
+        New sampling frequency in Hz.
+    sampling_frequency: int
+        Sampling frequency of the raw data in Hz.
+    detrend: bool
+        If True, the data is detrended (linear detrending)
+    ransac: bool
+        If True, RANSAC is used to detect bad channels.
+    autoreject: bool
+        If True, autoreject is used to detect bad epochs.
+
+    Returns:
+    -------
+    preprocessed_eeg: TODO: specify
+    channels_interpolated: list
+    rejected_epochs: TODO: specify
+        List with the number of interpolated channels per participant.
+
+    """
+    # Set EEG channel layout for topo plots
+    montage_filename = datadir / exp_name / rawdata_name / "CACS-64_REF.bvef"
+    montage = mne.channels.read_custom_montage(montage_filename)
+
+    # Store how many channels were interpolated per participant
+    channels_interpolated = []
+
+    # Setting montage from Brainvision montage file
+    raw_data.set_montage(montage)
+
+    # Bandpass filter the data
+    filtered_data = raw_data.filter(l_frew=low_frequency, h_freq=high_frequency, method="iir")
+
+    # Resample the data
+    resampled_data = filtered_data.resample(resample_rate)
+
+    # Pick only EEG channels for Ransac bad channel detection
+    picks = mne.pick_types(resampled_data.info, eeg=True, eog=False)
+
+    # Use RANSAC to detect bad channels
+    # (autoreject interpolates bad channels, takes quite long and removes a lot of epochs due to blink artifacts)
+    if ransac:
+        ransac = Ransac(verbose="progressbar", picks=picks, n_jobs=3)
+
+        preprocessed_data = ransac.fit_transform(resampled_data)
+        print("\n".join(ransac.bad_chs_))
+        channels_interpolated.append(ransac.bad_chs_)
+
+        # Detect bad epochs
+        # Now feed the clean channels into Autoreject to detect bad trials
+        if autoreject:
+            ar = AutoReject()
+            cleaned_data, rejected_epochs = ar.fit_transform(ransac_data)
+
+    print("Done with preprocessing and creating clean epochs.")
+
+    return preprocessed_data, channels_interpolated, rejected_epochs
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -299,7 +380,7 @@ if __name__ == "__main__":
             # Display interactive plot
             # TODO: make this better by scaling it to 10 seconds for each window and then clicking through them
             # Also, how do I actually correct anything?!
-            %matplotlib qt
+            %matplotlib ipympl
 
             editor_ecg = Editor(signal=cleaned_ecg,
                         corrected_json=ecg_corr_fpath,
