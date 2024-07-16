@@ -27,7 +27,7 @@ Required packages: mne, neurokit, systole
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 15 July 2024
+Last update: 16 July 2024
 """
 # %% Import
 import gzip
@@ -43,6 +43,8 @@ import seaborn as sns
 from systole.interact import Editor
 from IPython.display import display
 from bokeh.plotting import figure, show, output_notebook
+from autoreject import AutoReject
+import time
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -60,9 +62,23 @@ show_plots = True
 # Define whether manual cleaning of R-peaks should be done
 manual_cleaning = False
 
-# Define whether scaling of the data should be done
+# Define whether scaling of the ECG and PPG data should be done
 scaling = True
 scale_factor = 0.01
+
+# Define cutoff frequencies for bandfiltering EEG data
+low_frequency = 0.1
+high_frequency = 30
+
+# Define whether to resample the data (from the original 500 Hz)
+resample = True
+if resample:
+    resampling_rate = 250   # in Hz
+else:
+    resampling_rate = 500   # in Hz
+
+# Define whether autoreject method should be used to detect bad channels and epochs in EEG data
+autoreject = True
 
 # Specify the data path info (in BIDS format)
 # Change with the directory of data storage
@@ -92,6 +108,9 @@ cut_off_seconds = 2.5
 
 # Get rid of the sometimes excessive logging of MNE
 mne.set_log_level('error')
+
+# Enable interactive plots (only works when running in interactive mode)
+#%matplotlib qt
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 def plot_peaks(cleaned_signal, peaks, min_time, max_time, plot_title, sampling_rate):
@@ -134,22 +153,18 @@ def plot_peaks(cleaned_signal, peaks, min_time, max_time, plot_title, sampling_r
     sns.despine()
     plt.show()
 
-def preprocess_eeg(raw_data: Raw,
+def preprocess_eeg(raw_data,
     low_frequency: float,
     high_frequency: int,
     resample_rate: float,
-    sampling_frequency: int,
-    detrend: bool,
-    ransac: bool,
     autoreject: bool):
     """
     Preprocess EEG data using the MNE toolbox.
 
-    As implemented in MNE, add channel locations according to the 10/10 system,
-    inspect data for bad channels using RANSAC from the autoreject package. To
-    ensure the same amount of channels for all subjects, we interpolate bad channels.
+    Filter the data with a bandpass filter, resample it to a specified sampling rate,
+    segment it into epochs of 10s, and use Autoreject to detect bad channels and epochs.
 
-    Args:
+    Arguments:
     ----
     low_frequency: float
         Low cut-off frequency in Hz.
@@ -157,60 +172,128 @@ def preprocess_eeg(raw_data: Raw,
         High cut-off frequency in Hz.
     resample_rate: float
         New sampling frequency in Hz.
-    sampling_frequency: int
-        Sampling frequency of the raw data in Hz.
-    detrend: bool
-        If True, the data is detrended (linear detrending)
-    ransac: bool
-        If True, RANSAC is used to detect bad channels.
     autoreject: bool
-        If True, autoreject is used to detect bad epochs.
+        If True, autoreject is used to detect bad channels and epochs.
 
     Returns:
     -------
-    preprocessed_eeg: TODO: specify
-    channels_interpolated: list
-    rejected_epochs: TODO: specify
-        List with the number of interpolated channels per participant.
+    resampled_data: mne.io.Raw
+    epochs: mne.epochs.Epochs
+    reject_log: autoreject.autoreject.RejectLog
 
     """
-    # Set EEG channel layout for topo plots
-    montage_filename = datadir / exp_name / rawdata_name / "CACS-64_REF.bvef"
-    montage = mne.channels.read_custom_montage(montage_filename)
 
-    # Store how many channels were interpolated per participant
-    channels_interpolated = []
+    # Filtering
+    filtered_data = raw_data.copy().filter(l_freq=low_frequency, h_freq=high_frequency)
 
-    # Setting montage from Brainvision montage file
-    raw_data.set_montage(montage)
-
-    # Bandpass filter the data
-    filtered_data = raw_data.filter(l_frew=low_frequency, h_freq=high_frequency, method="iir")
-
-    # Resample the data
+    # Resampling
     resampled_data = filtered_data.resample(resample_rate)
 
-    # Pick only EEG channels for Ransac bad channel detection
-    picks = mne.pick_types(resampled_data.info, eeg=True, eog=False)
+    # Segment data into epochs of 10s
+    # Even though data is continuous, it is good practice to break it into epochs
+    # before detecting bad channels and running ICA
+    tstep = 10  # in seconds
+    events = mne.make_fixed_length_events(resampled_data, duration=tstep)
+    epochs = mne.Epochs(resampled_data, events, tmin=0, tmax=tstep, baseline=None, preload=True)
 
-    # Use RANSAC to detect bad channels
-    # (autoreject interpolates bad channels, takes quite long and removes a lot of epochs due to blink artifacts)
-    if ransac:
-        ransac = Ransac(verbose="progressbar", picks=picks, n_jobs=3)
+    # Pick only EEG channels for Autoreject bad channel detection
+    picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
 
-        preprocessed_data = ransac.fit_transform(resampled_data)
-        print("\n".join(ransac.bad_chs_))
-        channels_interpolated.append(ransac.bad_chs_)
+    # Use Autoreject to detect bad channels
+    # Autoreject interpolates bad channels, takes quite long and identifies a lot of epochs
+    # Here we do not remove any data, we only identify bad channels and epochs and store them in a log
+    # Define random state to ensure reproducibility
+    if autoreject:
+        # Print the running time that it takes to perform Autoreject
+        start_time = time.ctime()
+        print("Running Autoreject to detect bad channels and epochs...")
+        print("This may take a while...")
+        print("Start time: ", start_time)
+        ar = AutoReject(random_state=42, picks=picks, n_jobs=3, verbose="progressbar")
+        ar.fit(epochs)
+        reject_log = ar.get_reject_log(epochs)
+    
+    end_time = time.ctime()
+    print("Done with preprocessing and creating clean epochs at time: ", end_time)
+    print("Total duration of preprocessing: ", end_time - start_time)
+    return resampled_data, epochs, reject_log
 
-        # Detect bad epochs
-        # Now feed the clean channels into Autoreject to detect bad trials
-        if autoreject:
-            ar = AutoReject()
-            cleaned_data, rejected_epochs = ar.fit_transform(ransac_data)
 
-    print("Done with preprocessing and creating clean epochs.")
+def run_ica(epochs: mne.epochs.Epochs, rejected_epochs: np.array):
+    """
+    Run Independent Component Analysis (ICA) on the preprocessed EEG data (in epochs).
 
-    return preprocessed_data, channels_interpolated, rejected_epochs
+    Arguments:
+    ----
+    epochs: TODO: specify
+    rejected_epochs: TODO: specify
+
+    Returns:
+    -------
+    ica: TODO: specify
+
+    """
+    # Set ICA parameters
+    random_state = 42   # ensures ICA is reproducible each time it's run
+    ica_n_components = .99  # Specify n_components as a decimal to set % explained variance
+
+    # Fit ICA
+    ica = mne.preprocessing.ICA(n_components=ica_n_components, random_state=random_state)
+    ica.fit(epochs[~rejected_epochs], decim=3)  # decim reduces the number of time points to speed up computation
+
+    print("Done with ICA.")
+
+    return ica
+
+
+def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
+    """
+    Select ICA components semi-automatically using a correlation approach with eye movements and cardiac data.
+
+    Arguments:
+    ----
+    ica: TODO: specify
+    epochs: TODO: specify
+
+    Returns:
+    ica: TODO: specify
+    eog_indices: TODO: specify
+    eog_scores: TODO: specify
+    ecg_indices: TODO: specify
+    ecg_scores: TODO: specify
+    -------
+    """
+    # Create list of components to exclude
+    ica.exclude = []
+
+    # Find the right threshold for identifying bad EOG components
+    # The default value is 3.0 but this is not the optimal threshold for all datasets
+    # We use a while loop to iterate over a range of thresholds until at least 2 ICs are identified
+    # We would expect at least 2 ICs from both blinks and horizontal eye movements
+    number_ics_eog = 0
+    max_ics_eog = 2
+    z_threshold = 3.5
+    z_step = 0.1
+
+    while number_ics_eog < max_ics_eog:
+        # Correlate with EOG channels
+        eog_indices, eog_scores = ica.find_bads_eog(epochs, threshold=z_threshold)
+        number_ics_eog = len(eog_indices)
+        z_threshold -= z_step   # won't impact things if number_ics_eog is already >= max_ics_eog
+
+    print('Final threshold for EOG components: ' + str(z_threshold))
+    print('Number of EOG components identified: ' + str(len(eog_indices)))
+
+    # For ECG components, we use the default threshold of 3.0
+    # Correlate with ECG channels
+    ecg_indices, ecg_scores = ica.find_bads_ecg(epochs, threshold='auto', method='correlation')
+    print('Number of ECG components identified: ' + str(len(ecg_indices)))
+
+    # Assign the bad EOG components to the ICA.exclude attribute so they can be removed later
+    ica.exclude = eog_indices + ecg_indices
+
+    return ica, eog_indices, eog_scores, ecg_indices, ecg_scores
+
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -380,7 +463,7 @@ if __name__ == "__main__":
             # Display interactive plot
             # TODO: make this better by scaling it to 10 seconds for each window and then clicking through them
             # Also, how do I actually correct anything?!
-            %matplotlib ipympl
+            #%matplotlib qt
 
             editor_ecg = Editor(signal=cleaned_ecg,
                         corrected_json=ecg_corr_fpath,
@@ -429,6 +512,8 @@ if __name__ == "__main__":
         heart_rate_ecg = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
         heart_rate_ppg = nk.ppg_rate(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
 
+        # TODO: calculate LF-HRV and HF-HRV from IBI data
+
         # Plot IBI and HR for ECG and PPG data
         if show_plots:
             fig, axs = plt.subplots(2, 2, figsize=(20, 10))
@@ -453,9 +538,19 @@ if __name__ == "__main__":
         # Make the subject column the first column
         ecg_data_df = ecg_data_df[["subject", "ECG", "R-peaks", "IBI", "HR"]]
 
+        # Attributes
+        if scaling and manual_cleaning:
+            attributes_cardiac = "_scaled_manually-cleaned"
+        elif scaling and not manual_cleaning:
+            attributes_cardiac = "_scaled"
+        elif manual_cleaning and not scaling:
+            attributes_cardiac = "_manually-cleaned"
+        else:
+            attributes_cardiac = ""
+
         # Save ECG data to tsv file
         ecg_data_df.to_csv(
-            subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_ecg_preprocessed.tsv", sep="\t", index=False
+            subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_ecg_preprocessed{attributes_cardiac}.tsv", sep="\t", index=False
         )
 
         # Create dataframe with cleaned PPG data, PPG-peaks, IBI, and HR
@@ -471,88 +566,91 @@ if __name__ == "__main__":
 
         # Save PPG data to tsv file
         ppg_data_df.to_csv(
-            subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_ppg_preprocessed.tsv", sep="\t", index=False
+            subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_ppg_preprocessed{attributes_cardiac}.tsv", sep="\t", index=False
         )
 
         # ---------------------- 2d. Preprocess EEG data ----------------------
-        # High-pass filter EEG data (0.5 Hz)
+        # Set Montage
+        # Set EEG channel layout for topo plots
+        montage_filename = data_dir / exp_name / rawdata_name / "CACS-64_REF.bvef"
+        montage = mne.channels.read_custom_montage(montage_filename)
+        cropped_eeg_data.set_montage(montage)
 
-        # Import channel locations
+        # Interpolate the ECG data to match the EEG data
+        if len(cleaned_ecg) < len(cropped_eeg_data.times):
+            cleaned_ecg = np.interp(cropped_eeg_data.times, np.linspace(0, len(cleaned_ecg), len(cleaned_ecg)), cleaned_ecg)
+        # Or crop the ECG data to match the EEG data
+        elif len(cleaned_ecg) > len(cropped_eeg_data.times):
+            cleaned_ecg = cleaned_ecg[:len(cropped_eeg_data.times)]
+        # Or leave it as it is
+        else:
+            pass
+        
+        # Add ECG data as a new channel to the EEG data
+        ecg_data_channel = mne.io.RawArray([cleaned_ecg], mne.create_info(["ECG"], sampling_rates["ecg"], ["ecg"]))
+        cropped_eeg_data.add_channels([ecg_data_channel])
 
-        # Rereference EOG
+        # Preprocessing EEG data using preprocessing_eeg function
+        resampled_data, epochs, reject_log = preprocess_eeg(
+            cropped_eeg_data, low_frequency, high_frequency, resampling_rate, autoreject=autoreject)
 
-        # Subtract pre-stimulus baseline
+        # Plot reject_log
+        if show_plots:
+            fig, ax = plt.subplots(figsize=[15, 5])
+            reject_log.plot('horizontal', ax=ax, aspect='auto')
+            plt.show()
 
-        # Mark bad electrodes
+        # Artifact rejection with ICA using run_ica function
+        ica = run_ica(epochs, reject_log.bad_epochs)
 
-        # Average reference EEG channels
+        # Plot results of ICA
+        if show_plots:
+            ica.plot_components(inst=epochs)
+            ica.plot_sources(resampled_data)
+            ica.plot_overlay(resampled_data, exclude=[0], picks='eeg')
 
-        # Run ICA to clean data
+        # Semi-automatic selection of ICA components using ica_correlation function
+        ica, eog_indices, eog_scores, ecg_indices, ecg_scores = ica_correlation(ica, epochs)
 
-        # Artifact rejection
+        # Number of components removed
+        print(f"Number of components removed: {len(ica.exclude)}")
+
+        # Plot components and correlation scores
+        if show_plots:
+            ica.plot_components(inst=epochs, picks=ica.exclude, title="EOG and ECG components to be excluded")
+            ica.plot_scores(eog_scores, exclude=ica.exclude, title="EOG scores")
+
+        # Get the explained variance of the ICA components
+        explained_variance_ratio = ica.get_explained_variance_ratio(epochs)['eeg']
+        print(f"Explained variance ratio of ICA components: {explained_variance_ratio}")
+
+        # Reject components in the resampled data that are not brain related
+        eeg_clean = ica.apply(resampled_data.copy())
+
+        if resample and autoreject:
+            attributes_eeg = f"resampled_{resampling_rate}_autoreject_filtered_{low_frequency}-{high_frequency}"
+        elif resample and not autoreject:
+            attributes_eeg = f"resampled_{resampling_rate}_filtered_{low_frequency}-{high_frequency}"
+        elif not resample and autoreject:
+            attributes_eeg = f"autoreject_filtered_{low_frequency}-{high_frequency}"
+        else:
+            attributes_eeg = f"filtered_{low_frequency}-{high_frequency}"
+        
+        # Save the raw data before ICA
+        resampled_data.save(subject_preprocessed_folder /
+            f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_before_ica.fif", overwrite=True)
+
+        # Save the clean data after ICA
+        eeg_clean.save(subject_preprocessed_folder /
+            f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_after_ica.fif", overwrite=True)
+
+        # Save the ICA object with the bad components
+        ica.save(subject_preprocessed_folder / f"sub-{subject}_task-{task}_eeg_{attributes_eeg}_ica.fif", overwrite=True)
+
 
 
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
 
-    # TODO: THIS IS FROM OLD SCRIPT, NEEDS TO BE ADAPTED TO NEW SCRIPT  # noqa: FIX002
-
-    # Loop over conditions
-    for condition in conditions:
-        # Loop over sections
-        for section in sections:
-            # List all files in the path
-            file_list = os.listdir(preprocessed_path)
-
-            # Average over all participants' ECG & save to .tsv file
-            # Get files corresponding to the current condition and section
-            file_list_section = [file for file in file_list if f"{condition}_{section}_ECG_preprocessed.tsv" in file]
-            data_all = []
-
-            # Loop over all subjects
-            for file in file_list_section:
-                # Read in ECG data
-                ecg_data = pd.read_csv(preprocessed_path + file, delimiter="\t")
-                # Add data to list
-                data_all.append(ecg_data)
-
-            # Concatenate all dataframes
-            all_data_df = pd.concat(data_all)
-
-            # Average over all participants (grouped by the index = timepoint)
-            data_avg = all_data_df.groupby(level=0).mean()["ECG"]
-
-            # R-peaks detection using NeuroKit
-            r_peaks, info = nk.ecg_peaks(data_avg, sampling_rate=ecg_data["sampling_rate"][0])
-
-            # Plot cleaned ECG data and R-peaks for the first 10s
-            plot_peaks(
-                cleaned_signal
-            =data_avg,
-                rpeaks_info=info,
-                min_time=0,
-                max_time=10,
-                plot_title="Cleaned ECG signal with R-peaks",
-                sampling_rate=ecg_data["sampling_rate"][0])
-
-            # TODO: manually check R-peaks and adjust if necessary  # noqa: FIX002
-
-            # IBI Calculation
-            # Calculate inter-beat-intervals (IBI) from R-peaks
-            r_peaks_indices = info["ECG_R_Peaks"]
-            ibi = nk.signal_period(peaks=r_peaks_indices, sampling_rate=ecg_data["sampling_rate"][0])
-
-            # Calculate heart rate (HR) from R-peaks
-            heart_rate = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=ecg_data["sampling_rate"][0])
-
-            # Create dataframe with cleaned ECG data, R-peaks, IBI, and HR
-            ecg_data_df = pd.DataFrame({"ECG": data_avg})
-            ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices)
-            ecg_data_df["IBI"] = pd.Series(ibi)
-            ecg_data_df["HR"] = pd.Series(heart_rate)
-            ecg_data_df["sampling_rate"] = pd.Series(ecg_data["sampling_rate"][0])
-
-            # Save ECG data to tsv file
-            ecg_data_df.to_csv(preprocessed_path + f"avg_{condition}_{section}_ECG_preprocessed.tsv", sep="\t")
-            # Average over all participants' EEG & save to .tsv file
+    # TODO
 
 # %%
