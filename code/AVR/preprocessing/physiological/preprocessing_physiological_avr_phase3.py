@@ -36,6 +36,7 @@ Last update: 16 July 2024
 # %% Import
 import gzip
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -51,7 +52,8 @@ from systole.interact import Editor
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-subjects = ["001", "002", "003"]  # Adjust as needed
+subjects = []  # Adjust as needed
+# "001", "002", "003"   # already done
 task = "AVR"
 
 # Only analyze one subject when debug mode is on
@@ -59,19 +61,20 @@ debug = False
 if debug:
     subjects = [subjects[0]]
 
-# Define if plots for sanity checks should be shown
-show_plots = True
+# Define if plots for preprocessing steps should be shown
+show_plots = False
 
 # Define whether manual cleaning of R-peaks should be done
 manual_cleaning = False
 
 # Define whether scaling of the ECG and PPG data should be done
 scaling = True
-scale_factor = 0.01
+if scaling:
+    scale_factor = 0.01
 
 # Define cutoff frequencies for bandfiltering EEG data
-low_frequency = 0.1
-high_frequency = 30
+low_frequency = 0.1 # in Hz
+high_frequency = 30 # in Hz
 
 # Define whether to resample the data (from the original 500 Hz)
 resample = True
@@ -79,6 +82,10 @@ resampling_rate = 250 if resample else 500  # in Hz
 
 # Define whether autoreject method should be used to detect bad channels and epochs in EEG data
 autoreject = True
+
+# Define if the first and last 2.5 seconds of the data should be cut off
+# To avoid any potential artifacts at the beginning and end of the experiment
+cut_off_seconds = 2.5
 
 # Specify the data path info (in BIDS format)
 # Change with the directory of data storage
@@ -102,9 +109,12 @@ avg_preprocessed_folder.mkdir(parents=True, exist_ok=True)
 avg_results_folder = results_dir / exp_name / averaged_name / datatype_name
 avg_results_folder.mkdir(parents=True, exist_ok=True)
 
-# Define if the first and last 2.5 seconds of the data should be cut off
-# To avoid any potential artifacts at the beginning and end of the experiment
-cut_off_seconds = 2.5
+# Create color palette for plots
+colors = {"ECG": ["#F0E442", "#D55E00"],    # yellow and dark orange
+            "PPG": ["#E69F00", "#CC79A7"],   # light orange and pink
+            "EEG": ["#56B4E9", "#0072B2", "#009E73"],  # light blue, dark blue, and green
+            "others": ["#FFFFFF", "#6C6C6C", "#000000"] # white, gray, and black
+            }
 
 # Get rid of the sometimes excessive logging of MNE
 mne.set_log_level("error")
@@ -143,7 +153,7 @@ def plot_peaks(
     max_sample = int(time_range[1] * sampling_rate)
     # Create a time vector (samples)
     time = np.arange(min_sample, max_sample)
-    fig, axs = plt.subplots(figsize=(10, 5))
+    fig, axs = plt.subplots(figsize=(15, 5))
 
     # Select signal and peaks interval to plot
     selected_signal = cleaned_signal[min_sample:max_sample]
@@ -152,8 +162,17 @@ def plot_peaks(
     # Transform data from mV to V
     selected_signal = selected_signal / 1000
 
-    axs.plot(time, selected_signal, linewidth=1, label="Signal")
-    axs.scatter(selected_peaks, selected_signal[selected_peaks - min_sample], color="gray", edgecolor="k", alpha=0.6)
+    # Choose color palette based on the plot title
+    if "ECG" in plot_title:
+        linecolor = colors["ECG"][1]
+        circlecolor = colors["ECG"][0]
+    elif "PPG" in plot_title:
+        linecolor = colors["PPG"][1]
+        circlecolor = colors["PPG"][0]
+
+    axs.plot(time, selected_signal, linewidth=1, label="Signal", color=linecolor)
+    axs.scatter(selected_peaks, selected_signal[selected_peaks - min_sample], color=circlecolor,
+        edgecolor=circlecolor, linewidth=1, alpha=0.6)
     axs.set_ylabel("ECG" if "ECG" in plot_title else "PPG")
     axs.set_xlabel("Time (s)")
     x_ticks = axs.get_xticks()
@@ -165,6 +184,7 @@ def plot_peaks(
 
     sns.despine()
     plt.show()
+    plt.close()
 
 
 def preprocess_eeg(
@@ -234,7 +254,19 @@ def preprocess_eeg(
 
     end_time = time.ctime()
     print("Done with preprocessing and creating clean epochs at time: ", end_time)
-    print("Total duration of preprocessing: ", end_time - start_time)
+
+    # Convert time strings to struct_time
+    start_time_struct = time.strptime(start_time, "%a %b %d %H:%M:%S %Y")
+    end_time_struct = time.strptime(end_time, "%a %b %d %H:%M:%S %Y")
+    # Convert struct_time to epoch timestamp
+    start_timestamp = time.mktime(start_time_struct)
+    end_timestamp = time.mktime(end_time_struct)
+    # Calculate the total duration of the preprocessing
+    duration_seconds = end_timestamp - start_timestamp
+    # Convert seconds to more readable format
+    hours, remainder = divmod(duration_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    print(f"Total duration of preprocessing: {int(minutes)} minutes, {int(seconds)} seconds")
 
     return resampled_data, epochs, reject_log
 
@@ -341,6 +373,13 @@ if __name__ == "__main__":
 
         # Define the path to the data
         subject_data_path = data_dir / exp_name / rawdata_name / f"sub-{subject}" / datatype_name
+
+        # Define the path to the preprocessed data
+        subject_preprocessed_folder = (data_dir / exp_name / derivative_name / preprocessed_name
+                                    / f"sub-{subject}" / datatype_name)
+
+        # Define the path to the results
+        subject_results_folder = results_dir / exp_name / f"sub-{subject}" / datatype_name
 
         print("********** Loading data **********\n")
 
@@ -533,7 +572,7 @@ if __name__ == "__main__":
                 cleaned_signal=cleaned_ecg,
                 peaks=info_ecg["ECG_R_Peaks"],
                 time_range=(0, 10),
-                plot_title="Cleaned ECG signal with R-peaks",
+                plot_title=f"Cleaned ECG signal with R-peaks for subject {subject} for the first 10 seconds",
                 sampling_rate=sampling_rates["ecg"],
             )
 
@@ -543,7 +582,7 @@ if __name__ == "__main__":
                 cleaned_signal=signals_ppg["PPG_Clean"],
                 peaks=info_ppg["PPG_Peaks"],
                 time_range=(0, 10),
-                plot_title="Cleaned PPG signal with PPG-peaks",
+                plot_title=f"Cleaned PPG signal with PPG-peaks for subject {subject} for the first 10 seconds",
                 sampling_rate=sampling_rates["ppg"],
             )
 
@@ -568,7 +607,7 @@ if __name__ == "__main__":
                 sfreq=sampling_rates["ecg"],
                 corrected_peaks=r_peaks_ecg_boolean,
                 signal_type="ECG",
-                figsize=(10, 6),
+                figsize=(15, 5),
             )
 
             display(editor_ecg.commands_box)
@@ -587,7 +626,7 @@ if __name__ == "__main__":
                 sfreq=sampling_rates["ppg"],
                 corrected_peaks=ppg_peaks_boolean,
                 signal_type="PPG",
-                figsize=(10, 6),
+                figsize=(15, 5),
             )
 
             display(editor_ppg.commands_box)
@@ -621,17 +660,31 @@ if __name__ == "__main__":
         heart_rate_ppg = nk.ppg_rate(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
 
         # Plot IBI and HR for ECG and PPG data
+        fig, axs = plt.subplots(2, 2, figsize=(15, 8))
+        axs[0, 0].plot(ibi_ecg, color=colors["ECG"][0])
+        axs[0, 0].set_ylabel("IBI from ECG")
+        axs[0, 1].plot(heart_rate_ecg, color=colors["ECG"][1])
+        axs[0, 1].set_ylabel("HR from ECG")
+        axs[1, 0].plot(ibi_ppg, color=colors["PPG"][0])
+        axs[1, 0].set_ylabel("IBI from PPG")
+        axs[1, 1].plot(heart_rate_ppg, color=colors["PPG"][1])
+        axs[1, 1].set_ylabel("HR from PPG")
+        fig.suptitle(f"IBI and HR from ECG and PPG data for subject {subject} "
+        "(no manual cleaning)" if not manual_cleaning else "(after manual cleaning)", fontsize=16)
+        # Set x-axis labels to minutes instead of seconds for all axes
+        for ax in axs.flat:
+            ax.set_xlabel("Time (s)")
+            x_ticks = ax.get_xticks()
+            ax.set_xticks(x_ticks)
+            ax.set_xticklabels([f"{x/sampling_rates['ecg']}" for x in x_ticks])
+
+        # Save plot to results directory
+        plt.savefig(subject_results_folder / f"sub-{subject}_task-{task}_IBI-HR.png")
+
         if show_plots:
-            fig, axs = plt.subplots(2, 2, figsize=(20, 10))
-            axs[0, 0].plot(ibi_ecg)
-            axs[0, 0].set_title("IBI from ECG")
-            axs[0, 1].plot(heart_rate_ecg)
-            axs[0, 1].set_title("HR from ECG")
-            axs[1, 0].plot(ibi_ppg)
-            axs[1, 0].set_title("IBI from PPG")
-            axs[1, 1].plot(heart_rate_ppg)
-            axs[1, 1].set_title("HR from PPG")
             plt.show()
+
+        plt.close()
 
         print("Saving preprocessed ECG and PPG data to tsv files...")
 
@@ -689,8 +742,14 @@ if __name__ == "__main__":
         print("Set Montage for EEG data...")
         # Set EEG channel layout for topo plots
         montage_filename = data_dir / exp_name / rawdata_name / "CACS-64_REF.bvef"
-        montage = mne.channels.read_custom_montage(montage_filename)
-        cropped_eeg_data.set_montage(montage)
+        if montage_filename.exists():
+            montage = mne.channels.read_custom_montage(montage_filename)
+            cropped_eeg_data.set_montage(montage)
+        else:
+            print("ERROR! No montage file found. Make sure to download the CACS-64_REF.bvef file from Brainvision "
+            "(https://www.brainproducts.com/downloads/cap-montages/) and place it in the rawdata folder.")
+            # Exit the program if no montage file is found
+            sys.exit()
 
         # Interpolate the ECG data to match the EEG data
         if len(cleaned_ecg) < len(cropped_eeg_data.times):
@@ -716,20 +775,35 @@ if __name__ == "__main__":
         )
 
         # Plot reject_log
+        fig, ax = plt.subplots(figsize=(15, 10))
+        reject_log.plot(orientation="horizontal", show_names=1, aspect="auto", ax=ax, show=False)
+        ax.set_title(f"Autoreject: Rejected epochs and channels for subject {subject}", fontsize=16)
+
+        # Save plot to results directory
+        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_autoreject.png")
+
         if show_plots:
-            fig, ax = plt.subplots(figsize=[15, 5])
-            reject_log.plot("horizontal", ax=ax, aspect="auto")
             plt.show()
+
+        plt.close()
 
         # Artifact rejection with ICA using run_ica function
         print("Running ICA for artifact rejection...")
         ica = run_ica(epochs, reject_log.bad_epochs)
 
-        # Plot results of ICA
+        # Plot results of ICA for the first 5s
+        fig = ica.plot_overlay(resampled_data,
+            picks="eeg", start=0, stop=5*resampling_rate,
+            title=f"ICA overlay for subject {subject}",
+            show=False)
+
+        # Save plot to results directory
+        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ica_overlay.png")
+
         if show_plots:
-            ica.plot_components(inst=epochs)
-            ica.plot_sources(resampled_data)
-            ica.plot_overlay(resampled_data, exclude=[0], picks="eeg")
+            plt.show()
+
+        plt.close()
 
         # Semi-automatic selection of ICA components using ica_correlation function
         print("Selecting ICA components semi-automatically...")
@@ -738,10 +812,41 @@ if __name__ == "__main__":
         # Number of components removed
         print(f"Number of components removed: {len(ica.exclude)}")
 
-        # Plot components and correlation scores
+        # Plot components
+        fig, axs = plt.subplots(1, len(ica.exclude), figsize=[15, 5])
+        for index, component in enumerate(ica.exclude):
+            ica.plot_components(inst=epochs, picks=component,
+                axes=axs[index], show_names=True, colorbar=True, show=False)
+        fig.suptitle(f"EOG and ECG components to be excluded for subject {subject}", fontsize=16)
+
+        # Save plot to results directory
+        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_rejected_components.png")
+
         if show_plots:
-            ica.plot_components(inst=epochs, picks=ica.exclude, title="EOG and ECG components to be excluded")
-            ica.plot_scores(eog_scores, exclude=ica.exclude, title="EOG scores")
+            plt.show()
+
+        plt.close()
+
+        # Plot correlation scores
+        fig = ica.plot_scores(eog_scores, exclude=eog_indices,
+            title=f"Correlation scores for EOG components for subject {subject}", show=False)
+        # Save plot to results directory
+        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_eog_correlation_scores.png")
+
+        if show_plots:
+            plt.show()
+
+        plt.close()
+
+        fig = ica.plot_scores(ecg_scores, exclude=ecg_indices,
+            title=f"Correlation scores for ECG components for subject {subject}", show=False)
+        # Save plot to results directory
+        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ecg_correlation_scores.png")
+
+        if show_plots:
+            plt.show()
+
+        plt.close()
 
         # Get the explained variance of the ICA components
         explained_variance_ratio = ica.get_explained_variance_ratio(epochs)["eeg"]
