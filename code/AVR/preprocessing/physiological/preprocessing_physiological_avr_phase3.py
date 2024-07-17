@@ -1,9 +1,18 @@
 """
 Script to preprocess physiological data (EEG, ECG, PPG) for AVR phase 3.
 
-Inputs: Raw EEG data in .edf files, ECG and PPG data in tsv.gz files
+Inputs:     Raw EEG data in .edf files
+            ECG and PPG data in tsv.gz files
+            Event markers in tsv files
+            Event mapping in tsv files
+            BrainVision actiCap montage file ("CACS-64_REF.bvef")
 
-Outputs: Preprocessed data (EEG, ECG, PPG) in tsv files
+Outputs:    Preprocessed data (EEG, ECG, PPG) in tsv files (ECG & PPG) and fif files (EEG, before and after ICA)
+            Participant metadata in json files
+            Excluded participants (with too many bad channels) in a list
+            Plots of preprocessing steps
+            Data of all participants concatenated in tsv files (ECG & PPG) and fif files (EEG, after ICA)
+            Averaged data over all participants in tsv files (ECG & PPG)
 
 Functions:
     plot_peaks(): Plot ECG or PPG signal with peaks.
@@ -24,14 +33,16 @@ Steps:
     2c. Preprocess ECG and PPG data & save to tsv files
     2d. Preprocess EEG data & save to fif files
 3. AVERAGE OVER ALL PARTICIPANTS
-    3a. TODO
+    3a. Interpolating data
+    3b. Concatenate all data
+    3c. Average over all participants & save to tsv files
 
 Required packages: mne, neurokit, systole, seaborn, autoreject
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 16 July 2024
+Last update: 17 July 2024
 """
 # %% Import
 import gzip
@@ -52,17 +63,20 @@ from systole.interact import Editor
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
-subjects = []  # Adjust as needed
+subjects = ["001", "002", "003"]  # Adjust as needed
 # "001", "002", "003"   # already done
 task = "AVR"
 
 # Only analyze one subject when debug mode is on
-debug = False
+debug = True
 if debug:
     subjects = [subjects[0]]
 
+# Defne preprocessing steps to perform
+steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG", "Averaging"]    # Adjust as needed
+
 # Define if plots for preprocessing steps should be shown
-show_plots = False
+show_plots = True
 
 # Define whether manual cleaning of R-peaks should be done
 manual_cleaning = False
@@ -72,16 +86,21 @@ scaling = True
 if scaling:
     scale_factor = 0.01
 
+# Define power line frequency
+powerline = 50  # in Hz
+
 # Define cutoff frequencies for bandfiltering EEG data
 low_frequency = 0.1 # in Hz
-high_frequency = 30 # in Hz
+high_frequency = 45 # in Hz
+
+low_frequency_ica = 1  # in Hz
 
 # Define whether to resample the data (from the original 500 Hz)
 resample = True
 resampling_rate = 250 if resample else 500  # in Hz
 
-# Define whether autoreject method should be used to detect bad channels and epochs in EEG data
-autoreject = True
+# Define the percentage of bad epochs that should be tolerated
+bad_epochs_threshold = 30  # in percent
 
 # Define if the first and last 2.5 seconds of the data should be cut off
 # To avoid any potential artifacts at the beginning and end of the experiment
@@ -193,8 +212,9 @@ def preprocess_eeg(
     """
     Preprocess EEG data using the MNE toolbox.
 
-    Filter the data with a bandpass filter, resample it to a specified sampling rate,
-    segment it into epochs of 10s, and use Autoreject to detect bad channels and epochs.
+    Remove Line-noise of power line, rereference to average, filter the data with a bandpass filter,
+    resample it to a specified sampling rate, segment it into epochs of 10s,
+    and use Autoreject to detect bad channels and epochs.
 
     Arguments:
     ---------
@@ -216,12 +236,20 @@ def preprocess_eeg(
         The resampled raw data after preprocessing.
     epochs: mne.epochs.Epochs
         The segmented epochs extracted from the resampled data.
-    reject_log: autoreject.autoreject.RejectLog
+    reject_log: autoreject.autoreject.RejectLog (if autoreject=True)
         A log of the rejected epochs and channels.
     """
+    # Line-noise removal
+    print("Removing line noise...")
+    raw_data_50 = raw_data.copy().notch_filter(freqs=powerline, method="spectrum_fit")
+
+    # Rereference to average
+    print("Rereferencing to average...")
+    rereferenced_data = raw_data_50.copy().set_eeg_reference("average", projection=True)
+
     # Filtering
     print("Filtering data...")
-    filtered_data = raw_data.copy().filter(l_freq=low_frequency, h_freq=high_frequency)
+    filtered_data = rereferenced_data.copy().filter(l_freq=low_frequency, h_freq=high_frequency)
 
     # Resampling
     print("Resampling data...")
@@ -235,14 +263,14 @@ def preprocess_eeg(
     events = mne.make_fixed_length_events(resampled_data, duration=tstep)
     epochs = mne.Epochs(resampled_data, events, tmin=0, tmax=tstep, baseline=None, preload=True)
 
-    # Pick only EEG channels for Autoreject bad channel detection
-    picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
-
-    # Use Autoreject to detect bad channels
-    # Autoreject interpolates bad channels, takes quite long and identifies a lot of epochs
-    # Here we do not remove any data, we only identify bad channels and epochs and store them in a log
-    # Define random state to ensure reproducibility
     if autoreject:
+        # Pick only EEG channels for Autoreject bad channel detection
+        picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
+
+        # Use Autoreject to detect bad channels
+        # Autoreject interpolates bad channels, takes quite long and identifies a lot of epochs
+        # Here we do not remove any data, we only identify bad channels and epochs and store them in a log
+        # Define random state to ensure reproducibility
         # Print the running time that it takes to perform Autoreject
         start_time = time.ctime()
         print("Detecting bad channels and epochs...")
@@ -252,23 +280,60 @@ def preprocess_eeg(
         ar.fit(epochs)
         reject_log = ar.get_reject_log(epochs)
 
-    end_time = time.ctime()
-    print("Done with preprocessing and creating clean epochs at time: ", end_time)
+        end_time = time.ctime()
+        print("Done with preprocessing and creating clean epochs at time: ", end_time)
 
-    # Convert time strings to struct_time
-    start_time_struct = time.strptime(start_time, "%a %b %d %H:%M:%S %Y")
-    end_time_struct = time.strptime(end_time, "%a %b %d %H:%M:%S %Y")
-    # Convert struct_time to epoch timestamp
-    start_timestamp = time.mktime(start_time_struct)
-    end_timestamp = time.mktime(end_time_struct)
-    # Calculate the total duration of the preprocessing
-    duration_seconds = end_timestamp - start_timestamp
-    # Convert seconds to more readable format
-    hours, remainder = divmod(duration_seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    print(f"Total duration of preprocessing: {int(minutes)} minutes, {int(seconds)} seconds")
+        # Convert time strings to struct_time
+        start_time_struct = time.strptime(start_time, "%a %b %d %H:%M:%S %Y")
+        end_time_struct = time.strptime(end_time, "%a %b %d %H:%M:%S %Y")
+        # Convert struct_time to epoch timestamp
+        start_timestamp = time.mktime(start_time_struct)
+        end_timestamp = time.mktime(end_time_struct)
+        # Calculate the total duration of the preprocessing
+        duration_seconds = end_timestamp - start_timestamp
+        # Convert seconds to more readable format
+        hours, remainder = divmod(duration_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        print(f"Total duration of preprocessing: {int(minutes)} minutes, {int(seconds)} seconds")
 
-    return resampled_data, epochs, reject_log
+        # Get the number of bad epochs and channels
+        n_bad_epochs = reject_log.bad_epochs.size
+        n_bad_channels = len(reject_log.bad_channels)
+
+        # Get the number of interpolated epochs and channels
+        n_interpolated_epochs = reject_log.interpolated.size
+        n_interpolated_channels = len(reject_log.interpolated_channels)
+
+        # Get the number of all epochs and channels
+        n_epochs = len(epochs)
+        n_channels = len(epochs.ch_names)
+
+        # Get the percentage of bad epochs and channels
+        perc_bad_epochs = (n_bad_epochs / n_epochs) * 100
+        perc_bad_channels = (n_bad_channels / n_channels) * 100
+
+        # Get the percentage of interpolated epochs and channels
+        perc_interpolated_epochs = (n_interpolated_epochs / n_epochs) * 100
+        perc_interpolated_channels = (n_interpolated_channels / n_channels) * 100
+
+        print(f"Number of bad epochs: {n_bad_epochs} of {n_epochs} ({perc_bad_epochs:.2f}%).")
+        print(f"Number of bad channels: {n_bad_channels} of {n_channels} ({perc_bad_channels:.2f}%).")
+        print(f"Number of interpolated epochs: {n_interpolated_epochs} of {n_epochs} ({perc_interpolated_epochs:.2f}%).")
+        print(f"Number of interpolated channels: {n_interpolated_channels} of {n_channels} ({perc_interpolated_channels:.2f}%).")
+        if perc_bad_epochs > bad_epochs_threshold or perc_bad_channels > bad_epochs_threshold:
+            print(f"WARNING! More than {bad_epochs_threshold}% of epochs or channels are bad. Excluding the participant is recommended.")
+
+        answer = input("Do you want to exclude this participant? (Y/n): ")
+        if answer == "Y":
+            exclude = True
+            print("Participant will be added to the list of excluded participants.")
+        else:
+            exclude = False
+            print("Participant will not be excluded.")
+
+        print("Continuing with the preprocessing...")
+
+    return resampled_data, epochs, (reject_log if autoreject else _), (exclude if autoreject else _)
 
 
 def run_ica(epochs: mne.epochs.Epochs, rejected_epochs: np.array):
@@ -286,6 +351,8 @@ def run_ica(epochs: mne.epochs.Epochs, rejected_epochs: np.array):
     -------
     ica: mne.preprocessing.ICA
         The ICA object after fitting it to the epochs data, excluding the rejected epochs.
+    ica_n_components: float
+    n_components: int
     """
     # Set ICA parameters
     random_state = 42  # ensures ICA is reproducible each time it's run
@@ -297,19 +364,24 @@ def run_ica(epochs: mne.epochs.Epochs, rejected_epochs: np.array):
     ica.fit(epochs[~rejected_epochs], decim=3)  # decim reduces the number of time points to speed up computation
     print("Done with ICA.")
 
-    return ica
+    # Get the number of components
+    n_components = ica.n_components_
+
+    print(f"{n_components} components were found to explain {ica_n_components * 100}% of the variance.")
+
+    return ica, ica_n_components, n_components
 
 
 def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
     """
-    Select ICA components semi-automatically using a correlation approach with eye movements and cardiac data.
+    Select ICA components semi-automatically using a correlation approach with eye movements, cardiac data and muscle activity.
 
     Arguments:
     ---------
     ica: mne.preprocessing.ICA
         The ICA object containing the components to be examined. This should be the output from run_ica().
     epochs: mne.epochs.Epochs
-        The epochs data used for correlating with the ICA components. This should be the output from preprocess_eeg().
+        The epochs data (1 Hz) used for correlating with the ICA components. This should be the output from preprocess_eeg().
 
     Returns:
     -------
@@ -323,6 +395,10 @@ def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
         Indices of the ICA components identified as related to cardiac activity.
     ecg_scores: list
         Correlation scores for the cardiac components.
+    emg_indices: list
+        Indices of the ICA components identified as related to muscle activity.
+    emg_scores: list
+        Correlation scores for the muscle activity components.
     """
     # Create list of components to exclude
     ica.exclude = []
@@ -354,17 +430,29 @@ def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
     ecg_indices, ecg_scores = ica.find_bads_ecg(epochs, threshold="auto", method="correlation")
     print("Number of ECG components identified: " + str(len(ecg_indices)))
 
+    # For EMG components, we use the default threshold of 3.0
+    # Correlate with muscle ativity
+    print("Using the default threshold of 3.0 for EMG components...")
+    print("Correlating ICs with muscle activity...")
+    emg_indices, emg_scores = ica.find_bads_muscle(epochs, threshold="auto")
+
     # Assign the bad EOG components to the ICA.exclude attribute so they can be removed later
-    ica.exclude = eog_indices + ecg_indices
+    ica.exclude = eog_indices + ecg_indices + emg_indices
     print("Correlation done.")
 
-    return ica, eog_indices, eog_scores, ecg_indices, ecg_scores
+    return ica, eog_indices, eog_scores, ecg_indices, ecg_scores, emg_indices, emg_scores
 
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # %% STEP 1. LOAD DATA
 if __name__ == "__main__":
+    # Initialize list to store data of all participants
+    list_data_all = {"ECG": [], "PPG": [], "EEG": []}
+
+    # Initialize list to store excluded participants
+    excluded_participants = []
+
     # Loop over all subjects
     for subject_index, subject in enumerate(subjects):
         print("--------------------------------------------------------------------------------")
@@ -377,6 +465,23 @@ if __name__ == "__main__":
         # Define the path to the preprocessed data
         subject_preprocessed_folder = (data_dir / exp_name / derivative_name / preprocessed_name
                                     / f"sub-{subject}" / datatype_name)
+
+        # Create participant file with relevant preprocessing metadata
+        participant_metadata = {
+                "subject": subject,
+                "start_time": time.ctime(),
+                "steps": steps,
+                "manual_cleaning_of_peaks": manual_cleaning,
+                "power_line": powerline,
+                "low_frequency": low_frequency,
+                "high_frequency": high_frequency,
+                "low_frequency_ica": low_frequency_ica,
+                "resampling_rate": resampling_rate,
+                "scaling": scaling,
+                "scale_factor": scale_factor,
+                "cut_off_seconds": cut_off_seconds,
+                "bad_epochs_threshold": bad_epochs_threshold,
+            }
 
         # Define the path to the results
         subject_results_folder = results_dir / exp_name / f"sub-{subject}" / datatype_name
@@ -455,440 +560,669 @@ if __name__ == "__main__":
         raw_ecg_data["timestamp"] = raw_ecg_data["timestamp"] - raw_ecg_data["timestamp"].loc[0]
         raw_ppg_data["timestamp"] = raw_ppg_data["timestamp"] - raw_ppg_data["timestamp"].loc[0]
 
+        # Save the metadata of the participant
+        with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open("w") as f:
+            json.dump(participant_metadata, f)
+
         # %% STEP 2. PREPROCESS DATA
-        # ---------------------- 2a. Cutting data ----------------------
-        print("********** Cutting data **********\n")
-        # Get start and end time of the experiment
-        start_time = events[events["event_name"] == "start_spaceship"].reset_index()["onset"].tolist()[0]
-        end_time = events[events["event_name"] == "end_spaceship"].reset_index()["onset"].tolist()[-1]
+        if "Cutting" in steps:
+            # ---------------------- 2a. Cutting data ----------------------
+            print("********** Cutting data **********\n")
+            # Get start and end time of the experiment
+            start_time = events[events["event_name"] == "start_spaceship"].reset_index()["onset"].tolist()[0]
+            end_time = events[events["event_name"] == "end_spaceship"].reset_index()["onset"].tolist()[-1]
 
-        # Get events for experiment (from start to end of experiment)
-        events_experiment = events[(events["onset"] >= start_time) & (events["onset"] <= end_time)]
-        # Delete unnecessary column trial_type
-        events_experiment = events_experiment.drop(columns=["trial_type"])
+            # Get events for experiment (from start to end of experiment)
+            events_experiment = events[(events["onset"] >= start_time) & (events["onset"] <= end_time)]
+            # Delete unnecessary column trial_type
+            events_experiment = events_experiment.drop(columns=["trial_type"])
 
-        print("Cutting resting state, training phase and instructions before the experiment...")
-        print("Data that is left is only of the experiment itself.")
+            print("Cutting resting state, training phase and instructions before the experiment...")
+            print("Data that is left is only of the experiment itself.")
 
-        # Cut data to start and end time
-        # And remove first and last 2.5 seconds of data (if specified above)
-        if cut_off_seconds > 0:
-            print(f"Removing first and last {cut_off_seconds} seconds of data...\n")
-            cropped_eeg_data = raw_eeg_data.copy().crop(
-                tmin=(start_time + cut_off_seconds), tmax=(end_time - cut_off_seconds)
+            # Cut data to start and end time
+            # And remove first and last 2.5 seconds of data (if specified above)
+            if cut_off_seconds > 0:
+                print(f"Removing first and last {cut_off_seconds} seconds of data...\n")
+                cropped_eeg_data = raw_eeg_data.copy().crop(
+                    tmin=(start_time + cut_off_seconds), tmax=(end_time - cut_off_seconds)
+                )
+                cropped_ecg_data = raw_ecg_data[
+                    (raw_ecg_data["timestamp"] >= (start_time + cut_off_seconds))
+                    & (raw_ecg_data["timestamp"] <= (end_time - cut_off_seconds))
+                ]
+                cropped_ppg_data = raw_ppg_data[
+                    (raw_ppg_data["timestamp"] >= (start_time + cut_off_seconds))
+                    & (raw_ppg_data["timestamp"] <= (end_time - cut_off_seconds))
+                ]
+            else:
+                cropped_eeg_data = raw_eeg_data.copy().crop(tmin=(start_time), tmax=(end_time))
+                cropped_ecg_data = raw_ecg_data[
+                    (raw_ecg_data["timestamp"] >= (start_time)) & (raw_ecg_data["timestamp"] <= (end_time))
+                ]
+                cropped_ppg_data = raw_ppg_data[
+                    (raw_ppg_data["timestamp"] >= (start_time)) & (raw_ppg_data["timestamp"] <= (end_time))
+                ]
+
+        if "Formatting" in steps:
+            # ---------------------- 2b. Format data ----------------------
+            print("********** Formatting data **********\n")
+            # Set time to start at 0
+            # EEG data already starts at 0
+            print("Set time to start at 0...")
+            cropped_ecg_data.loc[:, "timestamp"] = (
+                cropped_ecg_data["timestamp"] - cropped_ecg_data["timestamp"].tolist()[0]
             )
-            cropped_ecg_data = raw_ecg_data[
-                (raw_ecg_data["timestamp"] >= (start_time + cut_off_seconds))
-                & (raw_ecg_data["timestamp"] <= (end_time - cut_off_seconds))
+            cropped_ppg_data.loc[:, "timestamp"] = (
+                cropped_ppg_data["timestamp"] - cropped_ppg_data["timestamp"].tolist()[0]
+            )
+
+            # Adjust event time so first marker starts not at 0 but at - cut_off_seconds
+            events_experiment["onset"] = events_experiment["onset"] - start_time - cut_off_seconds
+
+            print("Round onset column to 3 decimal places (1 ms accuracy) for ECG and PPG data...")
+            # Round onset column to 3 decimal places (1 ms accuracy)
+            # To account for small differences in onset times between participants
+            cropped_ecg_data.loc[:, "timestamp"] = cropped_ecg_data.loc[:, "timestamp"].round(3)
+            cropped_ppg_data.loc[:, "timestamp"] = cropped_ppg_data.loc[:, "timestamp"].round(3)
+            events_experiment["onset"] = events_experiment["onset"].round(3)
+
+            # Reset index
+            events_experiment = events_experiment.reset_index(drop=True)
+            cropped_ecg_data = cropped_ecg_data.reset_index(drop=True)
+            cropped_ppg_data = cropped_ppg_data.reset_index(drop=True)
+
+            # Scale ECG and PPG data
+            if scaling:
+                print(f"Scaling ECG and PPG data by {scale_factor}...\n")
+                cropped_ecg_data["cardiac"] = cropped_ecg_data["cardiac"] * scale_factor
+                cropped_ppg_data["ppg"] = cropped_ppg_data["ppg"] * scale_factor
+
+        # %% ---------------------- 2c. Preprocess ECG and PPG data ----------------------
+        if "Preprocessing ECG + PPG" in steps:
+            print("********** Preprocessing ECG and PPG **********\n")
+            # Flip ECG signal (as it is inverted)
+            print("Flipping ECG signal...")
+            ecg_data_flipped = nk.ecg_invert(cropped_ecg_data["cardiac"], sampling_rate=sampling_rates["ecg"],
+                force=True)[
+                0
             ]
-            cropped_ppg_data = raw_ppg_data[
-                (raw_ppg_data["timestamp"] >= (start_time + cut_off_seconds))
-                & (raw_ppg_data["timestamp"] <= (end_time - cut_off_seconds))
-            ]
-        else:
-            cropped_eeg_data = raw_eeg_data.copy().crop(tmin=(start_time), tmax=(end_time))
-            cropped_ecg_data = raw_ecg_data[
-                (raw_ecg_data["timestamp"] >= (start_time)) & (raw_ecg_data["timestamp"] <= (end_time))
-            ]
-            cropped_ppg_data = raw_ppg_data[
-                (raw_ppg_data["timestamp"] >= (start_time)) & (raw_ppg_data["timestamp"] <= (end_time))
-            ]
 
-        # ---------------------- 2b. Format data ----------------------
-        print("********** Formatting data **********\n")
-        # Set time to start at 0
-        # EEG data already starts at 0
-        print("Set time to start at 0...")
-        cropped_ecg_data.loc[:, "timestamp"] = (
-            cropped_ecg_data["timestamp"] - cropped_ecg_data["timestamp"].tolist()[0]
-        )
-        cropped_ppg_data.loc[:, "timestamp"] = (
-            cropped_ppg_data["timestamp"] - cropped_ppg_data["timestamp"].tolist()[0]
-        )
-
-        # Adjust event time so first marker starts not at 0 but at - cut_off_seconds
-        events_experiment["onset"] = events_experiment["onset"] - start_time - cut_off_seconds
-
-        print("Round onset column to 3 decimal places (1 ms accuracy) for ECG and PPG data...")
-        # Round onset column to 3 decimal places (1 ms accuracy)
-        # To account for small differences in onset times between participants
-        cropped_ecg_data.loc[:, "timestamp"] = cropped_ecg_data.loc[:, "timestamp"].round(3)
-        cropped_ppg_data.loc[:, "timestamp"] = cropped_ppg_data.loc[:, "timestamp"].round(3)
-        events_experiment["onset"] = events_experiment["onset"].round(3)
-
-        # Reset index
-        events_experiment = events_experiment.reset_index(drop=True)
-        cropped_ecg_data = cropped_ecg_data.reset_index(drop=True)
-        cropped_ppg_data = cropped_ppg_data.reset_index(drop=True)
-
-        # Scale ECG and PPG data
-        if scaling:
-            print(f"Scaling ECG and PPG data by {scale_factor}...\n")
-            cropped_ecg_data["cardiac"] = cropped_ecg_data["cardiac"] * scale_factor
-            cropped_ppg_data["ppg"] = cropped_ppg_data["ppg"] * scale_factor
-
-        # ---------------------- 2c. Preprocess ECG and PPG data ----------------------
-        print("********** Preprocessing ECG and PPG **********\n")
-        # Flip ECG signal (as it is inverted)
-        print("Flipping ECG signal...")
-        ecg_data_flipped = nk.ecg_invert(cropped_ecg_data["cardiac"], sampling_rate=sampling_rates["ecg"], force=True)[
-            0
-        ]
-
-        # Data Cleaning using NeuroKit for ECG data
-        # A 50 Hz powerline filter and
-        # 4th-order Butterworth filters (0.5 Hz high-pass, 30 Hz low-pass)
-        # are applied to the ECG signal.
-        print("Cleaning ECG data...")
-        cleaned_ecg = nk.signal_filter(
-            ecg_data_flipped,
-            sampling_rate=sampling_rates["ecg"],
-            lowcut=0.5,
-            highcut=30,
-            method="butterworth",
-            order=4,
-            powerline=50,
-            show=False,
-        )
-        print("Detecting R-peaks in ECG data...")
-        # R-peaks detection using NeuroKit for ECG data
-        r_peaks_ecg, info_ecg = nk.ecg_peaks(cleaned_ecg, sampling_rate=sampling_rates["ecg"])
-
-        # Data Cleaning using NeuroKit for PPG data
-        # Uses the preprocessing pipeline "elgendi" and "templatematch" to asses quality of method
-        # R-peaks detection using NeuroKit for PPG data
-        print("Cleaning PPG data...")
-        print("Detecting PPG-peaks in PPG data...\n")
-        signals_ppg, info_ppg = nk.ppg_process(
-            cropped_ppg_data["ppg"],
-            sampling_rate=sampling_rates["ppg"],
-            method="elgendi",
-            method_quality="templatematch",
-        )
-
-        # Plot cleaned ECG data and R-peaks for the first 10s
-        if show_plots:
-            plot_peaks(
-                cleaned_signal=cleaned_ecg,
-                peaks=info_ecg["ECG_R_Peaks"],
-                time_range=(0, 10),
-                plot_title=f"Cleaned ECG signal with R-peaks for subject {subject} for the first 10 seconds",
+            # Data Cleaning using NeuroKit for ECG data
+            # A 50 Hz powerline filter and
+            # 4th-order Butterworth filters (0.5 Hz high-pass, 30 Hz low-pass)
+            # are applied to the ECG signal.
+            print("Cleaning ECG data...")
+            cleaned_ecg = nk.signal_filter(
+                ecg_data_flipped,
                 sampling_rate=sampling_rates["ecg"],
+                lowcut=0.5,
+                highcut=30,
+                method="butterworth",
+                order=4,
+                powerline=50,
+                show=False,
             )
+            print("Detecting R-peaks in ECG data...")
+            # R-peaks detection using NeuroKit for ECG data
+            r_peaks_ecg, info_ecg = nk.ecg_peaks(cleaned_ecg, sampling_rate=sampling_rates["ecg"])
 
-        # Plot PPG data and PPG-peaks for the first 10s
-        if show_plots:
-            plot_peaks(
-                cleaned_signal=signals_ppg["PPG_Clean"],
-                peaks=info_ppg["PPG_Peaks"],
-                time_range=(0, 10),
-                plot_title=f"Cleaned PPG signal with PPG-peaks for subject {subject} for the first 10 seconds",
+            # Data Cleaning using NeuroKit for PPG data
+            # Uses the preprocessing pipeline "elgendi" and "templatematch" to asses quality of method
+            # R-peaks detection using NeuroKit for PPG data
+            print("Cleaning PPG data...")
+            print("Detecting PPG-peaks in PPG data...\n")
+            signals_ppg, info_ppg = nk.ppg_process(
+                cropped_ppg_data["ppg"],
                 sampling_rate=sampling_rates["ppg"],
+                method="elgendi",
+                method_quality="templatematch",
             )
 
-        # Perform manual cleaning of peaks if specified
-        if manual_cleaning:
-            print("* * * * * * Manual correction of peaks * * * * * *\n")
-            # Manual correction of R-peaks
-            # Save JSON file with corrected R-peaks and bad segments indices
-            ecg_corr_fname = f"sub-{subject}_task-{exp_name}_rpeaks-corrected.json"
-            ecg_corr_fpath = Path(subject_preprocessed_folder) / ecg_corr_fname
+            # Plot cleaned ECG data and R-peaks for the first 10s
+            if show_plots:
+                plot_peaks(
+                    cleaned_signal=cleaned_ecg,
+                    peaks=info_ecg["ECG_R_Peaks"],
+                    time_range=(0, 10),
+                    plot_title=f"Cleaned ECG signal with R-peaks for subject {subject} for the first 10 seconds",
+                    sampling_rate=sampling_rates["ecg"],
+                )
 
-            # Transform array of R-peaks marked as 1s in a list of 0s to a boolean array
-            r_peaks_ecg_boolean = r_peaks_ecg["ECG_R_Peaks"].astype(bool)
+            # Plot PPG data and PPG-peaks for the first 10s
+            if show_plots:
+                plot_peaks(
+                    cleaned_signal=signals_ppg["PPG_Clean"],
+                    peaks=info_ppg["PPG_Peaks"],
+                    time_range=(0, 10),
+                    plot_title=f"Cleaned PPG signal with PPG-peaks for subject {subject} for the first 10 seconds",
+                    sampling_rate=sampling_rates["ppg"],
+                )
 
-            # Display interactive plot
-            # TODO: make this better by scaling it to 10 seconds for each window # noqa: FIX002
-            # and then clicking through them
-            # Also, how do I actually correct anything?!
-            editor_ecg = Editor(
-                signal=cleaned_ecg,
-                corrected_json=ecg_corr_fpath,
-                sfreq=sampling_rates["ecg"],
-                corrected_peaks=r_peaks_ecg_boolean,
-                signal_type="ECG",
-                figsize=(15, 5),
+            # Perform manual cleaning of peaks if specified
+            if manual_cleaning:
+                print("* * * * * * Manual correction of peaks * * * * * *\n")
+                # Manual correction of R-peaks
+                # Save JSON file with corrected R-peaks and bad segments indices
+                ecg_corr_fname = f"sub-{subject}_task-{exp_name}_rpeaks-corrected.json"
+                ecg_corr_fpath = Path(subject_preprocessed_folder) / ecg_corr_fname
+
+                # Transform array of R-peaks marked as 1s in a list of 0s to a boolean array
+                r_peaks_ecg_boolean = r_peaks_ecg["ECG_R_Peaks"].astype(bool)
+
+                # Display interactive plot
+                # TODO: make this better by scaling it to 10 seconds for each window # noqa: FIX002
+                # and then clicking through them
+                # Also, how do I actually correct anything?!
+                editor_ecg = Editor(
+                    signal=cleaned_ecg,
+                    corrected_json=ecg_corr_fpath,
+                    sfreq=sampling_rates["ecg"],
+                    corrected_peaks=r_peaks_ecg_boolean,
+                    signal_type="ECG",
+                    figsize=(15, 5),
+                )
+
+                display(editor_ecg.commands_box)
+
+                # Manual correction of PPG-peaks
+                # Save JSON file with corrected PPG-peaks and bad segments indices
+                ppg_corr_fname = f"sub-{subject}_task-{exp_name}_ppg-peaks-corrected.json"
+                ppg_corr_fpath = Path(subject_preprocessed_folder) / ppg_corr_fname
+
+                # Transform array of PPG-peaks marked as 1s in a list of 0s to a boolean array
+                ppg_peaks_boolean = signals_ppg["PPG_Peaks"].astype(bool)
+
+                editor_ppg = Editor(
+                    signal=signals_ppg["PPG_Clean"],
+                    corrected_json=ppg_corr_fpath,
+                    sfreq=sampling_rates["ppg"],
+                    corrected_peaks=ppg_peaks_boolean,
+                    signal_type="PPG",
+                    figsize=(15, 5),
+                )
+
+                display(editor_ppg.commands_box)
+
+            # Execute only when manual peak correction is done
+            if manual_cleaning:
+                print("Saving corrected R-peaks and PPG-peaks...")
+                editor_ecg.save()
+                editor_ppg.save()
+
+            # Load corrected R-peaks and PPG-peaks if manual cleaning was done
+            if manual_cleaning:
+                print("Loading corrected R-peaks and PPG-peaks...")
+                # Load corrected R-peaks
+                with ecg_corr_fpath.open("r") as f:
+                    corrected_rpeaks = f.read()
+                # Load corrected PPG-peaks
+                with ppg_corr_fpath.open("r") as f:
+                    corrected_ppg_peaks = json.load(f)
+
+            print("Calculating IBI and HR from ECG and PPG data...")
+            # Calculate inter-beat-intervals (IBI) from peaks
+            r_peaks_indices = (corrected_rpeaks["ecg"]["corrected_peaks"] if manual_cleaning
+                else info_ecg["ECG_R_Peaks"])
+            ibi_ecg = nk.signal_period(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
+
+            ppg_peaks_indices = (corrected_ppg_peaks["ppg"]["corrected_peaks"] if manual_cleaning
+                else info_ppg["PPG_Peaks"])
+            ibi_ppg = nk.signal_period(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
+
+            # Calculate heart rate (HR) from peaks
+            heart_rate_ecg = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
+            heart_rate_ppg = nk.ppg_rate(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
+
+            # Plot IBI and HR for ECG and PPG data
+            fig, axs = plt.subplots(2, 2, figsize=(15, 8))
+            axs[0, 0].plot(ibi_ecg, color=colors["ECG"][0])
+            axs[0, 0].set_ylabel("IBI from ECG")
+            axs[0, 1].plot(heart_rate_ecg, color=colors["ECG"][1])
+            axs[0, 1].set_ylabel("HR from ECG")
+            axs[1, 0].plot(ibi_ppg, color=colors["PPG"][0])
+            axs[1, 0].set_ylabel("IBI from PPG")
+            axs[1, 1].plot(heart_rate_ppg, color=colors["PPG"][1])
+            axs[1, 1].set_ylabel("HR from PPG")
+            fig.suptitle(f"IBI and HR from ECG and PPG data for subject {subject} "
+            "(no manual cleaning)" if not manual_cleaning else "(after manual cleaning)", fontsize=16)
+            # Set x-axis labels to minutes instead of seconds for all axes
+            for ax in axs.flat:
+                ax.set_xlabel("Time (s)")
+                x_ticks = ax.get_xticks()
+                ax.set_xticks(x_ticks)
+                ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
+
+            # Save plot to results directory
+            plt.savefig(subject_results_folder / f"sub-{subject}_task-{task}_IBI-HR.png")
+
+            if show_plots:
+                plt.show()
+
+            plt.close()
+
+            print("Saving preprocessed ECG and PPG data to tsv files...")
+
+            # Create dataframe with cleaned ECG data, R-peaks, IBI, and HR
+            ecg_data_df = pd.DataFrame({"ECG": cleaned_ecg})
+            ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices)
+            ecg_data_df["IBI"] = pd.Series(ibi_ecg)
+            ecg_data_df["HR"] = pd.Series(heart_rate_ecg)
+            # Create array with subject id that has the same length as the other series
+            subject_array = [subject] * len(cleaned_ecg)
+            ecg_data_df["subject"] = pd.Series(subject_array)
+            ecg_data_df["timestamp"] = pd.Series(cropped_ecg_data["timestamp"])
+            # Make the subject column the first column and the timestamp the second column
+            ecg_data_df = ecg_data_df[["subject", "timestamp", "ECG", "R-peaks", "IBI", "HR"]]
+
+            # Attributes for file naming
+            if scaling and manual_cleaning:
+                attributes_cardiac = "_scaled_manually-cleaned"
+            elif scaling and not manual_cleaning:
+                attributes_cardiac = "_scaled"
+            elif manual_cleaning and not scaling:
+                attributes_cardiac = "_manually-cleaned"
+            else:
+                attributes_cardiac = ""
+
+            # Save ECG data to tsv file
+            ecg_data_df.to_csv(
+                subject_preprocessed_folder /
+                f"sub-{subject}_task-{task}_physio_ecg_preprocessed{attributes_cardiac}.tsv",
+                sep="\t",
+                index=False,
             )
 
-            display(editor_ecg.commands_box)
+            # Add ECG data to list_data_all
+            list_data_all["ECG"].append(ecg_data_df)
 
-            # Manual correction of PPG-peaks
-            # Save JSON file with corrected PPG-peaks and bad segments indices
-            ppg_corr_fname = f"sub-{subject}_task-{exp_name}_ppg-peaks-corrected.json"
-            ppg_corr_fpath = Path(subject_preprocessed_folder) / ppg_corr_fname
+            # Create dataframe with cleaned PPG data, PPG-peaks, IBI, and HR
+            ppg_data_df = pd.DataFrame({"PPG": signals_ppg["PPG_Clean"]})
+            ppg_data_df["PPG-peaks"] = pd.Series(ppg_peaks_indices)
+            ppg_data_df["IBI"] = pd.Series(ibi_ppg)
+            ppg_data_df["HR"] = pd.Series(heart_rate_ppg)
+            # Create array with subject ID that has the same length as the other series
+            subject_array = [subject] * len(signals_ppg["PPG_Clean"])
+            ppg_data_df["subject"] = pd.Series(subject_array)
+            ppg_data_df["timestamp"] = pd.Series(cropped_ppg_data["timestamp"])
+            # Make the subject column the first column and the timestamp the second column
+            ppg_data_df = ppg_data_df[["subject", "timestamp", "PPG", "PPG-peaks", "IBI", "HR"]]
 
-            # Transform array of PPG-peaks marked as 1s in a list of 0s to a boolean array
-            ppg_peaks_boolean = signals_ppg["PPG_Peaks"].astype(bool)
-
-            editor_ppg = Editor(
-                signal=signals_ppg["PPG_Clean"],
-                corrected_json=ppg_corr_fpath,
-                sfreq=sampling_rates["ppg"],
-                corrected_peaks=ppg_peaks_boolean,
-                signal_type="PPG",
-                figsize=(15, 5),
+            # Save PPG data to tsv file
+            ppg_data_df.to_csv(
+                subject_preprocessed_folder /
+                f"sub-{subject}_task-{task}_physio_ppg_preprocessed{attributes_cardiac}.tsv",
+                sep="\t",
+                index=False,
             )
 
-            display(editor_ppg.commands_box)
+            # Add PPG data to list_data_all
+            list_data_all["PPG"].append(ppg_data_df)
 
-        # Execute only when manual peak correction is done
-        if manual_cleaning:
-            print("Saving corrected R-peaks and PPG-peaks...")
-            editor_ecg.save()
-            editor_ppg.save()
+            print("Preprocessed ECG and PPG data saved to tsv files.\n")
 
-        # Load corrected R-peaks and PPG-peaks if manual cleaning was done
-        if manual_cleaning:
-            print("Loading corrected R-peaks and PPG-peaks...")
-            # Load corrected R-peaks
-            with ecg_corr_fpath.open("r") as f:
-                corrected_rpeaks = f.read()
-            # Load corrected PPG-peaks
-            with ppg_corr_fpath.open("r") as f:
-                corrected_ppg_peaks = json.load(f)
+        # %% ---------------------- 2d. Preprocess EEG data ----------------------
+        if "Preprocessing EEG" in steps:
+            print("********** Preprocessing EEG **********\n")
+            # Set Montage
+            print("Set Montage for EEG data...")
+            # Set EEG channel layout for topo plots
+            montage_filename = data_dir / exp_name / rawdata_name / "CACS-64_REF.bvef"
+            if montage_filename.exists():
+                montage = mne.channels.read_custom_montage(montage_filename)
+                cropped_eeg_data.set_montage(montage)
+            else:
+                print("ERROR! No montage file found. Make sure to download the CACS-64_REF.bvef file from Brainvision "
+                "(https://www.brainproducts.com/downloads/cap-montages/) and place it in the rawdata folder.")
+                # Exit the program if no montage file is found
+                sys.exit()
 
-        print("Calculating IBI and HR from ECG and PPG data...")
-        # Calculate inter-beat-intervals (IBI) from peaks
-        r_peaks_indices = corrected_rpeaks["ecg"]["corrected_peaks"] if manual_cleaning else info_ecg["ECG_R_Peaks"]
-        ibi_ecg = nk.signal_period(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
+            # Interpolate the ECG data to match the EEG data
+            if len(cleaned_ecg) < len(cropped_eeg_data.times):
+                cleaned_ecg = np.interp(
+                    cropped_eeg_data.times, np.linspace(0, len(cleaned_ecg), len(cleaned_ecg)), cleaned_ecg
+                )
+            # Or crop the ECG data to match the EEG data
+            elif len(cleaned_ecg) > len(cropped_eeg_data.times):
+                cleaned_ecg = cleaned_ecg[: len(cropped_eeg_data.times)]
+            # Or leave it as it is
+            else:
+                pass
 
-        ppg_peaks_indices = corrected_ppg_peaks["ppg"]["corrected_peaks"] if manual_cleaning else info_ppg["PPG_Peaks"]
-        ibi_ppg = nk.signal_period(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
+            print("Add ECG data as a new channel to the EEG data...")
+            # Add ECG data as a new channel to the EEG data
+            ecg_data_channel = mne.io.RawArray([cleaned_ecg], mne.create_info(["ECG"], sampling_rates["ecg"], ["ecg"]))
+            cropped_eeg_data.add_channels([ecg_data_channel])
 
-        # Calculate heart rate (HR) from peaks
-        heart_rate_ecg = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
-        heart_rate_ppg = nk.ppg_rate(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
+            # Preprocessing EEG data using preprocess_eeg function (high-pass filter of 0.1 Hz)
+            print("Preprocessing EEG data...")
+            resampled_data, epochs, _, _ = preprocess_eeg(
+                cropped_eeg_data, low_frequency, high_frequency, resampling_rate, autoreject=False
+            )
 
-        # Plot IBI and HR for ECG and PPG data
+            # Preprocessing EEG data using preprocess_eeg function for ICA (high-pass filter of 1 Hz)
+            resampled_data_ica, epochs_ica, reject_log_ica, exclude = preprocess_eeg(
+                cropped_eeg_data, low_frequency_ica, high_frequency, resampling_rate, autoreject=True
+            )
+
+            if exclude:
+                excluded_participants.append(subject)
+
+            # Plot reject_log
+            fig, ax = plt.subplots(figsize=(15, 10))
+            reject_log_ica.plot(orientation="horizontal", show_names=1, aspect="auto", ax=ax, show=False)
+            ax.set_title(f"Autoreject: Bad epochs and channels for subject {subject}", fontsize=16)
+
+            # Save plot to results directory
+            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_autoreject.png")
+
+            if show_plots:
+                plt.show()
+
+            plt.close()
+
+            # Artifact rejection with ICA using run_ica function
+            print("Running ICA for artifact rejection...")
+            ica, ica_variance, ica_n_components = run_ica(epochs_ica, reject_log_ica.bad_epochs)
+
+            # Plot results of ICA for the first 5s
+            fig = ica.plot_overlay(resampled_data_ica,
+                picks="eeg", start=0, stop=5*resampling_rate,
+                title=f"ICA overlay for subject {subject}",
+                show=False)
+
+            # Save plot to results directory
+            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ica_overlay.png")
+
+            if show_plots:
+                plt.show()
+
+            plt.close()
+
+            # Semi-automatic selection of ICA components using ica_correlation function
+            # Correlates ICA components with EOG, ECG and muscle data
+            print("Selecting ICA components semi-automatically...")
+            ica, eog_indices, eog_scores, ecg_indices, ecg_scores, emg_indices, emg_scores = ica_correlation(ica, epochs_ica)
+
+            # Number of components removed
+            print(f"Number of components removed: {len(ica.exclude)} (out of {ica.n_components_}).")
+            print(f"Components removed: {ica.exclude} ({len(eog_indices)} EOG components, {len(ecg_indices)} ECG components, {len(emg_indices)} EMG components, {len(ica.exclude)-len(eog_indices)-len(eog_indices)-len(emg_indices)} other components).")
+
+            # Plot components
+            fig, axs = plt.subplots(1, len(ica.exclude), figsize=[15, 5])
+            for index, component in enumerate(ica.exclude):
+                ica.plot_components(inst=epochs, picks=component,
+                    axes=axs[index], show_names=True, colorbar=True, show=False)
+            fig.suptitle(f"EOG, ECG, EMG and other components to be excluded for subject {subject}", fontsize=16)
+
+            # Save plot to results directory
+            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_rejected_components.png")
+
+            if show_plots:
+                plt.show()
+
+            plt.close()
+
+            # Plot correlation scores
+            fig = ica.plot_scores(eog_scores, exclude=eog_indices,
+                title=f"Correlation scores for EOG components for subject {subject}", show=False)
+            # Save plot to results directory
+            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_eog_correlation_scores.png")
+
+            if show_plots:
+                plt.show()
+
+            plt.close()
+
+            fig = ica.plot_scores(ecg_scores, exclude=ecg_indices,
+                title=f"Correlation scores for ECG components for subject {subject}", show=False)
+            # Save plot to results directory
+            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ecg_correlation_scores.png")
+
+            if show_plots:
+                plt.show()
+
+            plt.close()
+
+            fig = ica.plot_scores(emg_scores, exclude=emg_indices,
+                title=f"Correlation scores for EMG components for subject {subject}", show=False)
+            # Save plot to results directory
+            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_emg_correlation_scores.png")
+
+            if show_plots:
+                plt.show()
+
+            plt.close()
+
+            # Get the explained variance of the ICA components
+            explained_variance_ratio = ica.get_explained_variance_ratio(epochs)["eeg"]
+            print(f"Explained variance ratio of ICA components: {explained_variance_ratio}")
+
+            # Finally reject components in the resampled data (0.1 Hz) that are not brain related
+            print("Rejecting components in the resampled data (0.1 Hz) that are not brain related...")
+            eeg_clean = ica.apply(resampled_data.copy())
+
+            if resample:
+                attributes_eeg = f"resampled_{resampling_rate}_filtered_{low_frequency}-{high_frequency}"
+            else:
+                attributes_eeg = f"filtered_{low_frequency}-{high_frequency}"
+
+            print("Saving preprocessed EEG data to fif files...")
+
+            # Save the raw data before ICA
+            resampled_data.save(
+                subject_preprocessed_folder
+                / f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_before_ica.fif",
+                overwrite=True,
+            )
+
+            # Save the clean data after ICA
+            eeg_clean.save(
+                subject_preprocessed_folder /
+                f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_after_ica.fif",
+                overwrite=True,
+            )
+
+            # Add EEG data to list_data_all
+            list_data_all["EEG"].append(eeg_clean)
+
+            # Save the ICA object with the bad components
+            ica.save(
+                subject_preprocessed_folder / f"sub-{subject}_task-{task}_eeg_{attributes_eeg}_ica.fif", overwrite=True
+            )
+
+            print("Preprocessed EEG data saved to fif files.\n")
+
+            # Save the list with excluded participants by adding to the existing file
+            # Create the file if it does not exist
+            if not (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").exists():
+                with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open("w") as f:
+                    f.write(f"{subject}\n")
+            else:
+                with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open("w") as f:
+                    f.write(f"{subject}\n")
+            
+            # Read in the participant metadata json file
+            with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open("w") as f:
+                participant_metadata = json.load(f)
+
+            # Append more information to the participant metadata json file
+            participant_metadata["number_of_bad_epochs"] = len(reject_log_ica.bad_epochs)
+            participant_metadata["number_of_interpolated_epochs"] = len(reject_log_ica.interpolated_epochs)
+            participant_metadata["number_of_all_epochs"] = len(epochs_ica)
+            participant_metadata["number_of_bad_channels"] = len(reject_log_ica.bad_channels)
+            participant_metadata["number_of_interpolated_channels"] = len(reject_log_ica.interpolated_channels)
+            participant_metadata["number_of_all_channels"] = len(epochs_ica.info["ch_names"])
+            participant_metadata["participant_excluded"] = exclude
+            participant_metadata["number_of_all_components"] = ica_n_components
+            participant_metadata["number_of_removed_components"] = len(ica.exclude)
+            participant_metadata["ica_variance"] = ica_variance
+            participant_metadata["eog_components"] = eog_indices
+            participant_metadata["ecg_components"] = ecg_indices
+            participant_metadata["emg_components"] = emg_indices
+            participant_metadata["other_components"] = ica.exclude - eog_indices - ecg_indices - emg_indices
+            participant_metadata["explained_variance_ratio"] = explained_variance_ratio
+
+            # Include the end time of the preprocessing
+            participant_metadata["end_time"] = time.ctime()
+
+            # Save the updated participant metadata json file
+            with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open("w") as f:
+                json.dump(participant_metadata, f)
+
+
+    # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
+    if "Averaging" in steps:
+        print("********** Averaging over all participants **********\n")
+
+        # ---------------------- 3a. Interpolating data ----------------------
+        print("Interpolating data...")
+
+        # Get the lenghts of R-peaks, IBI, and HR for all participants
+        r_peaks_length = [len(subject["R-peaks"].dropna()) for subject in list_data_all["ECG"]]
+        ibi_length = [len(subject["IBI"].dropna()) for subject in list_data_all["ECG"]]
+        hr_length = [len(subject["HR"].dropna()) for subject in list_data_all["ECG"]]
+
+        # Check if the lengths of R-peaks, IBI, and HR are the same for all participants
+        if r_peaks_length == ibi_length == hr_length:
+            print("The lengths of R-peaks, IBI, and HR are the same for all participants.")
+        else:
+            print("The lengths of R-peaks, IBI, and HR are not the same for all participants.")
+            print("Interpolating the data to the same length...")
+
+            # Get the maximum length
+            r_peaks_length_max = max(r_peaks_length)
+            ibi_length_max = max(ibi_length)
+            hr_length_max = max(hr_length)
+
+            # Interpolate the data to the same length
+            for subject in list_data_all["ECG"]:
+                # Interpolate R-peaks
+                subject["R-peaks"] = subject["R-peaks"].interpolate(method="linear", limit_direction="both")
+                # Interpolate IBI
+                subject["IBI"] = subject["IBI"].interpolate(method="linear", limit_direction="both")
+                # Interpolate HR
+                subject["HR"] = subject["HR"].interpolate(method="linear", limit_direction="both")
+
+        # Get the lenghts of PPG-peaks, IBI, and HR for all participants
+        ppg_peaks_length = [len(subject["PPG-peaks"].dropna()) for subject in list_data_all["PPG"]]
+        ibi_length = [len(subject["IBI"].dropna()) for subject in list_data_all["PPG"]]
+        hr_length = [len(subject["HR"].dropna()) for subject in list_data_all["PPG"]]
+
+        # Check if the lengths of PPG-peaks, IBI, and HR are the same for all participants
+        if ppg_peaks_length == ibi_length == hr_length:
+            print("The lengths of PPG-peaks, IBI, and HR are the same for all participants.")
+        else:
+            print("The lengths of PPG-peaks, IBI, and HR are not the same for all participants.")
+            print("Interpolating the data to the same length...")
+
+            # Get the maximum length
+            ppg_peaks_length_max = max(ppg_peaks_length)
+            ibi_length_max = max(ibi_length)
+            hr_length_max = max(hr_length)
+
+            # Interpolate the data to the same length
+            for subject in list_data_all["PPG"]:
+                # Interpolate PPG-peaks
+                subject["PPG-peaks"] = subject["PPG-peaks"].interpolate(method="linear", limit_direction="both")
+                # Interpolate IBI
+                subject["IBI"] = subject["IBI"].interpolate(method="linear", limit_direction="both")
+                # Interpolate HR
+                subject["HR"] = subject["HR"].interpolate(method="linear", limit_direction="both")
+
+        # ---------------------- 3b. Concatenate all data ----------------------
+        print("Concatenating all data..."
+        )
+        # Concatenate all ECG data
+        all_ecg_data = pd.concat(list_data_all["ECG"], ignore_index=True)
+
+        # Concatenate all PPG data
+        all_ppg_data = pd.concat(list_data_all["PPG"], ignore_index=True)
+
+        # Concatenate all EEG data
+        all_eeg_data = mne.concatenate_raws(list_data_all["EEG"])
+
+        # Save concatenated data to tsv files
+        print("Saving concatenated data to tsv files...")
+
+        all_ecg_data.to_csv(
+            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
+            f"all_subjects_task-{task}_physio_preprocessed_ecg.tsv", sep="\t", index=False
+        )
+        all_ppg_data.to_csv(
+            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
+            f"all_subjects_task-{task}_physio_preprocessed_ppg.tsv", sep="\t", index=False
+        )
+        all_eeg_data.save(
+            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
+            f"all_subjects_task-{task}_eeg_preprocessed.fif", overwrite=True
+        )
+
+        # ---------------------- 3c. Average over all participants ----------------------
+        print("Averaging over all participants' ECG and PPG data...")
+
+        # Drop subject column
+        all_ecg_data = all_ecg_data.drop(columns=["subject"])
+        all_ppg_data = all_ppg_data.drop(columns=["subject"])
+
+        # Calculate averaged data
+        ecg_data_mean = all_ecg_data.groupby("timestamp").mean()
+        ppg_data_mean = all_ppg_data.groupby("timestamp").mean()
+
+        # Add time column as first column
+        ecg_data_mean.insert(0, "timestamp", ecg_data_mean.index)
+        ppg_data_mean.insert(0, "timestamp", ppg_data_mean.index)
+
+        # Save averaged data to tsv files
+        print("Saving averaged data to tsv files...")
+
+        ecg_data_mean.to_csv(
+            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
+            f"avg_task-{task}_physio_preprocessed_ecg.tsv", sep="\t", index=False
+        )
+
+        ppg_data_mean.to_csv(
+            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
+            f"avg_task-{task}_physio_preprocessed_ppg.tsv", sep="\t", index=False
+        )
+
+        # Plot averaged data
+        # Downsampling to 1 Hz for better visualization
+        ecg_data_mean = ecg_data_mean.iloc[::sampling_rates["ecg"]]
+        ppg_data_mean = ppg_data_mean.iloc[::sampling_rates["ppg"]]
+
         fig, axs = plt.subplots(2, 2, figsize=(15, 8))
-        axs[0, 0].plot(ibi_ecg, color=colors["ECG"][0])
+        axs[0, 0].plot(ecg_data_mean["timestamp"], ecg_data_mean["IBI"], color=colors["ECG"][0])
         axs[0, 0].set_ylabel("IBI from ECG")
-        axs[0, 1].plot(heart_rate_ecg, color=colors["ECG"][1])
+        axs[0, 1].plot(ecg_data_mean["timestamp"], ecg_data_mean["HR"], color=colors["ECG"][1])
         axs[0, 1].set_ylabel("HR from ECG")
-        axs[1, 0].plot(ibi_ppg, color=colors["PPG"][0])
+        axs[1, 0].plot(ppg_data_mean["timestamp"], ppg_data_mean["IBI"], color=colors["PPG"][0])
         axs[1, 0].set_ylabel("IBI from PPG")
-        axs[1, 1].plot(heart_rate_ppg, color=colors["PPG"][1])
+        axs[1, 1].plot(ppg_data_mean["timestamp"], ppg_data_mean["HR"], color=colors["PPG"][1])
         axs[1, 1].set_ylabel("HR from PPG")
-        fig.suptitle(f"IBI and HR from ECG and PPG data for subject {subject} "
+        fig.suptitle(f"Mean IBI and HR from ECG and PPG data for AVR phase 3 (n={len(subjects)}), "
         "(no manual cleaning)" if not manual_cleaning else "(after manual cleaning)", fontsize=16)
         # Set x-axis labels to minutes instead of seconds for all axes
         for ax in axs.flat:
-            ax.set_xlabel("Time (s)")
+            ax.set_xlabel("Time (min)")
             x_ticks = ax.get_xticks()
             ax.set_xticks(x_ticks)
-            ax.set_xticklabels([f"{x/sampling_rates['ecg']}" for x in x_ticks])
+            ax.set_xticklabels([f"{x/60}" for x in x_ticks])
+
+            # Add vertical lines for event markers
+            # Exclude first and last event markers
+            # And only use every second event marker to avoid overlap
+            for _, row in events_experiment.iloc[1:-1:2].iterrows():
+                ax.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
+                ax.text(row["onset"] - 90, -1.52, row["event_name"], rotation=45, fontsize=10, color="gray")
 
         # Save plot to results directory
-        plt.savefig(subject_results_folder / f"sub-{subject}_task-{task}_IBI-HR.png")
+        plt.savefig(Path(results_dir) / exp_name / averaged_name / datatype_name /
+        f"avg_task-{task}_physio_IBI-HR.png")
 
         if show_plots:
             plt.show()
 
         plt.close()
-
-        print("Saving preprocessed ECG and PPG data to tsv files...")
-
-        # Create dataframe with cleaned ECG data, R-peaks, IBI, and HR
-        ecg_data_df = pd.DataFrame({"ECG": cleaned_ecg})
-        ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices)
-        ecg_data_df["IBI"] = pd.Series(ibi_ecg)
-        ecg_data_df["HR"] = pd.Series(heart_rate_ecg)
-        # Create array with subject id that has the same length as the other series
-        subject_array = [subject] * len(cleaned_ecg)
-        ecg_data_df["subject"] = pd.Series(subject_array)
-        # Make the subject column the first column
-        ecg_data_df = ecg_data_df[["subject", "ECG", "R-peaks", "IBI", "HR"]]
-
-        # Attributes for file naming
-        if scaling and manual_cleaning:
-            attributes_cardiac = "_scaled_manually-cleaned"
-        elif scaling and not manual_cleaning:
-            attributes_cardiac = "_scaled"
-        elif manual_cleaning and not scaling:
-            attributes_cardiac = "_manually-cleaned"
-        else:
-            attributes_cardiac = ""
-
-        # Save ECG data to tsv file
-        ecg_data_df.to_csv(
-            subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_ecg_preprocessed{attributes_cardiac}.tsv",
-            sep="\t",
-            index=False,
-        )
-
-        # Create dataframe with cleaned PPG data, PPG-peaks, IBI, and HR
-        ppg_data_df = pd.DataFrame({"PPG": signals_ppg["PPG_Clean"]})
-        ppg_data_df["PPG-peaks"] = pd.Series(ppg_peaks_indices)
-        ppg_data_df["IBI"] = pd.Series(ibi_ppg)
-        ppg_data_df["HR"] = pd.Series(heart_rate_ppg)
-        # Create array with subject id that has the same length as the other series
-        subject_array = [subject] * len(signals_ppg["PPG_Clean"])
-        ppg_data_df["subject"] = pd.Series(subject_array)
-        # Make the subject column the first column
-        ppg_data_df = ppg_data_df[["subject", "PPG", "PPG-peaks", "IBI", "HR"]]
-
-        # Save PPG data to tsv file
-        ppg_data_df.to_csv(
-            subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_ppg_preprocessed{attributes_cardiac}.tsv",
-            sep="\t",
-            index=False,
-        )
-
-        print("Preprocessed ECG and PPG data saved to tsv files.\n")
-
-        # ---------------------- 2d. Preprocess EEG data ----------------------
-        print("********** Preprocessing EEG **********\n")
-        # Set Montage
-        print("Set Montage for EEG data...")
-        # Set EEG channel layout for topo plots
-        montage_filename = data_dir / exp_name / rawdata_name / "CACS-64_REF.bvef"
-        if montage_filename.exists():
-            montage = mne.channels.read_custom_montage(montage_filename)
-            cropped_eeg_data.set_montage(montage)
-        else:
-            print("ERROR! No montage file found. Make sure to download the CACS-64_REF.bvef file from Brainvision "
-            "(https://www.brainproducts.com/downloads/cap-montages/) and place it in the rawdata folder.")
-            # Exit the program if no montage file is found
-            sys.exit()
-
-        # Interpolate the ECG data to match the EEG data
-        if len(cleaned_ecg) < len(cropped_eeg_data.times):
-            cleaned_ecg = np.interp(
-                cropped_eeg_data.times, np.linspace(0, len(cleaned_ecg), len(cleaned_ecg)), cleaned_ecg
-            )
-        # Or crop the ECG data to match the EEG data
-        elif len(cleaned_ecg) > len(cropped_eeg_data.times):
-            cleaned_ecg = cleaned_ecg[: len(cropped_eeg_data.times)]
-        # Or leave it as it is
-        else:
-            pass
-
-        print("Add ECG data as a new channel to the EEG data...")
-        # Add ECG data as a new channel to the EEG data
-        ecg_data_channel = mne.io.RawArray([cleaned_ecg], mne.create_info(["ECG"], sampling_rates["ecg"], ["ecg"]))
-        cropped_eeg_data.add_channels([ecg_data_channel])
-
-        # Preprocessing EEG data using preprocessing_eeg function
-        print("Preprocessing EEG data...")
-        resampled_data, epochs, reject_log = preprocess_eeg(
-            cropped_eeg_data, low_frequency, high_frequency, resampling_rate, autoreject=autoreject
-        )
-
-        # Plot reject_log
-        fig, ax = plt.subplots(figsize=(15, 10))
-        reject_log.plot(orientation="horizontal", show_names=1, aspect="auto", ax=ax, show=False)
-        ax.set_title(f"Autoreject: Rejected epochs and channels for subject {subject}", fontsize=16)
-
-        # Save plot to results directory
-        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_autoreject.png")
-
-        if show_plots:
-            plt.show()
-
-        plt.close()
-
-        # Artifact rejection with ICA using run_ica function
-        print("Running ICA for artifact rejection...")
-        ica = run_ica(epochs, reject_log.bad_epochs)
-
-        # Plot results of ICA for the first 5s
-        fig = ica.plot_overlay(resampled_data,
-            picks="eeg", start=0, stop=5*resampling_rate,
-            title=f"ICA overlay for subject {subject}",
-            show=False)
-
-        # Save plot to results directory
-        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ica_overlay.png")
-
-        if show_plots:
-            plt.show()
-
-        plt.close()
-
-        # Semi-automatic selection of ICA components using ica_correlation function
-        print("Selecting ICA components semi-automatically...")
-        ica, eog_indices, eog_scores, ecg_indices, ecg_scores = ica_correlation(ica, epochs)
-
-        # Number of components removed
-        print(f"Number of components removed: {len(ica.exclude)}")
-
-        # Plot components
-        fig, axs = plt.subplots(1, len(ica.exclude), figsize=[15, 5])
-        for index, component in enumerate(ica.exclude):
-            ica.plot_components(inst=epochs, picks=component,
-                axes=axs[index], show_names=True, colorbar=True, show=False)
-        fig.suptitle(f"EOG and ECG components to be excluded for subject {subject}", fontsize=16)
-
-        # Save plot to results directory
-        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_rejected_components.png")
-
-        if show_plots:
-            plt.show()
-
-        plt.close()
-
-        # Plot correlation scores
-        fig = ica.plot_scores(eog_scores, exclude=eog_indices,
-            title=f"Correlation scores for EOG components for subject {subject}", show=False)
-        # Save plot to results directory
-        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_eog_correlation_scores.png")
-
-        if show_plots:
-            plt.show()
-
-        plt.close()
-
-        fig = ica.plot_scores(ecg_scores, exclude=ecg_indices,
-            title=f"Correlation scores for ECG components for subject {subject}", show=False)
-        # Save plot to results directory
-        fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ecg_correlation_scores.png")
-
-        if show_plots:
-            plt.show()
-
-        plt.close()
-
-        # Get the explained variance of the ICA components
-        explained_variance_ratio = ica.get_explained_variance_ratio(epochs)["eeg"]
-        print(f"Explained variance ratio of ICA components: {explained_variance_ratio}")
-
-        # Reject components in the resampled data that are not brain related
-        print("Rejecting components in the resampled data that are not brain related...")
-        eeg_clean = ica.apply(resampled_data.copy())
-
-        if resample and autoreject:
-            attributes_eeg = f"resampled_{resampling_rate}_autoreject_filtered_{low_frequency}-{high_frequency}"
-        elif resample and not autoreject:
-            attributes_eeg = f"resampled_{resampling_rate}_filtered_{low_frequency}-{high_frequency}"
-        elif not resample and autoreject:
-            attributes_eeg = f"autoreject_filtered_{low_frequency}-{high_frequency}"
-        else:
-            attributes_eeg = f"filtered_{low_frequency}-{high_frequency}"
-
-        print("Saving preprocessed EEG data to fif files...")
-
-        # Save the raw data before ICA
-        resampled_data.save(
-            subject_preprocessed_folder
-            / f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_before_ica.fif",
-            overwrite=True,
-        )
-
-        # Save the clean data after ICA
-        eeg_clean.save(
-            subject_preprocessed_folder / f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_after_ica.fif",
-            overwrite=True,
-        )
-
-        # Save the ICA object with the bad components
-        ica.save(
-            subject_preprocessed_folder / f"sub-{subject}_task-{task}_eeg_{attributes_eeg}_ica.fif", overwrite=True
-        )
-
-        print("Preprocessed EEG data saved to fif files.\n")
-
-    # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
-
-    # TODO: Implement averaging over all participants  # noqa: FIX002
 
 # %%

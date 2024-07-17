@@ -228,7 +228,8 @@ if __name__ == "__main__":
     plt.ylim(-1.2, 1.2)
 
     # Save plot
-    plt.savefig(Path(results_dir) / exp_name / averaged_name / f"avg_task-{task}_{datatype_name}_preprocessed.png")
+    plt.savefig(Path(results_dir) / exp_name / averaged_name / datatype_name /
+    f"avg_task-{task}_{datatype_name}_preprocessed.png")
 
     plt.show()
 # %%
