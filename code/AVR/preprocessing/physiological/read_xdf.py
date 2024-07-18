@@ -22,8 +22,8 @@ The following steps are performed:
         *tracksys-headmovement_motion.json file containing the metadata, and a *tracksys-headmovement_channels.tsv file
         containing the channel information.
         Save in rawdata/sub-<participant>/motion/.
-    d.  Create a *_recording-eye_physio.tsv.gz file containing the eye tracking data from the eyes combined
-        (cyclopedian), and a *_recording-eye_physio.json file containing the metadata.
+    d.  Create a *_recording-eye_physio.tsv.gz files containing the eye tracking data for each eye (left, right) and also the eyes combined
+        (cyclopedian), and a *_recording-eye_physio.json files containing the metadata.
         Save in rawdata/sub-<participant>/eyetrack/.
     e.  Create a *_eeg.edf file containing the EEG data, a _eeg.json file containing the metadata, and a *_channels.tsv
         file containing the channel information.
@@ -37,7 +37,7 @@ Required packages: pyxdf, mne
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 30 April 2024
-Last update: 15 July 2024
+Last update: 18 July 2024
 """
 
 # %% Import
@@ -55,7 +55,7 @@ from matplotlib import cm
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 subjects = ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010",
-            "011", "012", "013", "014", "015"]  # Adjust as needed
+            "011", "012", "013", "014", "015", "016", "017"]  # Adjust as needed
 task = "AVR"  # Task name
 
 # Debug mode: Only process the one subject
@@ -103,7 +103,7 @@ LSLoffset_corr = True
 LSLoffset = 0.010  # LSL markers precede the actual stimulus presentation by approx. 10 ms
 
 # Define the streams to be selected for further processing
-selected_streams = ["Events", "RatingCR", "Head.PosRot", "EDIA.Eye.CENTER", "LiveAmpSN-054206-0127"]
+selected_streams = ["Events", "RatingCR", "Head.PosRot", "EDIA.Eye.CENTER", "EDIA.Eye.LEFT", "EDIA.Eye.RIGHT", "LiveAmpSN-054206-0127"]
 # The center eye tracking data is used for the analysis
 # Alternatively, the left or right eye tracking data can be selected by changing the stream name
 stream_modality_mapping = {
@@ -111,9 +111,11 @@ stream_modality_mapping = {
     "RatingCR": "beh",
     "Head.PosRot": "motion",
     "EDIA.Eye.CENTER": "eyetrack",
+    "EDIA.Eye.LEFT": "eyetrack",
+    "EDIA.Eye.RIGHT": "eyetrack",
     "LiveAmpSN-054206-0127": "eeg",
 }
-stream_sampling_rate = {"RatingCR": 90, "Head.PosRot": 90, "EDIA.Eye.CENTER": 120, "LiveAmpSN-054206-0127": 500}
+stream_sampling_rate = {"RatingCR": 90, "Head.PosRot": 90, "EDIA.Eye.CENTER": 120, "EDIA.Eye.LEFT": 120, "EDIA.Eye.RIGHT":120, "LiveAmpSN-054206-0127": 500}
 stream_dimensions = {
     "RatingCR": {0: "valence", 1: "arousal", 2: "flubber_frequency", 3: "flubber_amplitude"},
     "Head.PosRot": {0: "PosX", 1: "PosY", 2: "PosZ", 3: "Pitch", 4: "Yaw", 5: "Roll"},
@@ -128,6 +130,28 @@ stream_dimensions = {
         7: "Confidence",
         8: "TimestampET",
     },
+    "EDIA.Eye.LEFT": {
+        0: "PosX",
+        1: "PosY",
+        2: "PosZ",
+        3: "Pitch",
+        4: "Yaw",
+        5: "Roll",
+        6: "PupilDiameter",
+        7: "Confidence",
+        8: "TimestampET",
+    },
+    "EDIA.Eye.RIGHT": {
+        0: "PosX",
+        1: "PosY",
+        2: "PosZ",
+        3: "Pitch",
+        4: "Yaw",
+        5: "Roll",
+        6: "PupilDiameter",
+        7: "Confidence",
+        8: "TimestampET",
+    }
 }
 # labels for the motion parameters in BIDS format
 rating_bids_labels = {
@@ -152,6 +176,11 @@ eyetracking_bids_labels = {
     "Yaw": "yaw",
     "Roll": "roll",
     "PupilDiameter": "pupil_size",
+}
+eyetracking_bids_numbers = {
+    "EDIA.Eye.LEFT":['left','1'],
+    "EDIA.Eye.RIGHT":['right','2'],
+    "EDIA.Eye.CENTER":['cyclopean','3']
 }
 physiological_modalities = ["eeg", "cardiac", "respiratory", "ppg", "gsr"]
 
@@ -325,6 +354,7 @@ def plot_raw_data(data, stream_name, sampling_rate, labels):
 if __name__ == "__main__":
     # Iterate through each participant
     for index_subject, subject in enumerate(subjects):
+
         print(f"Processing data for subject {index_subject + 1} (ID {subject}) of {len(subjects)}...")
         subject_name = "sub-" + subject  # participant ID
         file_name = f"{subject_name}_ses-S001_task-{task}_run-001_eeg.xdf"
@@ -398,6 +428,9 @@ if __name__ == "__main__":
         # Extract indexes corresponding to certain streams
         indexes_info = get_stream_indexes(streams, selected_streams)
         selected_indexes = list(indexes_info.values())
+
+        # initialize eye tracking dataframes dictionary, which keys are stream_modality_mapping[stream] == "eyetrack"
+        eyetrack_data_dataframes = {stream: None for stream in selected_streams if stream_modality_mapping[stream] == "eyetrack"}
 
         # STEP 2: PLOT RAW DATA FOR QUICK INSPECTION
         for stream in selected_streams:
@@ -555,7 +588,9 @@ if __name__ == "__main__":
                     if show_plots:
                         plt.show()
 
-                else:  # stream_modality_mapping[stream] == "eyetrack"
+                elif stream_modality_mapping[stream] == "eyetrack":
+                    # Get the eye number
+                    eye_nb = eyetracking_bids_numbers[stream][1]
                     # Exclude the timestamp and confidence dimension for the eyetracking data
                     vr_data = vr_data[:, :-2]
                     values_to_keep = sorted(stream_dimensions[stream].keys())[:-2]  # Get all keys except the last two
@@ -566,7 +601,7 @@ if __name__ == "__main__":
 
                     results_eyetrack_dir = Path(results_dir) / exp_name / f"sub-{subject}" / "eyetrack"
                     # Save the plot as a .png file
-                    vr_plot_file = results_eyetrack_dir / f"{subject_name}_task-{task}_recording-eye_physio.png"
+                    vr_plot_file = results_eyetrack_dir / f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.png"
                     plt.savefig(vr_plot_file)
 
                     if show_plots:
@@ -578,10 +613,13 @@ if __name__ == "__main__":
                     # Make the timestamps column the first column
                     eyetrack_data_dataframe.insert(0, "timestamp", vr_timestamps)
 
+                    # Store the eyetracking data in dictionaries for each eye
+                    eyetrack_data_dataframes[stream] = eyetrack_data_dataframe
+
             else:
                 print(f"Stream {stream} not recognized")
-
-        # %% STEP 3: CREATE BIDS-COMPATIBLE FILES & SAVE THEM IN APPROPRIATE DIRECTORY
+        #%%
+        # STEP 3: CREATE BIDS-COMPATIBLE FILES & SAVE THEM IN APPROPRIATE DIRECTORY
         for datatype in datatype_names:
             # STEP 3a: --------- EVENT MARKERS -----------
             if datatype == "beh":
@@ -712,30 +750,42 @@ if __name__ == "__main__":
 
             # STEP 3d: --------- EYETRACKING -----------
             elif datatype == "eyetrack":
-                # Create a *_recording_eye1_physio.tsv.gz file containing the eye tracking data for the center eye
-                eyetrack_filename = f"{subject_name}_task-{task}_recording-eye_physio.tsv.gz"
-                eyetrack_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_filename
-                # Save the eye tracking data in a tsv file
-                eyetrack_data_dataframe.to_csv(eyetrack_file, sep="\t", index=False)
-                # Create a *_recording_eye1_physio.json file containing the metadata
-                eyetrack_metadata = {
-                    "SamplingFrequency": stream_sampling_rate["EDIA.Eye.CENTER"],
-                    "StartTime": eyetrack_data_dataframe["timestamp"].iloc[0],
-                    "Columns": ["timestamp", *list(eyetracking_bids_labels.values())],
-                    "PhysioType": "eyetrack",
-                    "Organ": "eye (cyclopedian)",
-                    "EnvironmentCoordinates": "",
-                    "CalibrationCount": 1,
-                    "CalibrationType": "manual",
-                }
-                eyetrack_metadata_filename = f"{subject_name}_task-{task}_recording-eye_physio.json"
-                eyetrack_metadata_file = (
-                    Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_metadata_filename
-                )
-                # Save the eye tracking metadata in a json file
-                with eyetrack_metadata_file.open("w") as f:
-                    json.dump(eyetrack_metadata, f, indent=4)
-
+                # select the eye tracking streams from stream_modality_mapping
+                eyetrack_streams = [stream for stream in selected_streams if stream_modality_mapping[stream] == "eyetrack"]
+                # loop over the eye tracking streams
+                for stream in eyetrack_streams:
+                    # get the eye number and the recorded eye from eyetracking_bids_numbers
+                    recorded_eye = eyetracking_bids_numbers[stream][0]
+                    eye_nb = eyetracking_bids_numbers[stream][1]
+                    # Create a *_recording_eye[eye_nb]_physio.tsv.gz file containing the eye tracking data for the [recorded_eye] eye
+                    eyetrack_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.tsv.gz"
+                    eyetrack_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_filename
+                    # Save the eye tracking data in a tsv file
+                    #TODO: to change
+                    eyetrack_data_dataframes[stream].to_csv(eyetrack_file, sep="\t", index=False)
+                    # Create a *_recording_eye1_physio.json file containing the metadata
+                    eyetrack_metadata = {
+                        "SamplingFrequency": stream_sampling_rate[stream],
+                        "StartTime": eyetrack_data_dataframe["timestamp"].iloc[0],
+                        "Columns": ["timestamp", *list(eyetracking_bids_labels.values())],
+                        "Manufacturer": "htc",
+                        "ManufacturersModelName": "vive_pro_eye",
+                        "PhysioType": "eyetrack",
+                        "EnvironmentCoordinates": "center", #TODO: to check
+                        "RecordedEye": recorded_eye,
+                        "SampleCoordinateUnits":"pos:m, rot:degree_euler_angle", #TODO: to check
+                        "SampleCoordinateSystem": "eye-in-head", #TODO: to check
+                        "CalibrationCount": 1,
+                        "CalibrationType": "steamvr", #TODO: to check
+                    }
+                    eyetrack_metadata_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.json"
+                    eyetrack_metadata_file = (
+                        Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_metadata_filename
+                    )
+                    # Save the eye tracking metadata in a json file
+                    with eyetrack_metadata_file.open("w") as f:
+                        json.dump(eyetrack_metadata, f, indent=4)
+            # %%
             # STEP 3e: --------- EEG -----------
             elif datatype == "eeg":
                 # Create a *_eeg.edf file containing the EEG data
