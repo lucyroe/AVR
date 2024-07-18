@@ -134,7 +134,7 @@ if __name__ == "__main__":
         # Remove unnecessary columns
         data = data.drop(columns=["duration"])
 
-        # Round onset column to 3 decimal places (10 ms accuracy)
+        # Round onset column to 2 decimal places (10 ms accuracy)
         # To account for small differences in onset times between participants
         data["onset"] = data["onset"].round(2)
 

@@ -42,7 +42,7 @@ Required packages: mne, neurokit, systole, seaborn, autoreject
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 17 July 2024
+Last update: 18 July 2024
 """
 # %% Import
 import gzip
@@ -101,6 +101,9 @@ resampling_rate = 250 if resample else 500  # in Hz
 
 # Define the percentage of bad epochs that should be tolerated
 bad_epochs_threshold = 30  # in percent
+
+# Define the artifact threshold for epochs
+artifact_threshold = 100  # in microvolts
 
 # Define if the first and last 2.5 seconds of the data should be cut off
 # To avoid any potential artifacts at the beginning and end of the experiment
@@ -297,29 +300,26 @@ def preprocess_eeg(
         print(f"Total duration of preprocessing: {int(minutes)} minutes, {int(seconds)} seconds")
 
         # Get the number of bad epochs and channels
-        n_bad_epochs = reject_log.bad_epochs.size
-        n_bad_channels = len(reject_log.bad_channels)
+        n_bad_epochs = np.sum(reject_log.bad_epochs)
+        n_bad_channels = np.sum(reject_log.labels==1)
 
-        # Get the number of interpolated epochs and channels
-        n_interpolated_epochs = reject_log.interpolated.size
-        n_interpolated_channels = len(reject_log.interpolated_channels)
+        # Get the number of interpolated channels
+        n_interpolated_channels = np.sum(reject_log.labels==2)
 
         # Get the number of all epochs and channels
         n_epochs = len(epochs)
-        n_channels = len(epochs.ch_names)
+        n_channels = len(reject_log.ch_names) * n_epochs
 
         # Get the percentage of bad epochs and channels
         perc_bad_epochs = (n_bad_epochs / n_epochs) * 100
         perc_bad_channels = (n_bad_channels / n_channels) * 100
 
-        # Get the percentage of interpolated epochs and channels
-        perc_interpolated_epochs = (n_interpolated_epochs / n_epochs) * 100
+        # Get the percentage of interpolated channels * epochs
         perc_interpolated_channels = (n_interpolated_channels / n_channels) * 100
 
         print(f"Number of bad epochs: {n_bad_epochs} of {n_epochs} ({perc_bad_epochs:.2f}%).")
-        print(f"Number of bad channels: {n_bad_channels} of {n_channels} ({perc_bad_channels:.2f}%).")
-        print(f"Number of interpolated epochs: {n_interpolated_epochs} of {n_epochs} ({perc_interpolated_epochs:.2f}%).")
-        print(f"Number of interpolated channels: {n_interpolated_channels} of {n_channels} ({perc_interpolated_channels:.2f}%).")
+        print(f"Number of bad channels across all epochs: {n_bad_channels} of {n_channels} ({perc_bad_channels:.2f}%).")
+        print(f"Number of interpolated channels across all epochs: {n_interpolated_channels} of {n_channels} ({perc_interpolated_channels:.2f}%).")
         if perc_bad_epochs > bad_epochs_threshold or perc_bad_channels > bad_epochs_threshold:
             print(f"WARNING! More than {bad_epochs_threshold}% of epochs or channels are bad. Excluding the participant is recommended.")
 
@@ -403,38 +403,20 @@ def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
     # Create list of components to exclude
     ica.exclude = []
 
-    # Find the right threshold for identifying bad EOG components
-    # The default value is 3.0 but this is not the optimal threshold for all datasets
-    # We use a while loop to iterate over a range of thresholds until at least 2 ICs are identified
-    # We would expect at least 2 ICs from both blinks and horizontal eye movements
-    number_ics_eog = 0
-    max_ics_eog = 2
-    z_threshold = 3.5
-    z_step = 0.1
-
-    print("Finding threshold for EOG components...")
+    # Correlate with EOG channels
     print("Correlating ICs with EOG channels...")
-    while number_ics_eog < max_ics_eog:
-        # Correlate with EOG channels
-        eog_indices, eog_scores = ica.find_bads_eog(epochs, threshold=z_threshold)
-        number_ics_eog = len(eog_indices)
-        z_threshold -= z_step  # won't impact things if number_ics_eog is already >= max_ics_eog
-
-    print("Final threshold for EOG components: " + str(z_threshold))
+    eog_indices, eog_scores = ica.find_bads_eog(epochs, threshold="auto", measure="zscore")
     print("Number of EOG components identified: " + str(len(eog_indices)))
 
-    # For ECG components, we use the default threshold of 3.0
     # Correlate with ECG channels
-    print("Using the default threshold of 3.0 for ECG components...")
     print("Correlating ICs with ECG channels...")
-    ecg_indices, ecg_scores = ica.find_bads_ecg(epochs, threshold="auto", method="correlation")
+    ecg_indices, ecg_scores = ica.find_bads_ecg(epochs)
     print("Number of ECG components identified: " + str(len(ecg_indices)))
 
-    # For EMG components, we use the default threshold of 3.0
     # Correlate with muscle ativity
-    print("Using the default threshold of 3.0 for EMG components...")
     print("Correlating ICs with muscle activity...")
-    emg_indices, emg_scores = ica.find_bads_muscle(epochs, threshold="auto")
+    emg_indices, emg_scores = ica.find_bads_muscle(epochs)
+    print("Number of muscle components identified: " + str(len(emg_indices)))
 
     # Assign the bad EOG components to the ICA.exclude attribute so they can be removed later
     ica.exclude = eog_indices + ecg_indices + emg_indices
@@ -774,6 +756,18 @@ if __name__ == "__main__":
             heart_rate_ecg = nk.ecg_rate(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
             heart_rate_ppg = nk.ppg_rate(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
 
+            # Interpolate IBI and HR to match the length of the ECG and PPG data
+            desired_length = round(len(cleaned_ecg)/sampling_rates["ecg"])
+            x_new = np.linspace(0, desired_length-1, num=desired_length, endpoint=False)
+            x_values_ibi_ecg = np.linspace(0, len(ibi_ecg)-1, num=len(ibi_ecg), endpoint=False)
+            ibi_ecg = nk.signal_interpolate(x_values_ibi_ecg, ibi_ecg, x_new, method="linear")
+            x_values_hr_ecg = np.linspace(0, len(heart_rate_ecg)-1, num=len(heart_rate_ecg), endpoint=False)
+            heart_rate_ecg = nk.signal_interpolate(x_values_hr_ecg, heart_rate_ecg, x_new, method="linear")
+            x_values_ibi_ppg = np.linspace(0, len(ibi_ppg)-1, num=len(ibi_ppg), endpoint=False)
+            ibi_ppg = nk.signal_interpolate(x_values_ibi_ppg, ibi_ppg, x_new, method="linear")
+            x_values_hr_ppg = np.linspace(0, len(heart_rate_ppg)-1, num=len(heart_rate_ppg), endpoint=False)
+            heart_rate_ppg = nk.signal_interpolate(x_values_hr_ppg, heart_rate_ppg, x_new, method="linear")
+
             # Plot IBI and HR for ECG and PPG data
             fig, axs = plt.subplots(2, 2, figsize=(15, 8))
             axs[0, 0].plot(ibi_ecg, color=colors["ECG"][0])
@@ -788,7 +782,7 @@ if __name__ == "__main__":
             "(no manual cleaning)" if not manual_cleaning else "(after manual cleaning)", fontsize=16)
             # Set x-axis labels to minutes instead of seconds for all axes
             for ax in axs.flat:
-                ax.set_xlabel("Time (s)")
+                ax.set_xlabel("Time (min)")
                 x_ticks = ax.get_xticks()
                 ax.set_xticks(x_ticks)
                 ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
@@ -946,14 +940,10 @@ if __name__ == "__main__":
 
             # Number of components removed
             print(f"Number of components removed: {len(ica.exclude)} (out of {ica.n_components_}).")
-            print(f"Components removed: {ica.exclude} ({len(eog_indices)} EOG components, {len(ecg_indices)} ECG components, {len(emg_indices)} EMG components, {len(ica.exclude)-len(eog_indices)-len(eog_indices)-len(emg_indices)} other components).")
+            print(f"Components removed: {ica.exclude} ({len(eog_indices)} EOG components, {len(ecg_indices)} ECG components, {len(emg_indices)} EMG components, {len(ica.exclude)-len(eog_indices)-len(ecg_indices)-len(emg_indices)} other components).")
 
             # Plot components
-            fig, axs = plt.subplots(1, len(ica.exclude), figsize=[15, 5])
-            for index, component in enumerate(ica.exclude):
-                ica.plot_components(inst=epochs, picks=component,
-                    axes=axs[index], show_names=True, colorbar=True, show=False)
-            fig.suptitle(f"EOG, ECG, EMG and other components to be excluded for subject {subject}", fontsize=16)
+            fig = ica.plot_components(inst=epochs_ica, picks=ica.exclude, colorbar=True, show=False, title=f"EOG, ECG, EMG and other components to be excluded for subject {subject}")
 
             # Save plot to results directory
             fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_rejected_components.png")
@@ -963,7 +953,7 @@ if __name__ == "__main__":
 
             plt.close()
 
-            # Plot correlation scores
+            # Plot correlation scores to see which components are most likely to be EOG
             fig = ica.plot_scores(eog_scores, exclude=eog_indices,
                 title=f"Correlation scores for EOG components for subject {subject}", show=False)
             # Save plot to results directory
@@ -974,33 +964,42 @@ if __name__ == "__main__":
 
             plt.close()
 
-            fig = ica.plot_scores(ecg_scores, exclude=ecg_indices,
-                title=f"Correlation scores for ECG components for subject {subject}", show=False)
-            # Save plot to results directory
-            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ecg_correlation_scores.png")
-
-            if show_plots:
-                plt.show()
-
-            plt.close()
-
-            fig = ica.plot_scores(emg_scores, exclude=emg_indices,
-                title=f"Correlation scores for EMG components for subject {subject}", show=False)
-            # Save plot to results directory
-            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_emg_correlation_scores.png")
-
-            if show_plots:
-                plt.show()
-
-            plt.close()
-
             # Get the explained variance of the ICA components
-            explained_variance_ratio = ica.get_explained_variance_ratio(epochs)["eeg"]
+            explained_variance_ratio = ica.get_explained_variance_ratio(epochs_ica)["eeg"]
             print(f"Explained variance ratio of ICA components: {explained_variance_ratio}")
 
             # Finally reject components in the resampled data (0.1 Hz) that are not brain related
             print("Rejecting components in the resampled data (0.1 Hz) that are not brain related...")
             eeg_clean = ica.apply(resampled_data.copy())
+
+            # Final Check: Segment cleaned data into epochs again and check in how many epochs there are still artifacts of more than 100 µV
+            print(f"Checking for any remaining bad epochs (max. value above {artifact_threshold} µV) in the cleaned data...")
+            tstep = 10  # in seconds
+            events = mne.make_fixed_length_events(eeg_clean, duration=tstep)
+            epochs = mne.Epochs(eeg_clean, events, tmin=0, tmax=tstep, baseline=None, preload=True)
+
+            # Check for bad epochs
+            remaining_bad_epochs = []
+            for i, epoch in enumerate(epochs):
+                if np.max(epoch._data) > artifact_threshold:
+                    remaining_bad_epochs.append(i)
+
+            # Calculate the percentage of bad epochs
+            percentage_bad_epochs = len(remaining_bad_epochs) / len(epochs) * 100
+
+            # Print the number of remaining bad epochs
+            print(f"Number of remaining bad epochs: {len(remaining_bad_epochs)} ({percentage_bad_epochs:.2f}%).")
+
+            # Check if the percentage of bad epochs is above the threshold
+            if percentage_bad_epochs > bad_epochs_threshold:
+                print("The percentage of bad epochs is above the threshold. Participant should be excluded.")
+
+            answer = input("Do you want to exclude this participant? (Y/n): ")
+            if answer == "Y":
+                excluded_participants.append(subject)
+                print("Participant added to the list of excluded participants.")
+            else:
+                print("Participant not excluded.")
 
             if resample:
                 attributes_eeg = f"resampled_{resampling_rate}_filtered_{low_frequency}-{high_frequency}"
@@ -1037,31 +1036,34 @@ if __name__ == "__main__":
             # Create the file if it does not exist
             if not (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").exists():
                 with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open("w") as f:
-                    f.write(f"{subject}\n")
+                    f.write(excluded_participants)
             else:
                 with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open("w") as f:
-                    f.write(f"{subject}\n")
+                    f.append(excluded_participants)
             
             # Read in the participant metadata json file
-            with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open("w") as f:
+            with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open("r") as f:
                 participant_metadata = json.load(f)
 
             # Append more information to the participant metadata json file
-            participant_metadata["number_of_bad_epochs"] = len(reject_log_ica.bad_epochs)
-            participant_metadata["number_of_interpolated_epochs"] = len(reject_log_ica.interpolated_epochs)
-            participant_metadata["number_of_all_epochs"] = len(epochs_ica)
-            participant_metadata["number_of_bad_channels"] = len(reject_log_ica.bad_channels)
-            participant_metadata["number_of_interpolated_channels"] = len(reject_log_ica.interpolated_channels)
-            participant_metadata["number_of_all_channels"] = len(epochs_ica.info["ch_names"])
+            participant_metadata["number_of_bad_epochs"] = int(np.sum(reject_log_ica.bad_epochs))
+            participant_metadata["number_of_all_epochs"] = int(len(epochs_ica))
+            participant_metadata["number_of_bad_channels"] = int(np.sum(reject_log_ica.labels==1))
+            participant_metadata["number_of_interpolated_channels"] = int(np.sum(reject_log_ica.labels==2))
+            participant_metadata["number_of_all_channels_across_epochs"] = int(len(epochs_ica.info["ch_names"])*len(epochs_ica))
             participant_metadata["participant_excluded"] = exclude
-            participant_metadata["number_of_all_components"] = ica_n_components
-            participant_metadata["number_of_removed_components"] = len(ica.exclude)
-            participant_metadata["ica_variance"] = ica_variance
-            participant_metadata["eog_components"] = eog_indices
-            participant_metadata["ecg_components"] = ecg_indices
-            participant_metadata["emg_components"] = emg_indices
-            participant_metadata["other_components"] = ica.exclude - eog_indices - ecg_indices - emg_indices
-            participant_metadata["explained_variance_ratio"] = explained_variance_ratio
+            participant_metadata["number_of_all_components"] = int(ica_n_components)
+            participant_metadata["number_of_removed_components"] = int(len(ica.exclude))
+            participant_metadata["ica_variance"] = float(ica_variance)
+            participant_metadata["eog_components"] = [int(index) for index in eog_indices]
+            participant_metadata["ecg_components"] = [int(index) for index in ecg_indices]
+            participant_metadata["emg_components"] = [int(index) for index in emg_indices]
+            other_components = set(ica.exclude)
+            for sublist in [eog_indices, ecg_indices, emg_indices]:
+                other_components -= set(sublist)
+            list_other_components = list(other_components)
+            participant_metadata["other_components"] = [int(index) for index in list_other_components]
+            participant_metadata["explained_variance_ratio"] = float(explained_variance_ratio)
 
             # Include the end time of the preprocessing
             participant_metadata["end_time"] = time.ctime()
