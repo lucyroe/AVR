@@ -761,7 +761,6 @@ if __name__ == "__main__":
                     eyetrack_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.tsv.gz"
                     eyetrack_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_filename
                     # Save the eye tracking data in a tsv file
-                    #TODO: to change
                     eyetrack_data_dataframes[stream].to_csv(eyetrack_file, sep="\t", index=False)
                     # Create a *_recording_eye1_physio.json file containing the metadata
                     eyetrack_metadata = {
