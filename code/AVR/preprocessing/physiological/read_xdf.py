@@ -946,6 +946,7 @@ if __name__ == "__main__":
                     "StartTime": physio_data["timestamp"].iloc[0],
                     "Columns": ["cardiac", "respiratory", "ppg", "gsr"],
                     "Manufacturer": "Brain Products",
+                    "ManufacturersModelName": "LiveAmp Sensor & Trigger Extension",
                     "cardiac": {
                         "Description":
                         "continuous heart measurement with three passive electrodes placed in Lead II configuration",
@@ -965,6 +966,9 @@ if __name__ == "__main__":
                         "continuous measurements of GSR, two electrodes placed on the inner palm of the left hand",
                         "Units": "mV",
                     },
+                    "InstitutionName": "Max Planck Institute for Human Brain and Cognitive Sciences",
+                    "InstitutionAddress": "Stephanstrasse 1a, 04103 Leipzig, Germany",
+                    "InstitutionalDepartmentName": "Department of Neurology",
                 }
                 physio_metadata_filename = f"{subject_name}_task-{task}_physio.json"
                 physio_metadata_file = (
