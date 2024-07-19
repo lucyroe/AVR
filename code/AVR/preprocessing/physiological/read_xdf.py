@@ -56,7 +56,7 @@ from matplotlib import cm
 # subjects = ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010",
 #             "011", "012", "013", "014", "015", "016", "017", "018", "019", "020",
 #             "021"]
-subjects = ["018"]  # Adjust as needed
+subjects = ["020"]  # Adjust as needed
 task = "AVR"  # Task name
 
 # Debug mode: Only process the one subject
@@ -730,7 +730,7 @@ if __name__ == "__main__":
                     "ManufacturersModelName": "Vive Pro Eye",
                     "TrackingSystemName": "HTC Vive Pro Eye HMD",
                     "TaskName": task,
-                    "TaskDescription": "VR task with head movement" if "mov" in task else "VR task",
+                    "TaskDescription": "VR task with head movement; continuous rating of valence and arousal during sequence of stereoscopic 360 videos",
                     "MotionChannelCount": len(motion_bids_labels),
                     "ORNTChannelCount": len(motion_bids_labels)/2,
                     "POSChannelCount": len(motion_bids_labels)/2,
@@ -790,7 +790,7 @@ if __name__ == "__main__":
                         "PhysioType": "eyetrack",
                         "EnvironmentCoordinates": "center", #TODO: to check
                         "RecordedEye": recorded_eye,
-                        "SampleCoordinateUnits":"pos:m, rot:deg", #TODO: to check
+                        "SampleCoordinateUnits":"pos:m, ornt:deg", #TODO: to check
                         "SampleCoordinateSystem": "eye-in-head", #TODO: to check
                         "EventIdentifier": "None",
                         "RawSamples": 1,
@@ -800,6 +800,7 @@ if __name__ == "__main__":
                         "CalibrationType": "SteamVR 5-point", #TODO: to check
                         "MaximalCalibrationError": "0.5-1.1 deg within FOV 20 deg",
                         "EyeCameraSettings": "FOV 110 deg",
+                        "ScreenSize": "3.5 inch diagonal (8.89 cm)",
                         "ScreenResolution": "1440 x 1600 px per eye (2880 x 1600 px combined)",
                         "ScreenRefreshRate": "90 Hz",
                         "InstitutionName": "Max Planck Institute for Human Brain and Cognitive Sciences",
@@ -813,7 +814,7 @@ if __name__ == "__main__":
                     # Save the eye tracking metadata in a json file
                     with eyetrack_metadata_file.open("w") as f:
                         json.dump(eyetrack_metadata, f, indent=4)
-            # %%
+        
             # STEP 3e: --------- EEG -----------
             elif datatype == "eeg":
                 # Create a *_eeg.edf file containing the EEG data
@@ -833,7 +834,7 @@ if __name__ == "__main__":
                     "SamplingFrequency": stream_sampling_rate["LiveAmpSN-054206-0127"],
                     "PowerLineFrequency": 50,
                     "SoftwareFilters": "n/a",
-                    "TaskDescription": "VR task with head movement",
+                    "TaskDescription": "VR task with head movement; continuous rating of valence and arousal during sequence of stereoscopic 360 videos",
                     "CapManufacturer": "EasyCap",
                     "CapManufacturersModelName": "actiCAP snap 64 channels",
                     "Manufacturer": "Brain Products",
@@ -963,7 +964,7 @@ if __name__ == "__main__":
                     },
                     "gsr": {
                         "Description":
-                        "continuous measurements of GSR, two electrodes placed on the inner palm of the left hand",
+                        "continuous measurements of GSR, two electrodes placed on the palmar side of the left hand (distal and proximal hypothenar)",
                         "Units": "mV",
                     },
                     "InstitutionName": "Max Planck Institute for Human Brain and Cognitive Sciences",
