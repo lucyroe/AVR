@@ -107,8 +107,8 @@ if __name__ == "__main__":
         # %% STEP 2. PREPROCESS DATA
         # 2a. Cutting data
         # Get start and end time of the experiment
-        start_time = events[events["event_name"] == "start_experiment"]["onset"].iloc[0]
-        end_time = events[events["event_name"] == "end_experiment"]["onset"].iloc[0]
+        start_time = events[events["event_name"] == "start_spaceship"].reset_index()["onset"].tolist()[0]
+        end_time = events[events["event_name"] == "end_spaceship"].reset_index()["onset"].tolist()[-1]
 
         # Get events for experiment (from start to end of experiment)
         events_experiment = events[(events["onset"] >= start_time) & (events["onset"] <= end_time)]

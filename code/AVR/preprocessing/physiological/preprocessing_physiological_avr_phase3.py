@@ -33,16 +33,15 @@ Steps:
     2c. Preprocess ECG and PPG data & save to tsv files
     2d. Preprocess EEG data & save to fif files
 3. AVERAGE OVER ALL PARTICIPANTS
-    3a. Interpolating data
-    3b. Concatenate all data
-    3c. Average over all participants & save to tsv files
+    3a. Concatenate all ECG & PPG data
+    3b. Average over all participants (ECG & PPG) & save to tsv files
 
 Required packages: mne, neurokit, systole, seaborn, autoreject
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 18 July 2024
+Last update: 24 July 2024
 """
 # %% Import
 import gzip
@@ -64,7 +63,6 @@ from systole.interact import Editor
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 subjects = ["001", "002", "003"]  # Adjust as needed
-# "001", "002", "003"   # already done
 task = "AVR"
 
 # Only analyze one subject when debug mode is on
@@ -73,10 +71,11 @@ if debug:
     subjects = [subjects[0]]
 
 # Defne preprocessing steps to perform
-steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG", "Averaging"]    # Adjust as needed
+steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG"]  # Adjust as needed
+# "Averaging"
 
 # Define if plots for preprocessing steps should be shown
-show_plots = True
+show_plots = False
 
 # Define whether manual cleaning of R-peaks should be done
 manual_cleaning = False
@@ -90,14 +89,10 @@ if scaling:
 powerline = 50  # in Hz
 
 # Define cutoff frequencies for bandfiltering EEG data
-low_frequency = 0.1 # in Hz
-high_frequency = 45 # in Hz
+low_frequency = 0.1  # in Hz
+high_frequency = 45  # in Hz
 
 low_frequency_ica = 1  # in Hz
-
-# Define whether to resample the data (from the original 500 Hz)
-resample = True
-resampling_rate = 250 if resample else 500  # in Hz
 
 # Define the percentage of bad epochs that should be tolerated
 bad_epochs_threshold = 30  # in percent
@@ -132,11 +127,12 @@ avg_results_folder = results_dir / exp_name / averaged_name / datatype_name
 avg_results_folder.mkdir(parents=True, exist_ok=True)
 
 # Create color palette for plots
-colors = {"ECG": ["#F0E442", "#D55E00"],    # yellow and dark orange
-            "PPG": ["#E69F00", "#CC79A7"],   # light orange and pink
-            "EEG": ["#56B4E9", "#0072B2", "#009E73"],  # light blue, dark blue, and green
-            "others": ["#FFFFFF", "#6C6C6C", "#000000"] # white, gray, and black
-            }
+colors = {
+    "ECG": ["#F0E442", "#D55E00"],  # yellow and dark orange
+    "PPG": ["#E69F00", "#CC79A7"],  # light orange and pink
+    "EEG": ["#56B4E9", "#0072B2", "#009E73"],  # light blue, dark blue, and green
+    "others": ["#FFFFFF", "#6C6C6C", "#000000"],  # white, gray, and black
+}
 
 # Get rid of the sometimes excessive logging of MNE
 mne.set_log_level("error")
@@ -193,8 +189,14 @@ def plot_peaks(
         circlecolor = colors["PPG"][0]
 
     axs.plot(time, selected_signal, linewidth=1, label="Signal", color=linecolor)
-    axs.scatter(selected_peaks, selected_signal[selected_peaks - min_sample], color=circlecolor,
-        edgecolor=circlecolor, linewidth=1, alpha=0.6)
+    axs.scatter(
+        selected_peaks,
+        selected_signal[selected_peaks - min_sample],
+        color=circlecolor,
+        edgecolor=circlecolor,
+        linewidth=1,
+        alpha=0.6,
+    )
     axs.set_ylabel("ECG" if "ECG" in plot_title else "PPG")
     axs.set_xlabel("Time (s)")
     x_ticks = axs.get_xticks()
@@ -209,15 +211,14 @@ def plot_peaks(
     plt.close()
 
 
-def preprocess_eeg(
-    raw_data: mne.io.Raw, low_frequency: float, high_frequency: int, resample_rate: float, autoreject: bool
+def preprocess_eeg(  # noqa: PLR0915
+    raw_data: mne.io.Raw, low_frequency: float, high_frequency: int, autoreject: bool
 ):
     """
     Preprocess EEG data using the MNE toolbox.
 
     Remove Line-noise of power line, rereference to average, filter the data with a bandpass filter,
-    resample it to a specified sampling rate, segment it into epochs of 10s,
-    and use Autoreject to detect bad channels and epochs.
+    segment it into epochs of 10s, and use Autoreject to detect bad channels and epochs.
 
     Arguments:
     ---------
@@ -228,17 +229,15 @@ def preprocess_eeg(
         Low cut-off frequency in Hz for the bandpass filter.
     high_frequency: int
         High cut-off frequency in Hz for the bandpass filter.
-    resample_rate: float
-        New sampling frequency in Hz. The data will be resampled to this frequency.
     autoreject: bool
         If True, autoreject is used to detect and interpolate bad channels and epochs automatically.
 
     Returns:
     -------
-    resampled_data: mne.io.Raw
-        The resampled raw data after preprocessing.
+    filtered_data: mne.io.Raw
+        The filtered raw data after preprocessing.
     epochs: mne.epochs.Epochs
-        The segmented epochs extracted from the resampled data.
+        The segmented epochs extracted from the filtered data.
     reject_log: autoreject.autoreject.RejectLog (if autoreject=True)
         A log of the rejected epochs and channels.
     """
@@ -254,17 +253,13 @@ def preprocess_eeg(
     print("Filtering data...")
     filtered_data = rereferenced_data.copy().filter(l_freq=low_frequency, h_freq=high_frequency)
 
-    # Resampling
-    print("Resampling data...")
-    resampled_data = filtered_data.resample(resample_rate)
-
     # Segment data into epochs of 10s
     # Even though data is continuous, it is good practice to break it into epochs
     # before detecting bad channels and running ICA
     print("Segmenting data into epochs...")
     tstep = 10  # in seconds
-    events = mne.make_fixed_length_events(resampled_data, duration=tstep)
-    epochs = mne.Epochs(resampled_data, events, tmin=0, tmax=tstep, baseline=None, preload=True)
+    events = mne.make_fixed_length_events(filtered_data, duration=tstep)
+    epochs = mne.Epochs(filtered_data, events, tmin=0, tmax=tstep, baseline=None, preload=True)
 
     if autoreject:
         # Pick only EEG channels for Autoreject bad channel detection
@@ -301,10 +296,10 @@ def preprocess_eeg(
 
         # Get the number of bad epochs and channels
         n_bad_epochs = np.sum(reject_log.bad_epochs)
-        n_bad_channels = np.sum(reject_log.labels==1)
+        n_bad_channels = np.sum(reject_log.labels == 1)
 
         # Get the number of interpolated channels
-        n_interpolated_channels = np.sum(reject_log.labels==2)
+        n_interpolated_channels = np.sum(reject_log.labels == 2)  # noqa: PLR2004
 
         # Get the number of all epochs and channels
         n_epochs = len(epochs)
@@ -318,10 +313,18 @@ def preprocess_eeg(
         perc_interpolated_channels = (n_interpolated_channels / n_channels) * 100
 
         print(f"Number of bad epochs: {n_bad_epochs} of {n_epochs} ({perc_bad_epochs:.2f}%).")
-        print(f"Number of bad channels across all epochs: {n_bad_channels} of {n_channels} ({perc_bad_channels:.2f}%).")
-        print(f"Number of interpolated channels across all epochs: {n_interpolated_channels} of {n_channels} ({perc_interpolated_channels:.2f}%).")
+        print(
+            f"Number of bad channels across all epochs: {n_bad_channels} of {n_channels} ({perc_bad_channels:.2f}%)."
+        )
+        print(
+            "Number of interpolated channels across all epochs: "
+            f"{n_interpolated_channels} of {n_channels} ({perc_interpolated_channels:.2f}%)."
+        )
         if perc_bad_epochs > bad_epochs_threshold or perc_bad_channels > bad_epochs_threshold:
-            print(f"WARNING! More than {bad_epochs_threshold}% of epochs or channels are bad. Excluding the participant is recommended.")
+            print(
+                f"WARNING! More than {bad_epochs_threshold}% of epochs or channels are bad."
+                "Excluding the participant is recommended."
+            )
 
         answer = input("Do you want to exclude this participant? (Y/n): ")
         if answer == "Y":
@@ -333,7 +336,7 @@ def preprocess_eeg(
 
         print("Continuing with the preprocessing...")
 
-    return resampled_data, epochs, (reject_log if autoreject else _), (exclude if autoreject else _)
+    return filtered_data, epochs, (reject_log if autoreject else None), (exclude if autoreject else None)
 
 
 def run_ica(epochs: mne.epochs.Epochs, rejected_epochs: np.array):
@@ -374,14 +377,15 @@ def run_ica(epochs: mne.epochs.Epochs, rejected_epochs: np.array):
 
 def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
     """
-    Select ICA components semi-automatically using a correlation approach with eye movements, cardiac data and muscle activity.
+    Select ICA components semi-automatically using a correlation approach.
 
     Arguments:
     ---------
     ica: mne.preprocessing.ICA
         The ICA object containing the components to be examined. This should be the output from run_ica().
     epochs: mne.epochs.Epochs
-        The epochs data (1 Hz) used for correlating with the ICA components. This should be the output from preprocess_eeg().
+        The epochs data (1 Hz) used for correlating with the ICA components.
+        This should be the output from preprocess_eeg().
 
     Returns:
     -------
@@ -405,17 +409,19 @@ def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
 
     # Correlate with EOG channels
     print("Correlating ICs with EOG channels...")
-    eog_indices, eog_scores = ica.find_bads_eog(epochs, threshold="auto", measure="zscore")
+    eog_indices, eog_scores = ica.find_bads_eog(epochs, ch_name=eog_channels, threshold="auto", measure="zscore")
     print("Number of EOG components identified: " + str(len(eog_indices)))
 
     # Correlate with ECG channels
     print("Correlating ICs with ECG channels...")
-    ecg_indices, ecg_scores = ica.find_bads_ecg(epochs)
+    ecg_indices, ecg_scores = ica.find_bads_ecg(
+        epochs, ch_name="ECG", method="correlation", measure="zscore", threshold="auto"
+    )
     print("Number of ECG components identified: " + str(len(ecg_indices)))
 
     # Correlate with muscle ativity
     print("Correlating ICs with muscle activity...")
-    emg_indices, emg_scores = ica.find_bads_muscle(epochs)
+    emg_indices, emg_scores = ica.find_bads_muscle(epochs, threshold=0.8)
     print("Number of muscle components identified: " + str(len(emg_indices)))
 
     # Assign the bad EOG components to the ICA.exclude attribute so they can be removed later
@@ -445,25 +451,9 @@ if __name__ == "__main__":
         subject_data_path = data_dir / exp_name / rawdata_name / f"sub-{subject}" / datatype_name
 
         # Define the path to the preprocessed data
-        subject_preprocessed_folder = (data_dir / exp_name / derivative_name / preprocessed_name
-                                    / f"sub-{subject}" / datatype_name)
-
-        # Create participant file with relevant preprocessing metadata
-        participant_metadata = {
-                "subject": subject,
-                "start_time": time.ctime(),
-                "steps": steps,
-                "manual_cleaning_of_peaks": manual_cleaning,
-                "power_line": powerline,
-                "low_frequency": low_frequency,
-                "high_frequency": high_frequency,
-                "low_frequency_ica": low_frequency_ica,
-                "resampling_rate": resampling_rate,
-                "scaling": scaling,
-                "scale_factor": scale_factor,
-                "cut_off_seconds": cut_off_seconds,
-                "bad_epochs_threshold": bad_epochs_threshold,
-            }
+        subject_preprocessed_folder = (
+            data_dir / exp_name / derivative_name / preprocessed_name / f"sub-{subject}" / datatype_name
+        )
 
         # Define the path to the results
         subject_results_folder = results_dir / exp_name / f"sub-{subject}" / datatype_name
@@ -520,8 +510,8 @@ if __name__ == "__main__":
             event_mapping = pd.read_csv(mapping_filename, sep="\t")
         else:
             print(
-            "ERROR! No event mapping file found. Using default event markers, which means that the different videos "
-            "cannot be separated by their names."
+                "ERROR! No event mapping file found. Using default event markers, which means that the different"
+                " videos cannot be separated by their names."
             )
             event_mapping = event_markers.copy()
 
@@ -542,8 +532,29 @@ if __name__ == "__main__":
         raw_ecg_data["timestamp"] = raw_ecg_data["timestamp"] - raw_ecg_data["timestamp"].loc[0]
         raw_ppg_data["timestamp"] = raw_ppg_data["timestamp"] - raw_ppg_data["timestamp"].loc[0]
 
+        # Create participant file with relevant preprocessing metadata
+        participant_metadata = {
+            "subject": subject,
+            "start_time": time.ctime(),
+            "steps": steps,
+            "manual_cleaning_of_peaks": manual_cleaning,
+            "sampling_rate_ecg": sampling_rates["ecg"],
+            "sampling_rate_ppg": sampling_rates["ppg"],
+            "sampling_rate_eeg": sampling_rates["eeg"],
+            "power_line": powerline,
+            "low_frequency": low_frequency,
+            "high_frequency": high_frequency,
+            "low_frequency_ica": low_frequency_ica,
+            "scaling": scaling,
+            "scale_factor": scale_factor,
+            "cut_off_seconds": cut_off_seconds,
+            "bad_epochs_threshold": bad_epochs_threshold,
+        }
+
         # Save the metadata of the participant
-        with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open("w") as f:
+        with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open(
+            "w"
+        ) as f:
             json.dump(participant_metadata, f)
 
         # %% STEP 2. PREPROCESS DATA
@@ -602,13 +613,6 @@ if __name__ == "__main__":
             # Adjust event time so first marker starts not at 0 but at - cut_off_seconds
             events_experiment["onset"] = events_experiment["onset"] - start_time - cut_off_seconds
 
-            print("Round onset column to 3 decimal places (1 ms accuracy) for ECG and PPG data...")
-            # Round onset column to 3 decimal places (1 ms accuracy)
-            # To account for small differences in onset times between participants
-            cropped_ecg_data.loc[:, "timestamp"] = cropped_ecg_data.loc[:, "timestamp"].round(3)
-            cropped_ppg_data.loc[:, "timestamp"] = cropped_ppg_data.loc[:, "timestamp"].round(3)
-            events_experiment["onset"] = events_experiment["onset"].round(3)
-
             # Reset index
             events_experiment = events_experiment.reset_index(drop=True)
             cropped_ecg_data = cropped_ecg_data.reset_index(drop=True)
@@ -625,10 +629,9 @@ if __name__ == "__main__":
             print("********** Preprocessing ECG and PPG **********\n")
             # Flip ECG signal (as it is inverted)
             print("Flipping ECG signal...")
-            ecg_data_flipped = nk.ecg_invert(cropped_ecg_data["cardiac"], sampling_rate=sampling_rates["ecg"],
-                force=True)[
-                0
-            ]
+            ecg_data_flipped = nk.ecg_invert(
+                cropped_ecg_data["cardiac"], sampling_rate=sampling_rates["ecg"], force=True
+            )[0]
 
             # Data Cleaning using NeuroKit for ECG data
             # A 50 Hz powerline filter and
@@ -744,12 +747,14 @@ if __name__ == "__main__":
 
             print("Calculating IBI and HR from ECG and PPG data...")
             # Calculate inter-beat-intervals (IBI) from peaks
-            r_peaks_indices = (corrected_rpeaks["ecg"]["corrected_peaks"] if manual_cleaning
-                else info_ecg["ECG_R_Peaks"])
+            r_peaks_indices = (
+                corrected_rpeaks["ecg"]["corrected_peaks"] if manual_cleaning else info_ecg["ECG_R_Peaks"]
+            )
             ibi_ecg = nk.signal_period(peaks=r_peaks_indices, sampling_rate=sampling_rates["ecg"])
 
-            ppg_peaks_indices = (corrected_ppg_peaks["ppg"]["corrected_peaks"] if manual_cleaning
-                else info_ppg["PPG_Peaks"])
+            ppg_peaks_indices = (
+                corrected_ppg_peaks["ppg"]["corrected_peaks"] if manual_cleaning else info_ppg["PPG_Peaks"]
+            )
             ibi_ppg = nk.signal_period(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
 
             # Calculate heart rate (HR) from peaks
@@ -757,15 +762,15 @@ if __name__ == "__main__":
             heart_rate_ppg = nk.ppg_rate(peaks=ppg_peaks_indices, sampling_rate=sampling_rates["ppg"])
 
             # Interpolate IBI and HR to match the length of the ECG and PPG data
-            desired_length = round(len(cleaned_ecg)/sampling_rates["ecg"])
-            x_new = np.linspace(0, desired_length-1, num=desired_length, endpoint=False)
-            x_values_ibi_ecg = np.linspace(0, len(ibi_ecg)-1, num=len(ibi_ecg), endpoint=False)
+            desired_length = round(len(cleaned_ecg) / sampling_rates["ecg"])
+            x_new = np.linspace(0, desired_length - 1, num=desired_length, endpoint=False)
+            x_values_ibi_ecg = np.linspace(0, len(ibi_ecg) - 1, num=len(ibi_ecg), endpoint=False)
             ibi_ecg = nk.signal_interpolate(x_values_ibi_ecg, ibi_ecg, x_new, method="linear")
-            x_values_hr_ecg = np.linspace(0, len(heart_rate_ecg)-1, num=len(heart_rate_ecg), endpoint=False)
+            x_values_hr_ecg = np.linspace(0, len(heart_rate_ecg) - 1, num=len(heart_rate_ecg), endpoint=False)
             heart_rate_ecg = nk.signal_interpolate(x_values_hr_ecg, heart_rate_ecg, x_new, method="linear")
-            x_values_ibi_ppg = np.linspace(0, len(ibi_ppg)-1, num=len(ibi_ppg), endpoint=False)
+            x_values_ibi_ppg = np.linspace(0, len(ibi_ppg) - 1, num=len(ibi_ppg), endpoint=False)
             ibi_ppg = nk.signal_interpolate(x_values_ibi_ppg, ibi_ppg, x_new, method="linear")
-            x_values_hr_ppg = np.linspace(0, len(heart_rate_ppg)-1, num=len(heart_rate_ppg), endpoint=False)
+            x_values_hr_ppg = np.linspace(0, len(heart_rate_ppg) - 1, num=len(heart_rate_ppg), endpoint=False)
             heart_rate_ppg = nk.signal_interpolate(x_values_hr_ppg, heart_rate_ppg, x_new, method="linear")
 
             # Plot IBI and HR for ECG and PPG data
@@ -778,8 +783,13 @@ if __name__ == "__main__":
             axs[1, 0].set_ylabel("IBI from PPG")
             axs[1, 1].plot(heart_rate_ppg, color=colors["PPG"][1])
             axs[1, 1].set_ylabel("HR from PPG")
-            fig.suptitle(f"IBI and HR from ECG and PPG data for subject {subject} "
-            "(no manual cleaning)" if not manual_cleaning else "(after manual cleaning)", fontsize=16)
+            fig.suptitle(
+                f"IBI and HR from ECG and PPG data for subject {subject} "
+                "(no manual cleaning)"
+                if not manual_cleaning
+                else "(after manual cleaning)",
+                fontsize=16,
+            )
             # Set x-axis labels to minutes instead of seconds for all axes
             for ax in axs.flat:
                 ax.set_xlabel("Time (min)")
@@ -797,11 +807,16 @@ if __name__ == "__main__":
 
             print("Saving preprocessed ECG and PPG data to tsv files...")
 
+            # Append R-peaks, IBI, and HR so that they have the same length as the ECG data
+            r_peaks_indices_with_nans = list(r_peaks_indices) + [np.nan] * (len(cleaned_ecg) - len(r_peaks_indices))
+            ibi_ecg_with_nans = list(ibi_ecg) + [np.nan] * (len(cleaned_ecg) - len(ibi_ecg))
+            heart_rate_ecg_with_nans = list(heart_rate_ecg) + [np.nan] * (len(cleaned_ecg) - len(heart_rate_ecg))
+
             # Create dataframe with cleaned ECG data, R-peaks, IBI, and HR
             ecg_data_df = pd.DataFrame({"ECG": cleaned_ecg})
-            ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices)
-            ecg_data_df["IBI"] = pd.Series(ibi_ecg)
-            ecg_data_df["HR"] = pd.Series(heart_rate_ecg)
+            ecg_data_df["R-peaks"] = pd.Series(r_peaks_indices_with_nans)
+            ecg_data_df["IBI"] = pd.Series(ibi_ecg_with_nans)
+            ecg_data_df["HR"] = pd.Series(heart_rate_ecg_with_nans)
             # Create array with subject id that has the same length as the other series
             subject_array = [subject] * len(cleaned_ecg)
             ecg_data_df["subject"] = pd.Series(subject_array)
@@ -814,15 +829,15 @@ if __name__ == "__main__":
                 attributes_cardiac = "_scaled_manually-cleaned"
             elif scaling and not manual_cleaning:
                 attributes_cardiac = "_scaled"
-            elif manual_cleaning and not scaling:
+            elif not scaling and manual_cleaning:
                 attributes_cardiac = "_manually-cleaned"
             else:
                 attributes_cardiac = ""
 
             # Save ECG data to tsv file
             ecg_data_df.to_csv(
-                subject_preprocessed_folder /
-                f"sub-{subject}_task-{task}_physio_ecg_preprocessed{attributes_cardiac}.tsv",
+                subject_preprocessed_folder
+                / f"sub-{subject}_task-{task}_physio_ecg_preprocessed{attributes_cardiac}.tsv",
                 sep="\t",
                 index=False,
             )
@@ -830,11 +845,20 @@ if __name__ == "__main__":
             # Add ECG data to list_data_all
             list_data_all["ECG"].append(ecg_data_df)
 
+            # Append PPG-peaks, IBI, and HR so that they have the same length as the PPG data
+            ppg_peaks_indices_with_nans = list(ppg_peaks_indices) + [np.nan] * (
+                len(signals_ppg["PPG_Clean"]) - len(ppg_peaks_indices)
+            )
+            ibi_ppg_with_nans = list(ibi_ppg) + [np.nan] * (len(signals_ppg["PPG_Clean"]) - len(ibi_ppg))
+            heart_rate_ppg_with_nans = list(heart_rate_ppg) + [np.nan] * (
+                len(signals_ppg["PPG_Clean"]) - len(heart_rate_ppg)
+            )
+
             # Create dataframe with cleaned PPG data, PPG-peaks, IBI, and HR
             ppg_data_df = pd.DataFrame({"PPG": signals_ppg["PPG_Clean"]})
-            ppg_data_df["PPG-peaks"] = pd.Series(ppg_peaks_indices)
-            ppg_data_df["IBI"] = pd.Series(ibi_ppg)
-            ppg_data_df["HR"] = pd.Series(heart_rate_ppg)
+            ppg_data_df["PPG-peaks"] = pd.Series(ppg_peaks_indices_with_nans)
+            ppg_data_df["IBI"] = pd.Series(ibi_ppg_with_nans)
+            ppg_data_df["HR"] = pd.Series(heart_rate_ppg_with_nans)
             # Create array with subject ID that has the same length as the other series
             subject_array = [subject] * len(signals_ppg["PPG_Clean"])
             ppg_data_df["subject"] = pd.Series(subject_array)
@@ -844,8 +868,8 @@ if __name__ == "__main__":
 
             # Save PPG data to tsv file
             ppg_data_df.to_csv(
-                subject_preprocessed_folder /
-                f"sub-{subject}_task-{task}_physio_ppg_preprocessed{attributes_cardiac}.tsv",
+                subject_preprocessed_folder
+                / f"sub-{subject}_task-{task}_physio_ppg_preprocessed{attributes_cardiac}.tsv",
                 sep="\t",
                 index=False,
             )
@@ -866,16 +890,16 @@ if __name__ == "__main__":
                 montage = mne.channels.read_custom_montage(montage_filename)
                 cropped_eeg_data.set_montage(montage)
             else:
-                print("ERROR! No montage file found. Make sure to download the CACS-64_REF.bvef file from Brainvision "
-                "(https://www.brainproducts.com/downloads/cap-montages/) and place it in the rawdata folder.")
+                print(
+                    "ERROR! No montage file found. Make sure to download the CACS-64_REF.bvef file from Brainvision "
+                    "(https://www.brainproducts.com/downloads/cap-montages/) and place it in the rawdata folder."
+                )
                 # Exit the program if no montage file is found
                 sys.exit()
 
-            # Interpolate the ECG data to match the EEG data
+            # Add NaNs to the ECG data to match the EEG data
             if len(cleaned_ecg) < len(cropped_eeg_data.times):
-                cleaned_ecg = np.interp(
-                    cropped_eeg_data.times, np.linspace(0, len(cleaned_ecg), len(cleaned_ecg)), cleaned_ecg
-                )
+                cleaned_ecg = np.append(cleaned_ecg, [np.nan] * (len(cropped_eeg_data.times) - len(cleaned_ecg)))
             # Or crop the ECG data to match the EEG data
             elif len(cleaned_ecg) > len(cropped_eeg_data.times):
                 cleaned_ecg = cleaned_ecg[: len(cropped_eeg_data.times)]
@@ -890,13 +914,13 @@ if __name__ == "__main__":
 
             # Preprocessing EEG data using preprocess_eeg function (high-pass filter of 0.1 Hz)
             print("Preprocessing EEG data...")
-            resampled_data, epochs, _, _ = preprocess_eeg(
-                cropped_eeg_data, low_frequency, high_frequency, resampling_rate, autoreject=False
+            filtered_data, epochs, _, _ = preprocess_eeg(
+                cropped_eeg_data, low_frequency, high_frequency, autoreject=False
             )
 
             # Preprocessing EEG data using preprocess_eeg function for ICA (high-pass filter of 1 Hz)
-            resampled_data_ica, epochs_ica, reject_log_ica, exclude = preprocess_eeg(
-                cropped_eeg_data, low_frequency_ica, high_frequency, resampling_rate, autoreject=True
+            filtered_data_ica, epochs_ica, reject_log_ica, exclude = preprocess_eeg(
+                cropped_eeg_data, low_frequency_ica, high_frequency, autoreject=True
             )
 
             if exclude:
@@ -919,11 +943,163 @@ if __name__ == "__main__":
             print("Running ICA for artifact rejection...")
             ica, ica_variance, ica_n_components = run_ica(epochs_ica, reject_log_ica.bad_epochs)
 
-            # Plot results of ICA for the first 5s
-            fig = ica.plot_overlay(resampled_data_ica,
-                picks="eeg", start=0, stop=5*resampling_rate,
-                title=f"ICA overlay for subject {subject}",
-                show=False)
+            # Semi-automatic selection of ICA components using ica_correlation function
+            # Correlates ICA components with EOG, ECG and muscle data
+            print("Selecting ICA components semi-automatically...")
+            ica, eog_indices, eog_scores, ecg_indices, ecg_scores, emg_indices, emg_scores = ica_correlation(
+                ica, epochs_ica
+            )
+
+            other_components = set(ica.exclude)
+            for sublist in [eog_indices, ecg_indices, emg_indices]:
+                other_components -= set(sublist)
+            list_other_components = list(other_components)
+
+            # Number of components identified automatically
+            print(f"Number of components identified automatically: {len(ica.exclude)} (out of {ica.n_components_}).")
+            print(
+                f"Components identified automatically: {ica.exclude} ({len(eog_indices)} EOG components, "
+                f"{len(ecg_indices)} ECG components, {len(emg_indices)} EMG components, "
+                f"{len(list_other_components)} other components)."
+            )
+
+            # Plot components (with properties)
+            # EOG, ECG, EMG and others in separate plots
+            if eog_indices != []:
+                # Combine all EOG plots into one figure
+                fig, axs = plt.subplots(len(eog_indices), 5, figsize=(30, len(eog_indices) * 4))
+                for index, component in enumerate(eog_indices):
+                    ica.plot_properties(filtered_data_ica, picks=component, show=False, axes=axs[index])
+                fig.suptitle(f"EOG components for subject {subject}", fontsize=16)
+                # Save plot to results directory
+                fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_eog_components.png")
+                if show_plots:
+                    plt.show()
+                plt.close()
+
+            if ecg_indices != []:
+                # Combine all ECG plots into one figure
+                if len(ecg_indices) == 1:
+                    fig, axs = plt.subplots(1, 5, figsize=(30, 4))
+                    ica.plot_properties(filtered_data_ica, picks=ecg_indices, show=False, axes=axs)
+                else:
+                    fig, axs = plt.subplots(len(ecg_indices), 5, figsize=(30, len(ecg_indices) * 4))
+                    for index, component in enumerate(ecg_indices):
+                        ica.plot_properties(filtered_data_ica, picks=component, show=False, axes=axs[index])
+                fig.suptitle(f"ECG components for subject {subject}", fontsize=16)
+                # Save plot to results directory
+                fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ecg_components.png")
+                if show_plots:
+                    plt.show()
+                plt.close()
+
+            if emg_indices != []:
+                # Combine all EMG plots into one figure
+                fig, axs = plt.subplots(len(emg_indices), 5, figsize=(30, len(emg_indices) * 4))
+                for index, component in enumerate(emg_indices):
+                    ica.plot_properties(filtered_data_ica, picks=component, show=False, axes=axs[index])
+                fig.suptitle(f"EMG components for subject {subject}", fontsize=16)
+                # Save plot to results directory
+                fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_emg_components.png")
+                if show_plots:
+                    plt.show()
+                plt.close()
+
+            if list_other_components != []:
+                # Combine all other components plots into one figure
+                fig, axs = plt.subplots(len(list_other_components), 5, figsize=(30, len(list_other_components) * 4))
+                for index, component in enumerate(list_other_components):
+                    ica.plot_properties(filtered_data_ica, picks=component, show=False, axes=axs[index])
+                fig.suptitle(f"Other components for subject {subject}", fontsize=16)
+                # Save plot to results directory
+                fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_other_components.png")
+                if show_plots:
+                    plt.show()
+                plt.close()
+
+            # Manual rejection of components
+            answer = input("Do you want to remove any of the automatically identified components? (Y/n): ")
+            if answer == "Y":
+                print("EOG components identified: " + str(eog_indices))
+                remove = input("Do you want to remove any of the EOG components? (Y/n): ")
+                if remove == "Y":
+                    manual_rejection_eog = input(
+                        "Enter the indices of the EOG components you want to remove (separated by commas): "
+                    )
+                    manual_rejection_eog = [int(i) for i in manual_rejection_eog.split(",")]
+                    eog_indices = set(eog_indices)
+                    for sublist in manual_rejection_eog:
+                        eog_indices -= {sublist}
+                    eog_indices = list(eog_indices)
+                    print(f"EOG components {manual_rejection_eog} removed from list of components.")
+
+                print("ECG components identified: " + str(ecg_indices))
+                remove = input("Do you want to remove any of the ECG components? (Y/n): ")
+                if remove == "Y":
+                    manual_rejection_ecg = input(
+                        "Enter the indices of the ECG components you want to remove (separated by commas): "
+                    )
+                    manual_rejection_ecg = [int(i) for i in manual_rejection_ecg.split(",")]
+                    ecg_indices = set(ecg_indices)
+                    for sublist in manual_rejection_ecg:
+                        ecg_indices -= {sublist}
+                    ecg_indices = list(ecg_indices)
+                    print(f"ECG components {manual_rejection_ecg} removed from list of components.")
+
+                print("EMG components identified: " + str(emg_indices))
+                remove = input("Do you want to remove any of the EMG components? (Y/n): ")
+                if remove == "Y":
+                    manual_rejection_emg = input(
+                        "Enter the indices of the EMG components you want to remove (separated by commas): "
+                    )
+                    manual_rejection_emg = [int(i) for i in manual_rejection_emg.split(",")]
+                    emg_indices = set(emg_indices)
+                    for sublist in manual_rejection_emg:
+                        emg_indices -= {sublist}
+                    emg_indices = list(emg_indices)
+                    print(f"EMG components {manual_rejection_emg} removed from list of components.")
+
+                print("Other components identified: " + str(list_other_components))
+                remove = input("Do you want to remove any of the other components? (Y/n): ")
+                if remove == "Y":
+                    manual_rejection_other = input(
+                        "Enter the indices of the other components you want to remove (separated by commas): "
+                    )
+                    manual_rejection_other = [int(i) for i in manual_rejection_other.split(",")]
+                    list_other_components = set(list_other_components)
+                    for sublist in manual_rejection_other:
+                        list_other_components -= {sublist}
+                    list_other_components = list(list_other_components)
+                    print(f"Other components {manual_rejection_other} removed from list of components.")
+
+                ica.exclude = eog_indices + ecg_indices + emg_indices + list_other_components
+                print(
+                    f"Number of components identified after manual removal of invalid components: {len(ica.exclude)} "
+                    f"(out of {ica.n_components_})."
+                )
+                print(
+                    f"Components identified after manual removal of invalid components: {ica.exclude} "
+                    f"({len(eog_indices)} EOG components, {len(ecg_indices)} ECG components, {len(emg_indices)}"
+                    f" EMG components, {len(other_components)} other components)."
+                )
+            else:
+                print("No components removed manually. Keeping the automatically identified components.")
+
+            # Get the explained variance of the ICA components
+            explained_variance_ratio = ica.get_explained_variance_ratio(epochs_ica)["eeg"]
+            print(f"Explained variance ratio of ICA components: {explained_variance_ratio}")
+
+            # Finally reject components in the filtered data (0.1 Hz) that are not brain related
+            print("Rejecting components in the filtered data (0.1 Hz) that are not brain related...")
+            eeg_clean = ica.apply(filtered_data.copy())
+
+            # Plot results of ICA for the first 2.5s
+            fig = ica.plot_overlay(
+                eeg_clean,
+                picks="eeg",
+                title=f"ICA overlay for subject {subject} (red: original, black: cleaned)",
+                show=False,
+            )
 
             # Save plot to results directory
             fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ica_overlay.png")
@@ -933,55 +1109,22 @@ if __name__ == "__main__":
 
             plt.close()
 
-            # Semi-automatic selection of ICA components using ica_correlation function
-            # Correlates ICA components with EOG, ECG and muscle data
-            print("Selecting ICA components semi-automatically...")
-            ica, eog_indices, eog_scores, ecg_indices, ecg_scores, emg_indices, emg_scores = ica_correlation(ica, epochs_ica)
-
-            # Number of components removed
-            print(f"Number of components removed: {len(ica.exclude)} (out of {ica.n_components_}).")
-            print(f"Components removed: {ica.exclude} ({len(eog_indices)} EOG components, {len(ecg_indices)} ECG components, {len(emg_indices)} EMG components, {len(ica.exclude)-len(eog_indices)-len(ecg_indices)-len(emg_indices)} other components).")
-
-            # Plot components
-            fig = ica.plot_components(inst=epochs_ica, picks=ica.exclude, colorbar=True, show=False, title=f"EOG, ECG, EMG and other components to be excluded for subject {subject}")
-
-            # Save plot to results directory
-            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_rejected_components.png")
-
-            if show_plots:
-                plt.show()
-
-            plt.close()
-
-            # Plot correlation scores to see which components are most likely to be EOG
-            fig = ica.plot_scores(eog_scores, exclude=eog_indices,
-                title=f"Correlation scores for EOG components for subject {subject}", show=False)
-            # Save plot to results directory
-            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_eog_correlation_scores.png")
-
-            if show_plots:
-                plt.show()
-
-            plt.close()
-
-            # Get the explained variance of the ICA components
-            explained_variance_ratio = ica.get_explained_variance_ratio(epochs_ica)["eeg"]
-            print(f"Explained variance ratio of ICA components: {explained_variance_ratio}")
-
-            # Finally reject components in the resampled data (0.1 Hz) that are not brain related
-            print("Rejecting components in the resampled data (0.1 Hz) that are not brain related...")
-            eeg_clean = ica.apply(resampled_data.copy())
-
-            # Final Check: Segment cleaned data into epochs again and check in how many epochs there are still artifacts of more than 100 µV
-            print(f"Checking for any remaining bad epochs (max. value above {artifact_threshold} µV) in the cleaned data...")
+            # Final Check: Segment cleaned data into epochs again and check in how many epochs
+            # there are still artifacts of more than 100 µV
+            print(
+                f"Checking for any remaining bad epochs (max. value above {artifact_threshold} µV) "
+                "in the cleaned data..."
+            )
             tstep = 10  # in seconds
             events = mne.make_fixed_length_events(eeg_clean, duration=tstep)
             epochs = mne.Epochs(eeg_clean, events, tmin=0, tmax=tstep, baseline=None, preload=True)
+            # Pick only EEG channels
+            epochs.pick_types(eeg=True, eog=False, ecg=False)
 
             # Check for bad epochs
             remaining_bad_epochs = []
             for i, epoch in enumerate(epochs):
-                if np.max(epoch._data) > artifact_threshold:
+                if np.max(epoch.data) > artifact_threshold:
                     remaining_bad_epochs.append(i)
 
             # Calculate the percentage of bad epochs
@@ -1001,15 +1144,12 @@ if __name__ == "__main__":
             else:
                 print("Participant not excluded.")
 
-            if resample:
-                attributes_eeg = f"resampled_{resampling_rate}_filtered_{low_frequency}-{high_frequency}"
-            else:
-                attributes_eeg = f"filtered_{low_frequency}-{high_frequency}"
+            attributes_eeg = f"filtered_{low_frequency}-{high_frequency}"
 
             print("Saving preprocessed EEG data to fif files...")
 
             # Save the raw data before ICA
-            resampled_data.save(
+            filtered_data.save(
                 subject_preprocessed_folder
                 / f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_before_ica.fif",
                 overwrite=True,
@@ -1017,8 +1157,8 @@ if __name__ == "__main__":
 
             # Save the clean data after ICA
             eeg_clean.save(
-                subject_preprocessed_folder /
-                f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_after_ica.fif",
+                subject_preprocessed_folder
+                / f"sub-{subject}_task-{task}_eeg_preprocessed_{attributes_eeg}_after_ica.fif",
                 overwrite=True,
             )
 
@@ -1035,22 +1175,30 @@ if __name__ == "__main__":
             # Save the list with excluded participants by adding to the existing file
             # Create the file if it does not exist
             if not (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").exists():
-                with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open("w") as f:
-                    f.write(excluded_participants)
+                with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open(
+                    "w"
+                ) as f:
+                    f.write(str(excluded_participants) + "\n")
             else:
-                with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open("w") as f:
-                    f.append(excluded_participants)
-            
+                with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open(
+                    "a"
+                ) as f:
+                    f.write(str(excluded_participants) + "\n")
+
             # Read in the participant metadata json file
-            with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open("r") as f:
+            with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open(
+                "r"
+            ) as f:
                 participant_metadata = json.load(f)
 
             # Append more information to the participant metadata json file
             participant_metadata["number_of_bad_epochs"] = int(np.sum(reject_log_ica.bad_epochs))
             participant_metadata["number_of_all_epochs"] = int(len(epochs_ica))
-            participant_metadata["number_of_bad_channels"] = int(np.sum(reject_log_ica.labels==1))
-            participant_metadata["number_of_interpolated_channels"] = int(np.sum(reject_log_ica.labels==2))
-            participant_metadata["number_of_all_channels_across_epochs"] = int(len(epochs_ica.info["ch_names"])*len(epochs_ica))
+            participant_metadata["number_of_bad_channels"] = int(np.sum(reject_log_ica.labels == 1))
+            participant_metadata["number_of_interpolated_channels"] = int(np.sum(reject_log_ica.labels == 2))  # noqa: PLR2004
+            participant_metadata["number_of_all_channels_across_epochs"] = int(
+                len(epochs_ica.info["ch_names"]) * len(epochs_ica)
+            )
             participant_metadata["participant_excluded"] = exclude
             participant_metadata["number_of_all_components"] = int(ica_n_components)
             participant_metadata["number_of_removed_components"] = int(len(ica.exclude))
@@ -1058,10 +1206,6 @@ if __name__ == "__main__":
             participant_metadata["eog_components"] = [int(index) for index in eog_indices]
             participant_metadata["ecg_components"] = [int(index) for index in ecg_indices]
             participant_metadata["emg_components"] = [int(index) for index in emg_indices]
-            other_components = set(ica.exclude)
-            for sublist in [eog_indices, ecg_indices, emg_indices]:
-                other_components -= set(sublist)
-            list_other_components = list(other_components)
             participant_metadata["other_components"] = [int(index) for index in list_other_components]
             participant_metadata["explained_variance_ratio"] = float(explained_variance_ratio)
 
@@ -1069,158 +1213,296 @@ if __name__ == "__main__":
             participant_metadata["end_time"] = time.ctime()
 
             # Save the updated participant metadata json file
-            with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open("w") as f:
+            with (subject_preprocessed_folder / f"sub-{subject}_task-{task}_physio_preprocessing_metadata.json").open(
+                "w"
+            ) as f:
                 json.dump(participant_metadata, f)
-
 
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
     if "Averaging" in steps:
         print("********** Averaging over all participants **********\n")
+        # ---------------------- 3a. Interpolate data ----------------------
+        print("Interpolating data to match the length of the first subject's data...")
 
-        # ---------------------- 3a. Interpolating data ----------------------
-        print("Interpolating data...")
+        # Create new empty lists to store the interpolated data
+        list_data_all_interpolated = {"ECG": [], "PPG": []}
 
-        # Get the lenghts of R-peaks, IBI, and HR for all participants
-        r_peaks_length = [len(subject["R-peaks"].dropna()) for subject in list_data_all["ECG"]]
-        ibi_length = [len(subject["IBI"].dropna()) for subject in list_data_all["ECG"]]
-        hr_length = [len(subject["HR"].dropna()) for subject in list_data_all["ECG"]]
+        # Interpolate ECG data
+        for i, ecg_data in enumerate(list_data_all["ECG"]):
+            # Interpolate ECG data to match the length of the first subject's data
+            if i != 0:
+                interpolated_ecg = nk.signal_interpolate(
+                    np.linspace(0, len(ecg_data["ECG"]) - 1, num=len(ecg_data["ECG"]), endpoint=False),
+                    ecg_data["ECG"].to_numpy(),
+                    np.linspace(
+                        0,
+                        len(list_data_all["ECG"][0]["ECG"]) - 1,
+                        num=len(list_data_all["ECG"][0]["ECG"]),
+                        endpoint=False,
+                    ),
+                    method="linear",
+                )
+                interpolated_rpeaks = nk.signal_interpolate(
+                    np.linspace(0, len(ecg_data["R-peaks"]) - 1, num=len(ecg_data["R-peaks"]), endpoint=False),
+                    ecg_data["R-peaks"].to_numpy(),
+                    np.linspace(
+                        0,
+                        len(list_data_all["ECG"][0]["R-peaks"]) - 1,
+                        num=len(list_data_all["ECG"][0]["R-peaks"]),
+                        endpoint=False,
+                    ),
+                    method="linear",
+                )
+                interpolated_ibi = nk.signal_interpolate(
+                    np.linspace(0, len(ecg_data["IBI"]) - 1, num=len(ecg_data["IBI"]), endpoint=False),
+                    ecg_data["IBI"].to_numpy(),
+                    np.linspace(
+                        0,
+                        len(list_data_all["ECG"][0]["IBI"]) - 1,
+                        num=len(list_data_all["ECG"][0]["IBI"]),
+                        endpoint=False,
+                    ),
+                    method="linear",
+                )
+                interpoldated_hr = nk.signal_interpolate(
+                    np.linspace(0, len(ecg_data["HR"]) - 1, num=len(ecg_data["HR"]), endpoint=False),
+                    ecg_data["HR"].to_numpy(),
+                    np.linspace(
+                        0,
+                        len(list_data_all["ECG"][0]["HR"]) - 1,
+                        num=len(list_data_all["ECG"][0]["HR"]),
+                        endpoint=False,
+                    ),
+                    method="linear",
+                )
 
-        # Check if the lengths of R-peaks, IBI, and HR are the same for all participants
-        if r_peaks_length == ibi_length == hr_length:
-            print("The lengths of R-peaks, IBI, and HR are the same for all participants.")
-        else:
-            print("The lengths of R-peaks, IBI, and HR are not the same for all participants.")
-            print("Interpolating the data to the same length...")
+                # Get the timestamps of the first subject
+                timestamps_first_subject = list_data_all["ECG"][0]["timestamp"]
 
-            # Get the maximum length
-            r_peaks_length_max = max(r_peaks_length)
-            ibi_length_max = max(ibi_length)
-            hr_length_max = max(hr_length)
+                # Create new array with subject number that has the same length as the interpolated data
+                subject_array = [ecg_data["subject"].unique()[0]] * len(interpolated_ecg)
 
-            # Interpolate the data to the same length
-            for subject in list_data_all["ECG"]:
-                # Interpolate R-peaks
-                subject["R-peaks"] = subject["R-peaks"].interpolate(method="linear", limit_direction="both")
-                # Interpolate IBI
-                subject["IBI"] = subject["IBI"].interpolate(method="linear", limit_direction="both")
-                # Interpolate HR
-                subject["HR"] = subject["HR"].interpolate(method="linear", limit_direction="both")
+                # Initialize new empty dataframe
+                ecg_data_interpolated = pd.DataFrame()
 
-        # Get the lenghts of PPG-peaks, IBI, and HR for all participants
-        ppg_peaks_length = [len(subject["PPG-peaks"].dropna()) for subject in list_data_all["PPG"]]
-        ibi_length = [len(subject["IBI"].dropna()) for subject in list_data_all["PPG"]]
-        hr_length = [len(subject["HR"].dropna()) for subject in list_data_all["PPG"]]
+                # Add the interpolated data to the new dataframe
+                ecg_data_interpolated["subject"] = subject_array
+                ecg_data_interpolated["timestamp"] = timestamps_first_subject
+                ecg_data_interpolated["ECG"] = interpolated_ecg
+                ecg_data_interpolated["R-peaks"] = interpolated_rpeaks
+                ecg_data_interpolated["IBI"] = interpolated_ibi
+                ecg_data_interpolated["HR"] = interpoldated_hr
 
-        # Check if the lengths of PPG-peaks, IBI, and HR are the same for all participants
-        if ppg_peaks_length == ibi_length == hr_length:
-            print("The lengths of PPG-peaks, IBI, and HR are the same for all participants.")
-        else:
-            print("The lengths of PPG-peaks, IBI, and HR are not the same for all participants.")
-            print("Interpolating the data to the same length...")
+                # Append the interpolated data to the list
+                list_data_all_interpolated["ECG"].append(ecg_data_interpolated)
 
-            # Get the maximum length
-            ppg_peaks_length_max = max(ppg_peaks_length)
-            ibi_length_max = max(ibi_length)
-            hr_length_max = max(hr_length)
+            else:
+                list_data_all_interpolated["ECG"].append(ecg_data)
 
-            # Interpolate the data to the same length
-            for subject in list_data_all["PPG"]:
-                # Interpolate PPG-peaks
-                subject["PPG-peaks"] = subject["PPG-peaks"].interpolate(method="linear", limit_direction="both")
-                # Interpolate IBI
-                subject["IBI"] = subject["IBI"].interpolate(method="linear", limit_direction="both")
-                # Interpolate HR
-                subject["HR"] = subject["HR"].interpolate(method="linear", limit_direction="both")
+        # Interpolate PPG data
+        for i, ppg_data in enumerate(list_data_all["PPG"]):
+            # Interpolate PPG data to match the length of the first subject's data
+            if i != 0:
+                interpolated_ppg = nk.signal_interpolate(
+                    np.linspace(0, len(ppg_data["PPG"]) - 1, num=len(ppg_data["PPG"]), endpoint=False),
+                    ppg_data["PPG"].to_numpy(),
+                    np.linspace(
+                        0,
+                        len(list_data_all["PPG"][0]["PPG"]) - 1,
+                        num=len(list_data_all["PPG"][0]["PPG"]),
+                        endpoint=False,
+                    ),
+                    method="linear",
+                )
+                interpolated_ppg_peaks = nk.signal_interpolate(
+                    np.linspace(0, len(ppg_data["PPG-peaks"]) - 1, num=len(ppg_data["PPG-peaks"]), endpoint=False),
+                    ppg_data["PPG-peaks"].to_numpy(),
+                    np.linspace(
+                        0,
+                        len(list_data_all["PPG"][0]["PPG-peaks"]) - 1,
+                        num=len(list_data_all["PPG"][0]["PPG-peaks"]),
+                        endpoint=False,
+                    ),
+                    method="linear",
+                )
+                interpolated_ppg_ibi = nk.signal_interpolate(
+                    np.linspace(0, len(ppg_data["IBI"]) - 1, num=len(ppg_data["IBI"]), endpoint=False),
+                    ppg_data["IBI"].to_numpy(),
+                    np.linspace(
+                        0,
+                        len(list_data_all["PPG"][0]["IBI"]) - 1,
+                        num=len(list_data_all["PPG"][0]["IBI"]),
+                        endpoint=False,
+                    ),
+                    method="linear",
+                )
+                interpolated_ppg_hr = nk.signal_interpolate(
+                    np.linspace(0, len(ppg_data["HR"]) - 1, num=len(ppg_data["HR"]), endpoint=False),
+                    ppg_data["HR"].to_numpy(),
+                    np.linspace(
+                        0,
+                        len(list_data_all["PPG"][0]["HR"]) - 1,
+                        num=len(list_data_all["PPG"][0]["HR"]),
+                        endpoint=False,
+                    ),
+                    method="linear",
+                )
+
+                # Get the timestamps of the first subject
+                timestamps_first_subject = list_data_all["PPG"][0]["timestamp"]
+
+                # Create new array with subject number that has the same length as the interpolated data
+                subject_array = [ppg_data["subject"].unique()[0]] * len(interpolated_ppg)
+
+                # Initialize new empty dataframe
+                ppg_data_interpolated = pd.DataFrame()
+
+                # Add the interpolated data to the new dataframe
+                ppg_data_interpolated["subject"] = subject_array
+                ppg_data_interpolated["timestamp"] = timestamps_first_subject
+                ppg_data_interpolated["PPG"] = interpolated_ppg
+                ppg_data_interpolated["PPG-peaks"] = interpolated_ppg_peaks
+                ppg_data_interpolated["IBI"] = interpolated_ppg_ibi
+                ppg_data_interpolated["HR"] = interpolated_ppg_hr
+
+                # Append the interpolated data to the list
+                list_data_all_interpolated["PPG"].append(ppg_data_interpolated)
+
+            else:
+                list_data_all_interpolated["PPG"].append(ppg_data)
 
         # ---------------------- 3b. Concatenate all data ----------------------
-        print("Concatenating all data..."
-        )
+        print("Concatenating all data...")
         # Concatenate all ECG data
-        all_ecg_data = pd.concat(list_data_all["ECG"], ignore_index=True)
+        all_ecg_data = pd.concat(list_data_all_interpolated["ECG"], ignore_index=True)
 
         # Concatenate all PPG data
-        all_ppg_data = pd.concat(list_data_all["PPG"], ignore_index=True)
-
-        # Concatenate all EEG data
-        all_eeg_data = mne.concatenate_raws(list_data_all["EEG"])
+        all_ppg_data = pd.concat(list_data_all_interpolated["PPG"], ignore_index=True)
 
         # Save concatenated data to tsv files
         print("Saving concatenated data to tsv files...")
 
         all_ecg_data.to_csv(
-            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
-            f"all_subjects_task-{task}_physio_preprocessed_ecg.tsv", sep="\t", index=False
+            data_dir
+            / exp_name
+            / derivative_name
+            / preprocessed_name
+            / averaged_name
+            / datatype_name
+            / f"all_subjects_task-{task}_physio_preprocessed_ecg.tsv",
+            sep="\t",
+            index=False,
         )
         all_ppg_data.to_csv(
-            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
-            f"all_subjects_task-{task}_physio_preprocessed_ppg.tsv", sep="\t", index=False
-        )
-        all_eeg_data.save(
-            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
-            f"all_subjects_task-{task}_eeg_preprocessed.fif", overwrite=True
+            data_dir
+            / exp_name
+            / derivative_name
+            / preprocessed_name
+            / averaged_name
+            / datatype_name
+            / f"all_subjects_task-{task}_physio_preprocessed_ppg.tsv",
+            sep="\t",
+            index=False,
         )
 
-        # ---------------------- 3c. Average over all participants ----------------------
+        # ---------------------- 3b. Average over all participants ----------------------
         print("Averaging over all participants' ECG and PPG data...")
 
         # Drop subject column
         all_ecg_data = all_ecg_data.drop(columns=["subject"])
         all_ppg_data = all_ppg_data.drop(columns=["subject"])
 
+        # Drop peak columns
+        all_ecg_data = all_ecg_data.drop(columns=["R-peaks"])
+        all_ppg_data = all_ppg_data.drop(columns=["PPG-peaks"])
+
         # Calculate averaged data
         ecg_data_mean = all_ecg_data.groupby("timestamp").mean()
         ppg_data_mean = all_ppg_data.groupby("timestamp").mean()
 
-        # Add time column as first column
-        ecg_data_mean.insert(0, "timestamp", ecg_data_mean.index)
-        ppg_data_mean.insert(0, "timestamp", ppg_data_mean.index)
+        # Reset index
+        ecg_data_mean.reset_index(inplace=True)  # noqa: PD002
+        ppg_data_mean.reset_index(inplace=True)  # noqa: PD002
 
         # Save averaged data to tsv files
         print("Saving averaged data to tsv files...")
 
         ecg_data_mean.to_csv(
-            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
-            f"avg_task-{task}_physio_preprocessed_ecg.tsv", sep="\t", index=False
+            data_dir
+            / exp_name
+            / derivative_name
+            / preprocessed_name
+            / averaged_name
+            / datatype_name
+            / f"avg_task-{task}_physio_preprocessed_ecg.tsv",
+            sep="\t",
+            index=False,
         )
 
         ppg_data_mean.to_csv(
-            data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name /
-            f"avg_task-{task}_physio_preprocessed_ppg.tsv", sep="\t", index=False
+            data_dir
+            / exp_name
+            / derivative_name
+            / preprocessed_name
+            / averaged_name
+            / datatype_name
+            / f"avg_task-{task}_physio_preprocessed_ppg.tsv",
+            sep="\t",
+            index=False,
         )
 
         # Plot averaged data
-        # Downsampling to 1 Hz for better visualization
-        ecg_data_mean = ecg_data_mean.iloc[::sampling_rates["ecg"]]
-        ppg_data_mean = ppg_data_mean.iloc[::sampling_rates["ppg"]]
-
         fig, axs = plt.subplots(2, 2, figsize=(15, 8))
-        axs[0, 0].plot(ecg_data_mean["timestamp"], ecg_data_mean["IBI"], color=colors["ECG"][0])
+        axs[0, 0].plot(
+            ecg_data_mean["timestamp"][:: sampling_rates["ecg"]], ecg_data_mean["IBI"].dropna(), color=colors["ECG"][0]
+        )
         axs[0, 0].set_ylabel("IBI from ECG")
-        axs[0, 1].plot(ecg_data_mean["timestamp"], ecg_data_mean["HR"], color=colors["ECG"][1])
+        axs[0, 1].plot(
+            ecg_data_mean["timestamp"][:: sampling_rates["ecg"]], ecg_data_mean["HR"].dropna(), color=colors["ECG"][1]
+        )
         axs[0, 1].set_ylabel("HR from ECG")
-        axs[1, 0].plot(ppg_data_mean["timestamp"], ppg_data_mean["IBI"], color=colors["PPG"][0])
+        axs[1, 0].plot(
+            ppg_data_mean["timestamp"][:: sampling_rates["ppg"]], ppg_data_mean["IBI"].dropna(), color=colors["PPG"][0]
+        )
         axs[1, 0].set_ylabel("IBI from PPG")
-        axs[1, 1].plot(ppg_data_mean["timestamp"], ppg_data_mean["HR"], color=colors["PPG"][1])
+        axs[1, 1].plot(
+            ppg_data_mean["timestamp"][:: sampling_rates["ppg"]], ppg_data_mean["HR"].dropna(), color=colors["PPG"][1]
+        )
         axs[1, 1].set_ylabel("HR from PPG")
-        fig.suptitle(f"Mean IBI and HR from ECG and PPG data for AVR phase 3 (n={len(subjects)}), "
-        "(no manual cleaning)" if not manual_cleaning else "(after manual cleaning)", fontsize=16)
+        fig.suptitle(
+            f"Mean IBI and HR from ECG and PPG data for AVR phase 3 (n={len(subjects)}), "
+            "(no manual cleaning)"
+            if not manual_cleaning
+            else "(after manual cleaning)",
+            fontsize=16,
+        )
         # Set x-axis labels to minutes instead of seconds for all axes
         for ax in axs.flat:
             ax.set_xlabel("Time (min)")
             x_ticks = ax.get_xticks()
             ax.set_xticks(x_ticks)
-            ax.set_xticklabels([f"{x/60}" for x in x_ticks])
+            ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
 
             # Add vertical lines for event markers
             # Exclude first and last event markers
             # And only use every second event marker to avoid overlap
-            for _, row in events_experiment.iloc[1:-1:2].iterrows():
+            for _, row in events_experiment.iloc[0:-1:2].iterrows():
                 ax.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
-                ax.text(row["onset"] - 90, -1.52, row["event_name"], rotation=45, fontsize=10, color="gray")
+
+                if ax in (axs[1, 0], axs[1, 1]):
+                    ax.text(
+                        row["onset"],
+                        (-0.2 if ax == axs[1, 0] else -20),
+                        row["event_name"],
+                        rotation=-45,
+                        fontsize=6,
+                        color="gray",
+                    )
 
         # Save plot to results directory
-        plt.savefig(Path(results_dir) / exp_name / averaged_name / datatype_name /
-        f"avg_task-{task}_physio_IBI-HR.png")
+        plt.savefig(
+            Path(results_dir) / exp_name / averaged_name / datatype_name / f"avg_task-{task}_physio_IBI-HR.png"
+        )
 
         if show_plots:
             plt.show()
