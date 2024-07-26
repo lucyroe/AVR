@@ -23,7 +23,7 @@ The following steps are performed:
         containing the channel information.
         Save in rawdata/sub-<participant>/motion/.
     d.  Create a *_recording-eye_physio.tsv.gz files containing the eye tracking data for each eye (left, right) and also the eyes combined
-        (cyclopedian), and a *_recording-eye_physio.json files containing the metadata.
+        (cyclopedian), and *_recording-eye_physio.json files containing the metadata.
         Save in rawdata/sub-<participant>/eyetrack/.
     e.  Create a *_eeg.edf file containing the EEG data, a _eeg.json file containing the metadata, and a *_channels.tsv
         file containing the channel information.
@@ -776,7 +776,8 @@ if __name__ == "__main__":
                     recorded_eye = eyetracking_bids_numbers[stream][0]
                     eye_nb = eyetracking_bids_numbers[stream][1]
                     # Create a *_recording_eye[eye_nb]_physio.tsv.gz file containing the eye tracking data for the [recorded_eye] eye
-                    eyetrack_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.tsv.gz"
+                    #eyetrack_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.tsv.gz"
+                    eyetrack_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}.tsv.gz"
                     eyetrack_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_filename
                     # Save the eye tracking data in a tsv file
                     eyetrack_data_dataframes[stream].to_csv(eyetrack_file, sep="\t", index=False)
@@ -807,7 +808,8 @@ if __name__ == "__main__":
                         "InstitutionAddress": "Stephanstrasse 1a, 04103 Leipzig, Germany",
                         "InstitutionalDepartmentName": "Department of Neurology",
                     }
-                    eyetrack_metadata_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.json"
+                    #eyetrack_metadata_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.json"
+                    eyetrack_metadata_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}.json"
                     eyetrack_metadata_file = (
                         Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_metadata_filename
                     )
