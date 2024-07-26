@@ -22,8 +22,8 @@ The following steps are performed:
         *tracksys-headmovement_motion.json file containing the metadata, and a *tracksys-headmovement_channels.tsv file
         containing the channel information.
         Save in rawdata/sub-<participant>/motion/.
-    d.  Create a *_recording-eye_physio.tsv.gz files containing the eye tracking data for each eye (left, right) and also the eyes combined
-        (cyclopedian), and *_recording-eye_physio.json files containing the metadata.
+    d.  Create a *_recording-eye.tsv.gz files containing the eye tracking data for each eye (left, right) and also the eyes combined
+        (cyclopedian), and *_recording-eye.json files containing the metadata.
         Save in rawdata/sub-<participant>/eyetrack/.
     e.  Create a *_eeg.edf file containing the EEG data, a _eeg.json file containing the metadata, and a *_channels.tsv
         file containing the channel information.
@@ -34,10 +34,10 @@ The following steps are performed:
 
 Required packages: pyxdf, mne
 
-Author: Lucy Roellecke
+Author: Lucy Roellecke, Antonin Fourcade
 Contact: lucy.roellecke[at]tuta.com
 Created on: 30 April 2024
-Last update: 18 July 2024
+Last update: 26 July 2024
 """
 
 # %% Import
