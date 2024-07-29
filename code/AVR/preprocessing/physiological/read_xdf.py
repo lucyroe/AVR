@@ -22,8 +22,8 @@ The following steps are performed:
         *tracksys-headmovement_motion.json file containing the metadata, and a *tracksys-headmovement_channels.tsv file
         containing the channel information.
         Save in rawdata/sub-<participant>/motion/.
-    d.  Create a *_recording-eye_physio.tsv.gz files containing the eye tracking data for each eye (left, right) and also the eyes combined
-        (cyclopedian), and a *_recording-eye_physio.json files containing the metadata.
+    d.  Create a *_recording-eye.tsv.gz files containing the eye tracking data for each eye (left, right) and also the eyes combined
+        (cyclopedian), and *_recording-eye.json files containing the metadata.
         Save in rawdata/sub-<participant>/eyetrack/.
     e.  Create a *_eeg.edf file containing the EEG data, a _eeg.json file containing the metadata, and a *_channels.tsv
         file containing the channel information.
@@ -34,10 +34,10 @@ The following steps are performed:
 
 Required packages: pyxdf, mne
 
-Author: Lucy Roellecke
+Author: Lucy Roellecke, Antonin Fourcade
 Contact: lucy.roellecke[at]tuta.com
 Created on: 30 April 2024
-Last update: 18 July 2024
+Last update: 26 July 2024
 """
 
 # %% Import
@@ -53,9 +53,10 @@ import pyxdf
 from matplotlib import cm
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-subjects = ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010",
-            "011", "012", "013", "014", "015", "016", "017"]  # Adjust as needed
+# subjects = ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010",
+#             "011", "012", "013", "014", "015", "016", "017", "018", "019", "020",
+#             "021"]
+subjects = ["020"]  # Adjust as needed
 task = "AVR"  # Task name
 
 # Debug mode: Only process the one subject
@@ -625,7 +626,7 @@ if __name__ == "__main__":
 
             else:
                 print(f"Stream {stream} not recognized")
-        #%%
+
         # STEP 3: CREATE BIDS-COMPATIBLE FILES & SAVE THEM IN APPROPRIATE DIRECTORY
         for datatype in datatype_names:
             # STEP 3a: --------- EVENT MARKERS -----------
@@ -700,6 +701,9 @@ if __name__ == "__main__":
                         "Range": [0.07, 0.0875],
                         "SamplingRate": stream_sampling_rate["RatingCR"],
                     },
+                    "InstitutionName": "Max Planck Institute for Human Brain and Cognitive Sciences",
+                    "InstitutionAddress": "Stephanstrasse 1a, 04103 Leipzig, Germany",
+                    "InstitutionalDepartmentName": "Department of Neurology",
                 }
 
                 rating_metadata_filename = f"{subject_name}_task-{task}_beh.json"
@@ -722,12 +726,19 @@ if __name__ == "__main__":
                 # Create a *tracksys-headmovement_motion.json file containing the metadata
                 headmovement_metadata = {
                     "SamplingFrequency": stream_sampling_rate["Head.PosRot"],
-                    "TrackingSystemName": "Vive Pro Eye HMD",
+                    "Manufacturer": "HTC",
+                    "ManufacturersModelName": "Vive Pro Eye",
+                    "TrackingSystemName": "HTC Vive Pro Eye HMD",
                     "TaskName": task,
-                    "TaskDescription": "VR task with head movement" if "mov" in task else "VR task",
+                    "TaskDescription": "VR task with head movement; continuous rating of valence and arousal during sequence of stereoscopic 360 videos",
                     "MotionChannelCount": len(motion_bids_labels),
+                    "ORNTChannelCount": len(motion_bids_labels)/2,
+                    "POSChannelCount": len(motion_bids_labels)/2,
                     "RecordingDuration": len(head_movement_data_dataframe) / stream_sampling_rate["Head.PosRot"],
                     "MissingValues": "0",
+                    "InstitutionName": "Max Planck Institute for Human Brain and Cognitive Sciences",
+                    "InstitutionAddress": "Stephanstrasse 1a, 04103 Leipzig, Germany",
+                    "InstitutionalDepartmentName": "Department of Neurology",
                 }
                 headmovement_metadata_filename = f"{subject_name}_task-{task}_tracksys-headmovement_motion.json"
                 headmovement_metadata_file = (
@@ -749,7 +760,7 @@ if __name__ == "__main__":
                         "component": list(motion_bids_labels.values()),
                         "type": ["POS", "POS", "POS", "ORNT", "ORNT", "ORNT"],
                         "tracked_point": ["Head", "Head", "Head", "Head", "Head", "Head"],
-                        "units": ["m", "m", "m", "n/a", "n/a", "n/a"],
+                        "units": ["m", "m", "m", "deg", "deg", "deg"],
                     }
                 )
                 # Save the channel information in a tsv file
@@ -765,7 +776,8 @@ if __name__ == "__main__":
                     recorded_eye = eyetracking_bids_numbers[stream][0]
                     eye_nb = eyetracking_bids_numbers[stream][1]
                     # Create a *_recording_eye[eye_nb]_physio.tsv.gz file containing the eye tracking data for the [recorded_eye] eye
-                    eyetrack_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.tsv.gz"
+                    #eyetrack_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.tsv.gz"
+                    eyetrack_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}.tsv.gz"
                     eyetrack_file = Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_filename
                     # Save the eye tracking data in a tsv file
                     eyetrack_data_dataframes[stream].to_csv(eyetrack_file, sep="\t", index=False)
@@ -774,24 +786,37 @@ if __name__ == "__main__":
                         "SamplingFrequency": stream_sampling_rate[stream],
                         "StartTime": eyetrack_data_dataframe["timestamp"].iloc[0],
                         "Columns": ["timestamp", *list(eyetracking_bids_labels.values())],
-                        "Manufacturer": "htc",
-                        "ManufacturersModelName": "vive_pro_eye",
+                        "Manufacturer": "HTC",
+                        "ManufacturersModelName": "Vive Pro Eye",
                         "PhysioType": "eyetrack",
                         "EnvironmentCoordinates": "center", #TODO: to check
                         "RecordedEye": recorded_eye,
-                        "SampleCoordinateUnits":"pos:m, rot:degree_euler_angle", #TODO: to check
+                        "SampleCoordinateUnits":"pos:m, ornt:deg", #TODO: to check
                         "SampleCoordinateSystem": "eye-in-head", #TODO: to check
+                        "EventIdentifier": "None",
+                        "RawSamples": 1,
+                        "IncludedEyeMovementEvents": "None",
+                        "DetectionAlgorithm": "None",
                         "CalibrationCount": 1,
-                        "CalibrationType": "steamvr", #TODO: to check
+                        "CalibrationType": "SteamVR 5-point", #TODO: to check
+                        "MaximalCalibrationError": "0.5-1.1 deg within FOV 20 deg",
+                        "EyeCameraSettings": "FOV 110 deg",
+                        "ScreenSize": "3.5 inch diagonal (8.89 cm)",
+                        "ScreenResolution": "1440 x 1600 px per eye (2880 x 1600 px combined)",
+                        "ScreenRefreshRate": "90 Hz",
+                        "InstitutionName": "Max Planck Institute for Human Brain and Cognitive Sciences",
+                        "InstitutionAddress": "Stephanstrasse 1a, 04103 Leipzig, Germany",
+                        "InstitutionalDepartmentName": "Department of Neurology",
                     }
-                    eyetrack_metadata_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.json"
+                    #eyetrack_metadata_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}_physio.json"
+                    eyetrack_metadata_filename = f"{subject_name}_task-{task}_recording-eye{eye_nb}.json"
                     eyetrack_metadata_file = (
                         Path(data_dir) / exp_name / rawdata_name / subject_name / datatype / eyetrack_metadata_filename
                     )
                     # Save the eye tracking metadata in a json file
                     with eyetrack_metadata_file.open("w") as f:
                         json.dump(eyetrack_metadata, f, indent=4)
-            # %%
+        
             # STEP 3e: --------- EEG -----------
             elif datatype == "eeg":
                 # Create a *_eeg.edf file containing the EEG data
@@ -811,9 +836,11 @@ if __name__ == "__main__":
                     "SamplingFrequency": stream_sampling_rate["LiveAmpSN-054206-0127"],
                     "PowerLineFrequency": 50,
                     "SoftwareFilters": "n/a",
-                    "TaskDescription": "VR task with head movement",
-                    "CapManufacturer": "Brain Products",
-                    "CapManufacturersModelName": "ActiCap snap 64 channels",
+                    "TaskDescription": "VR task with head movement; continuous rating of valence and arousal during sequence of stereoscopic 360 videos",
+                    "CapManufacturer": "EasyCap",
+                    "CapManufacturersModelName": "actiCAP snap 64 channels",
+                    "Manufacturer": "Brain Products",
+                    "ManufacturersModelName": "LiveAmp 64",
                     "EEGChannelCount": len(channel_names["eeg"]) - len(eog_channels),
                     "ECGChannelCount": len(channel_names["cardiac"]),
                     "EOGChannelCount": len(eog_channels),
@@ -827,6 +854,9 @@ if __name__ == "__main__":
                     "EEGGround": "AFz",
                     "EEGPlacementScheme": "10-20",
                     "HardwareFilters": "n/a",
+                    "InstitutionName": "Max Planck Institute for Human Brain and Cognitive Sciences",
+                    "InstitutionAddress": "Stephanstrasse 1a, 04103 Leipzig, Germany",
+                    "InstitutionalDepartmentName": "Department of Neurology",
                 }
                 eeg_metadata_filename = f"{subject_name}_task-{task}_eeg.json"
                 eeg_metadata_file = (
@@ -919,6 +949,7 @@ if __name__ == "__main__":
                     "StartTime": physio_data["timestamp"].iloc[0],
                     "Columns": ["cardiac", "respiratory", "ppg", "gsr"],
                     "Manufacturer": "Brain Products",
+                    "ManufacturersModelName": "LiveAmp Sensor & Trigger Extension",
                     "cardiac": {
                         "Description":
                         "continuous heart measurement with three passive electrodes placed in Lead II configuration",
@@ -935,9 +966,12 @@ if __name__ == "__main__":
                     },
                     "gsr": {
                         "Description":
-                        "continuous measurements of GSR, two electrodes placed on the inner palm of the left hand",
+                        "continuous measurements of GSR, two electrodes placed on the palmar side of the left hand (distal and proximal hypothenar)",
                         "Units": "mV",
                     },
+                    "InstitutionName": "Max Planck Institute for Human Brain and Cognitive Sciences",
+                    "InstitutionAddress": "Stephanstrasse 1a, 04103 Leipzig, Germany",
+                    "InstitutionalDepartmentName": "Department of Neurology",
                 }
                 physio_metadata_filename = f"{subject_name}_task-{task}_physio.json"
                 physio_metadata_file = (
