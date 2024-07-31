@@ -4,25 +4,38 @@ Script to extract features from physiological data (ECG, EEG) for AVR phase 3 to
 Inputs:     Preprocessed data (EEG, ECG) in tsv files (ECG) and fif files (EEG, after ICA)
 
 Outputs:    Features extracted from the data in tsv files
+            - ECG: IBI, HRV, HF-HRV, LF-HRV
+            - EEG: Power of delta, theta, alpha, beta, gamma bands for all electrodes and for each of the ROIs
 
 Functions:
             calculate_hrv(): Compute heart rate variability (HRV) features from inter-beat intervals (IBI) data.
+            calculate_power(): Compute the power of all EEG frequency bands.
+            calculate_power_roi(): Compute the mean power of the EEG frequency bands for a region of interest (ROI).
+            integrate_power(): Integrate power over a specific frequency band.
 
 Steps:
 1. LOAD DATA
 2. FEATURE EXTRACTION ECG
+    2a. Calculate HRV features from IBI data
+    2b. Save HRV features in a tsv file
+    2c. Plot HRV features
 3. FEATURE EXTRACTION EEG
+    3a. Calculate the power of all EEG frequency bands
+    3b. Calculate the mean power of the EEG frequency bands for a region of interest (ROI)
+    3c. Save EEG power features in a tsv file
+    3d. Plot EEG power features
 
 Required packages:  mne, neurokit2, fcwt, scipy, fooof
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 23 July 2024
-Last update: 26 July 2024
+Last update: 31 July 2024
 """
 
 # %% Import
 import json
+import time
 from pathlib import Path
 
 import fcwt
@@ -33,14 +46,13 @@ import neurokit2 as nk
 import numpy as np
 import pandas as pd
 import scipy
-import time
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 subjects = ["001", "002", "003"]  # Adjust as needed
 task = "AVR"
 
 # Only analyze one subject when debug mode is on
-debug = True
+debug = False
 if debug:
     subjects = [subjects[0]]
 
@@ -48,8 +60,7 @@ if debug:
 show_plots = True
 
 # Define which steps to run
-steps = ["Load Data", "Feature Extraction EEG"]
-# "Feateure Extraction ECG"
+steps = ["Load Data", "Feature Extraction ECG", "Feature Extraction EEG"]
 
 # Specify the data path info (in BIDS format)
 # Change with the directory of data storage
@@ -72,7 +83,7 @@ avg_features_folder.mkdir(parents=True, exist_ok=True)
 # Define parameters for time-frequency analysis of both ECG and EEG data
 window_length = 2  # 2s window  # Length of the window for smoothing
 overlap = 0.5  # 50% overlap    # Overlap of the windows for smoothing
-mirror_length = 80  # Length of the mirror extension for symmetric padding
+mirror_length = 180  # Length of the mirror extension for symmetric padding
 
 # Define parameters for time-frequency analysis of ECG data
 sampling_frequency_ibi = 1  # Hz    # IBI and HR data are already sampled at 1 Hz from the preprocessing
@@ -82,8 +93,8 @@ lf_band = [0.04, 0.15]
 hf_band = [0.15, 0.4]
 
 # Define parameters for time-frequency analysis of EEG data
-sampling_frequency_eeg = 250  # Hz    # EEG data will be downsampled to 250 Hz
-frequencies = np.arange(0.5, 125.5, 0.5)  # Resolution 0.5 Hz
+sampling_frequency_eeg = 100  # Hz    # EEG data will be downsampled to 100 Hz
+frequencies = np.arange(0.5, 50.5, 0.5)  # Resolution 0.5 Hz
 
 # Define frequency bands of interest
 # Berger, 1929: delta (δ; 0.3-4 Hz), theta (θ; 4-8 Hz),
@@ -218,6 +229,25 @@ rois = {
     "parietal": ["P7", "P5", "P3", "P1", "Pz", "P2", "P4", "P6", "P8"],
     "parieto-occipital": ["PO7", "PO3", "POz", "PO4", "PO8"],
     "occipital": ["O1", "Oz", "02"],
+    "posterior": [
+        "P7",
+        "P5",
+        "P3",
+        "P1",
+        "Pz",
+        "P2",
+        "P4",
+        "P6",
+        "P8",
+        "PO7",
+        "PO3",
+        "POz",
+        "PO4",
+        "PO8",
+        "O1",
+        "Oz",
+        "O2",
+    ],
 }
 
 # Create color palette for plots
@@ -400,9 +430,8 @@ def calculate_hrv(  # noqa: PLR0915, PLR0913
 
     return lf_power_mirrored, hf_power_mirrored, hrv_power_mirrored, times_mirrored, ibi_mirrored_final, fig
 
-def calculate_power(
-    eeg, sampling_frequency, bands, frequencies, mirror_length, window_length, overlap
-):
+
+def calculate_power(eeg, sampling_frequency, bands, frequencies, mirror_length, window_length, overlap):
     """
     Calculate the power of all EEG frequency bands.
 
@@ -431,10 +460,10 @@ def calculate_power(
     power : dict
         Power of all EEG frequency bands.
     """
-    print("Downsampling EEG data to 250 Hz...")
+    print(f"Downsampling EEG data to {sampling_frequency} Hz...")
     # Downsampling the EEG to 250 Hz
     downsampled_eeg = eeg.copy().resample(sampling_frequency)
-    
+
     # Load the EEG data
     data = downsampled_eeg.get_data()
 
@@ -447,7 +476,12 @@ def calculate_power(
     eeg_data_mirrored = np.empty((data.shape[0], data.shape[1] + 2 * mirror_length * sampling_frequency))
     for e in range(0, data.shape[0]):
         eeg_data_mirrored[e, :] = np.hstack(
-            (np.flip(data[e])[-mirror_length * sampling_frequency:], data[e], np.flip(data[e][-mirror_length * sampling_frequency:])))
+            (
+                np.flip(data[e])[-mirror_length * sampling_frequency :],
+                data[e],
+                np.flip(data[e][-mirror_length * sampling_frequency :]),
+            )
+        )
 
     print("Performing Continuous Wavelet Transform (CWT) for TFR on EEG data...")
     # Get the current time
@@ -456,59 +490,139 @@ def calculate_power(
     # Perform Time-Frequency analysis
     # Continuous Wavelet Transform (CWT) on mirrored EEG data
 
-    # Create the wavelet for the CWT
-    wavelet = mne.time_frequency.morlet(sampling_frequency, frequencies, n_cycles=7.0, sigma=None, zero_mean=False)
+    # Loop over all channels and compute the CWT for each channel
+    # Initialize array for the CWT
+    tfr = np.empty((eeg_data_mirrored.shape[0], len(frequencies), eeg_data_mirrored.shape[1]))
+    for channel in range(0, eeg_data_mirrored.shape[0]):
+        # Compute the TFR for each channel
+        _, tfr_channel = fcwt.cwt(
+            eeg_data_mirrored[channel], sampling_frequency, min(frequencies), max(frequencies), len(frequencies)
+        )
+        # Convert complex TFR values to real values
+        tfr_channel = np.abs(tfr_channel)
+        # Flip the TFR matrix to match the frequencies
+        tfr_channel = np.flip(tfr_channel, axis=0)
+        tfr[channel] = tfr_channel
 
-    # Compute the TFR for the whole EEG data
-    tfr = mne.time_frequency.tfr.cwt(eeg_data_mirrored, wavelet, use_fft=True, mode='same', decim=1)
-    tfr_power = (np.abs(tfr)) ** 2
+    # Compute the power of the TFR
+    tfr_power = tfr**2
 
     # Get the current time
     end_time = time.ctime()
     print(f"End time: {end_time}")
-    print("CWT for TFR on EEG data completed. Total time elapsed: ", str(end_time - start_time))
+    print("CWT for TFR on EEG data completed.")
 
-    # Cut the power timeseries
-    tfr_power_mirrored = tfr_power[:, :, 0: mirror_length * sampling_frequency + data.shape[1]]
-
+    print("Smoothing the Time-Frequency representation by averaging over 2s windows, thereby downsampling to 1 Hz...")
     # Smooth the Time-Frequency representation
     # Average over 2s windows with 50% overlap
     # This down-samples the power timeseries to 1 Hz
-    PSDs = np.empty((tfr_power_mirrored.shape[0], tfr_power_mirrored.shape[1], int(tfr_power_mirrored.shape[2] / sampling_frequency) - 1))
-    for e in range(0, tfr_power_mirrored.shape[0]):
-        for f in range(0, tfr_power_mirrored.shape[1]):
-            window_avg = [np.mean(tfr_power_mirrored[e, f, i:i + window]) for i in range(0, len(tfr_power_mirrored[e, f]), noverlap) if i + window <= len(tfr_power_mirrored[e, f])]
-            PSDs[e, f] = np.asarray(window_avg)
-    
+    PSDs = np.empty((tfr_power.shape[0], tfr_power.shape[1], int(tfr_power.shape[2] / sampling_frequency) - 1))
+    for e in range(0, tfr_power.shape[0]):
+        PSDs_channel = np.empty((tfr_power.shape[1], int(tfr_power.shape[2] / sampling_frequency) - 1))
+        for f in range(0, tfr_power.shape[1]):
+            window_avg = [
+                np.mean(tfr_power[e, f, i : i + window])
+                for i in range(0, len(tfr_power[e, f]), noverlap)
+                if i + window <= len(tfr_power[e, f])
+            ]
+            times = np.arange(0, len(window_avg))
+            PSDs_channel[f] = np.asarray(window_avg)
+
+        # Save the Time-Frequency representation
+        PSDs[e] = PSDs_channel
+
+    # Create a plot with all TFRs for all channels
+    figure, axs = plt.subplots(12, 5, figsize=(20, 20))
+    for e in range(0, PSDs.shape[0]):
+        row = e // 5
+        col = e % 5
+        subfigure = axs[row, col].pcolormesh(times, frequencies, PSDs[e], shading="gouraud")
+        axs[row, col].set_title(f"Channel {eeg.ch_names[e]}")
+        axs[row, col].set_ylabel("Frequency (Hz)")
+        figure.colorbar(subfigure, ax=axs[row, col])
+        axs[row, col].set_xlim([times[0], times[-1]])
+        # Convert x-axis labels to minutes
+        x_ticks = axs[row, col].get_xticks()[:-1]
+        axs[row, col].set_xticks(x_ticks)
+        axs[row, col].set_xticklabels([f"{round(x/60)}" for x in x_ticks])
+        axs[row, col].set_xlabel("Time (min)")
+    figure.suptitle(f"Smoothed Time-Frequency Representation (fCWT) for EEG data for subject {subject}")
+    figure.tight_layout()
+
+    # Save the Time-Frequency representation plot
+    figure.savefig(subject_results_folder / f"sub-{subject}_task-{task}_eeg_tfr_cwt.png")
+
+    if show_plots:
+        plt.show()
+
+    plt.close()
+
+    print("Calculating power of each EEG frequency band...")
     # Separate the power into frequency bands
     # Initialize arrays for the power of each frequency band
-    power_delta = np.empty((PSDs.shape[2], PSDs.shape[0],))
-    power_theta = np.empty((PSDs.shape[2], PSDs.shape[0],))
-    power_alpha = np.empty((PSDs.shape[2], PSDs.shape[0],))
-    power_beta = np.empty((PSDs.shape[2], PSDs.shape[0],))
-    power_gamma = np.empty((PSDs.shape[2], PSDs.shape[0],))
+    power_delta = np.empty(
+        (
+            PSDs.shape[2],
+            PSDs.shape[0],
+        )
+    )
+    power_theta = np.empty(
+        (
+            PSDs.shape[2],
+            PSDs.shape[0],
+        )
+    )
+    power_alpha = np.empty(
+        (
+            PSDs.shape[2],
+            PSDs.shape[0],
+        )
+    )
+    power_beta = np.empty(
+        (
+            PSDs.shape[2],
+            PSDs.shape[0],
+        )
+    )
+    power_gamma = np.empty(
+        (
+            PSDs.shape[2],
+            PSDs.shape[0],
+        )
+    )
     # Integrate the power over the frequency bands
     for t in range(0, PSDs.shape[2]):
         PSD = PSDs[:, :, t]
         # Integrate full PSDs over the different frequency bands using the integrate_power() function
-        power_delta[t] = integrate_power(frequencies, PSD, bands.delta, "trapezoid")
-        power_theta[t] = integrate_power(frequencies, PSD, bands.theta, "trapezoid")
-        power_alpha[t] = integrate_power(frequencies, PSD, bands.alpha, "trapezoid")
-        power_beta[t] = integrate_power(frequencies, PSD, bands.beta, "trapezoid")
-        power_gamma[t] = integrate_power(frequencies, PSD, bands.gamma, "trapezoid")
+        power_delta[t] = integrate_power(frequencies, PSD, bands.delta)
+        power_theta[t] = integrate_power(frequencies, PSD, bands.theta)
+        power_alpha[t] = integrate_power(frequencies, PSD, bands.alpha)
+        power_beta[t] = integrate_power(frequencies, PSD, bands.beta)
+        power_gamma[t] = integrate_power(frequencies, PSD, bands.gamma)
 
+    print("Cutting the mirrored part of the power timeseries from the data...")
     # Cut the mirrored part of the power timeseries from the data (data w/o artifacts)
-    power_delta_mirrored = power_delta[mirror_length - 1:len(data) + mirror_length - 1]
-    power_theta_mirrored = power_theta[mirror_length - 1:len(data) + mirror_length - 1]
-    power_alpha_mirrored = power_alpha[mirror_length - 1:len(data) + mirror_length - 1]
-    power_beta_mirrored = power_beta[mirror_length - 1:len(data) + mirror_length - 1]
-    power_gamma_mirrored = power_gamma[mirror_length - 1:len(data) + mirror_length - 1]
+    power_delta_mirrored = power_delta[mirror_length - 1 : power_delta.shape[0] - mirror_length - 1]
+    power_theta_mirrored = power_theta[mirror_length - 1 : power_theta.shape[0] - mirror_length - 1]
+    power_alpha_mirrored = power_alpha[mirror_length - 1 : power_alpha.shape[0] - mirror_length - 1]
+    power_beta_mirrored = power_beta[mirror_length - 1 : power_beta.shape[0] - mirror_length - 1]
+    power_gamma_mirrored = power_gamma[mirror_length - 1 : power_gamma.shape[0] - mirror_length - 1]
 
     # Get the times of the power
     times_mirrored = np.arange(0, power_delta_mirrored.shape[0])
 
     # Combine all power arrays into one dictionary
-    power = {"times": times_mirrored, "channels": eeg.ch_names, "delta": power_delta_mirrored, "theta": power_theta_mirrored, "alpha": power_alpha_mirrored, "beta": power_beta_mirrored, "gamma": power_gamma_mirrored}
+    power = {
+        "times": times_mirrored,
+        "channels": eeg.ch_names,
+        "delta": power_delta_mirrored,
+        "theta": power_theta_mirrored,
+        "alpha": power_alpha_mirrored,
+        "beta": power_beta_mirrored,
+        "gamma": power_gamma_mirrored,
+    }
+
+    print("Done with EEG power calculation!")
 
     return power
 
@@ -534,7 +648,9 @@ def calculate_power_roi(power, roi):
     # Get the power of the ROI
     power_roi = {"times": power["times"], "channels": roi}
     for band in ["delta", "theta", "alpha", "beta", "gamma"]:
-        power_roi[band] = np.mean(power[band][:, roi_indices])
+        power_roi_band = power[band][:, roi_indices]
+        # Calculate the mean power of the ROI for each time point
+        power_roi[band] = np.mean(power_roi_band, axis=1)
 
     return power_roi
 
@@ -570,6 +686,7 @@ def integrate_power(frequencies, PSD, band):
         power[i] = scipy.integrate.trapezoid(psd_band, frequencies_band)
 
     return power
+
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -681,7 +798,7 @@ if __name__ == "__main__":
                     ax.plot(times, hf_power, c=colors["ECG"]["HF-HRV"], linewidth=1)
                 elif hrv == "hrv_power":
                     ax.plot(times, hrv_power, c=colors["ECG"]["HRV"], linewidth=1)
-            ax.set_ylabel("Power")
+            ax.set_ylabel("Power (a.u.)")
             # Transform x-axis labels to minutes
             x_ticks = ax.get_xticks()
             ax.set_xticks(x_ticks)
@@ -711,32 +828,83 @@ if __name__ == "__main__":
 
             print("Extracting power of EEG frequency bands...")
             # Compute power of all EEG frequency bands using calculate_power() function
-            power = calculate_power(eeg, sampling_frequency_eeg, bands, frequencies, mirror_length, window_length, overlap)
+            power = calculate_power(
+                eeg, sampling_frequency_eeg, bands, frequencies, mirror_length, window_length, overlap
+            )
 
             # Power timeseries are now also sampled at 1 Hz
 
+            print("Calculating power of EEG frequency bands for all ROIs...")
             # Initiate empty dictionary for the power of the ROIs
             power_rois = {}
             # Loop over ROIs and compute power for each ROI using calculate_power_roi() function
             for roi in rois:
+                print(f"Calculating power of EEG frequency bands for {roi} electrodes...")
                 power_roi = calculate_power_roi(power, rois[roi])
+
                 # Add the power of the ROI to the dictionary
                 power_rois[roi] = power_roi
 
+                # Create a plot of the power values of all frequencies for each ROI
+                figure, ax = plt.subplots(figsize=(20, 5))
+                for band in ["delta", "theta", "alpha", "beta", "gamma"]:
+                    ax.plot(power_roi["times"], power_roi[band], c=colors["EEG"][band], linewidth=1)
+                ax.set_ylabel("Power (a.u.)")
+                # Transform x-axis labels to minutes
+                x_ticks = ax.get_xticks()
+                ax.set_xticks(x_ticks)
+                ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
+                ax.set_xlabel("Time (min)")
+                ax.set_title(f"Power of EEG frequency bands for {roi} electrodes for subject {subject}")
+                ax.set_xlim([power_roi["times"][0], power_roi["times"][-1]])
+                ax.legend(["Delta", "Theta", "Alpha", "Beta", "Gamma"])
+
+                # Save the plot
+                figure.savefig(subject_results_folder / f"sub-{subject}_task-{task}_eeg_{roi}_power.png")
+
+                if show_plots:
+                    plt.show()
+
             print("Saving EEG features...")
 
-            # Save the power of all EEG frequency bands in a tsv file
-            power_df = pd.DataFrame(power)
-            power_df.to_csv(
-                subject_features_folder / f"sub-{subject}_task-{task}_eeg_features.tsv", sep="\t", index=False
-            )
+            # Save the power of each frequency band in a tsv file
+            for band in ["delta", "theta", "alpha", "beta", "gamma"]:
+                power_band_df = pd.DataFrame()
+                # First column is the time
+                power_band_df["timestamp"] = power["times"]
+                # Add the power of each channel
+                for channel in power["channels"]:
+                    power_band_df[channel] = power[band][:, power["channels"].index(channel)]
+                # Save the power of the frequency band in a tsv file
+                power_band_df.to_csv(
+                    subject_features_folder / f"sub-{subject}_task-{task}_eeg_features_all_channels_{band}_power.tsv",
+                    sep="\t",
+                    index=False,
+                )
 
-            # Save the power of the ROIs in a tsv file
-            power_rois_df = pd.DataFrame(power_rois)
-            power_rois_df.to_csv(
-                subject_features_folder / f"sub-{subject}_task-{task}_eeg_features_rois.tsv", sep="\t", index=False
-            )
+            # Save the power of each ROI in a tsv file
+            for roi in power_rois:
+                power_roi_df = pd.DataFrame()
+                # First column is the time
+                power_roi_df["timestamp"] = power_rois[roi]["times"]
+                # Add the power of each frequency band
+                for band in ["delta", "theta", "alpha", "beta", "gamma"]:
+                    power_roi_df[band] = power_rois[roi][band]
+                # Save the power of the ROI in a tsv file
+                power_roi_df.to_csv(
+                    subject_features_folder / f"sub-{subject}_task-{task}_eeg_features_{roi}_power.tsv",
+                    sep="\t",
+                    index=False,
+                )
 
+            # Create a metadata json file with the channels for each ROI
+            metadata = {"ROIs": {roi: rois[roi] for roi in rois}}
+
+            # Save the metadata json file
+            with (subject_features_folder / f"sub-{subject}_task-{task}_eeg_features_metadata.json").open("w") as file:
+                json.dump(metadata, file)
+
+            print("Done with EEG feature extraction!\n")
 
 
 # o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END
