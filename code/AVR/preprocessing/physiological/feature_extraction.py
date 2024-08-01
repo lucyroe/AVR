@@ -30,7 +30,7 @@ Required packages:  mne, neurokit2, fcwt, scipy, fooof
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 23 July 2024
-Last update: 31 July 2024
+Last update: 1 August 2024
 """
 
 # %% Import
@@ -57,7 +57,7 @@ if debug:
     subjects = [subjects[0]]
 
 # Define if plots should be shown
-show_plots = True
+show_plots = False
 
 # Define which steps to run
 steps = ["Load Data", "Feature Extraction ECG", "Feature Extraction EEG"]
@@ -222,7 +222,6 @@ rois = {
         "AF4",
     ],
     "frontal": ["AF7", "AF3", "AFz", "AF4", "AF8", "F7", "F5", "F3", "F1", "Fz", "F2", "F4", "F6", "F8"],
-    "left-frontal": ["AF7", "AF3", "F7", "F5", "F3", "F1"],
     "fronto-central": ["FC5", "FC3", "FC1", "FCz", "FC2", "FC4", "FC6"],
     "central": ["C5", "C3", "C1", "Cz", "C2", "C4", "C6"],
     "centro-parietal": ["CP5", "CP3", "CP1", "CPz", "CP2", "CP4", "CP6"],
@@ -254,8 +253,8 @@ rois = {
 colors = {
     "ECG": {"IBI": "#F0E442", "HRV": "#CC79A7", "LF-HRV": "#E69F00", "HF-HRV": "#D55E00"},
     # yellow, pink, light orange, dark orange
-    "EEG": {"delta": "#E69F00", "theta": "#D55E00", "alpha": "#CC79A7", "beta": "#56B4E9", "gamma": "#009E73"},
-    # light orange, dark orange, pink, light blue, green
+    "EEG": {"delta": "#F0E442", "theta": "#D55E00", "alpha": "#CC79A7", "beta": "#56B4E9", "gamma": "#009E73"},
+    # yellow, dark orange, pink, light blue, green
 }
 
 # Get rid of the sometimes excessive logging of MNE
@@ -385,13 +384,13 @@ def calculate_hrv(  # noqa: PLR0915, PLR0913
     hf_frequencies = frequencies[hf_index]
     hrv_frequencies = frequencies[hrv_index]
     # Get the LF and HF HRV power
-    lf_PSDs = tfr_smooth[lf_index, :]
-    hf_PSDs = tfr_smooth[hf_index, :]
-    hrv_PSDs = tfr_smooth[hrv_index, :]
+    lf_psds = tfr_smooth[lf_index, :]
+    hf_psds = tfr_smooth[hf_index, :]
+    hrv_psds = tfr_smooth[hrv_index, :]
     # Integrate over frequency bands to get the power
-    lf_power = scipy.integrate.trapezoid(lf_PSDs.transpose(), lf_frequencies)
-    hf_power = scipy.integrate.trapezoid(hf_PSDs.transpose(), hf_frequencies)
-    hrv_power = scipy.integrate.trapezoid(hrv_PSDs.transpose(), hrv_frequencies)
+    lf_power = scipy.integrate.trapezoid(lf_psds.transpose(), lf_frequencies)
+    hf_power = scipy.integrate.trapezoid(hf_psds.transpose(), hf_frequencies)
+    hrv_power = scipy.integrate.trapezoid(hrv_psds.transpose(), hrv_frequencies)
 
     # Add one NaN at the end, because only N-1 values because of smoothing
     lf_power = np.append(lf_power, np.nan)
@@ -431,7 +430,7 @@ def calculate_hrv(  # noqa: PLR0915, PLR0913
     return lf_power_mirrored, hf_power_mirrored, hrv_power_mirrored, times_mirrored, ibi_mirrored_final, fig
 
 
-def calculate_power(eeg, sampling_frequency, bands, frequencies, mirror_length, window_length, overlap):
+def calculate_power(eeg, sampling_frequency, bands, frequencies, mirror_length, window_length, overlap):  # noqa: PLR0913, PLR0915
     """
     Calculate the power of all EEG frequency bands.
 
@@ -461,7 +460,7 @@ def calculate_power(eeg, sampling_frequency, bands, frequencies, mirror_length, 
         Power of all EEG frequency bands.
     """
     print(f"Downsampling EEG data to {sampling_frequency} Hz...")
-    # Downsampling the EEG to 250 Hz
+    # Downsampling the EEG to 100 Hz
     downsampled_eeg = eeg.copy().resample(sampling_frequency)
 
     # Load the EEG data
@@ -516,9 +515,9 @@ def calculate_power(eeg, sampling_frequency, bands, frequencies, mirror_length, 
     # Smooth the Time-Frequency representation
     # Average over 2s windows with 50% overlap
     # This down-samples the power timeseries to 1 Hz
-    PSDs = np.empty((tfr_power.shape[0], tfr_power.shape[1], int(tfr_power.shape[2] / sampling_frequency) - 1))
+    psds = np.empty((tfr_power.shape[0], tfr_power.shape[1], int(tfr_power.shape[2] / sampling_frequency) - 1))
     for e in range(0, tfr_power.shape[0]):
-        PSDs_channel = np.empty((tfr_power.shape[1], int(tfr_power.shape[2] / sampling_frequency) - 1))
+        psds_channel = np.empty((tfr_power.shape[1], int(tfr_power.shape[2] / sampling_frequency) - 1))
         for f in range(0, tfr_power.shape[1]):
             window_avg = [
                 np.mean(tfr_power[e, f, i : i + window])
@@ -526,17 +525,17 @@ def calculate_power(eeg, sampling_frequency, bands, frequencies, mirror_length, 
                 if i + window <= len(tfr_power[e, f])
             ]
             times = np.arange(0, len(window_avg))
-            PSDs_channel[f] = np.asarray(window_avg)
+            psds_channel[f] = np.asarray(window_avg)
 
         # Save the Time-Frequency representation
-        PSDs[e] = PSDs_channel
+        psds[e] = psds_channel
 
     # Create a plot with all TFRs for all channels
     figure, axs = plt.subplots(12, 5, figsize=(20, 20))
-    for e in range(0, PSDs.shape[0]):
+    for e in range(0, psds.shape[0]):
         row = e // 5
         col = e % 5
-        subfigure = axs[row, col].pcolormesh(times, frequencies, PSDs[e], shading="gouraud")
+        subfigure = axs[row, col].pcolormesh(times, frequencies, psds[e], shading="gouraud")
         axs[row, col].set_title(f"Channel {eeg.ch_names[e]}")
         axs[row, col].set_ylabel("Frequency (Hz)")
         figure.colorbar(subfigure, ax=axs[row, col])
@@ -562,43 +561,43 @@ def calculate_power(eeg, sampling_frequency, bands, frequencies, mirror_length, 
     # Initialize arrays for the power of each frequency band
     power_delta = np.empty(
         (
-            PSDs.shape[2],
-            PSDs.shape[0],
+            psds.shape[2],
+            psds.shape[0],
         )
     )
     power_theta = np.empty(
         (
-            PSDs.shape[2],
-            PSDs.shape[0],
+            psds.shape[2],
+            psds.shape[0],
         )
     )
     power_alpha = np.empty(
         (
-            PSDs.shape[2],
-            PSDs.shape[0],
+            psds.shape[2],
+            psds.shape[0],
         )
     )
     power_beta = np.empty(
         (
-            PSDs.shape[2],
-            PSDs.shape[0],
+            psds.shape[2],
+            psds.shape[0],
         )
     )
     power_gamma = np.empty(
         (
-            PSDs.shape[2],
-            PSDs.shape[0],
+            psds.shape[2],
+            psds.shape[0],
         )
     )
     # Integrate the power over the frequency bands
-    for t in range(0, PSDs.shape[2]):
-        PSD = PSDs[:, :, t]
+    for t in range(0, psds.shape[2]):
+        psd = psds[:, :, t]
         # Integrate full PSDs over the different frequency bands using the integrate_power() function
-        power_delta[t] = integrate_power(frequencies, PSD, bands.delta)
-        power_theta[t] = integrate_power(frequencies, PSD, bands.theta)
-        power_alpha[t] = integrate_power(frequencies, PSD, bands.alpha)
-        power_beta[t] = integrate_power(frequencies, PSD, bands.beta)
-        power_gamma[t] = integrate_power(frequencies, PSD, bands.gamma)
+        power_delta[t] = integrate_power(frequencies, psd, bands.delta)
+        power_theta[t] = integrate_power(frequencies, psd, bands.theta)
+        power_alpha[t] = integrate_power(frequencies, psd, bands.alpha)
+        power_beta[t] = integrate_power(frequencies, psd, bands.beta)
+        power_gamma[t] = integrate_power(frequencies, psd, bands.gamma)
 
     print("Cutting the mirrored part of the power timeseries from the data...")
     # Cut the mirrored part of the power timeseries from the data (data w/o artifacts)
@@ -655,16 +654,17 @@ def calculate_power_roi(power, roi):
     return power_roi
 
 
-def integrate_power(frequencies, PSD, band):
+def integrate_power(frequencies, psd, band):
     """
     Integrate power over a specific frequency band.
+
     Using the trapezoid rule to approximate the integral of the power spectral density (PSD) over the frequency band.
 
     Parameters
     ----------
     frequencies : array
-        Frequencies of the PSD.
-    PSD : array[float]
+        Frequencies of the psd.
+    psd : array[float]
         Power spectral density.
     band : list[float]
         Frequency band of interest.
@@ -676,13 +676,13 @@ def integrate_power(frequencies, PSD, band):
         Integrated power over the frequency band.
     """
     # Initialize power array
-    power = np.zeros(PSD.shape[0])
+    power = np.zeros(psd.shape[0])
     # Get the frequencies within the band
     frequencies_band = frequencies[np.logical_and(frequencies >= band[0], frequencies <= band[1])]
     # Integrate the power over the frequency band
-    for i in range(PSD.shape[0]):
-        psd = PSD[i]
-        psd_band = psd[np.logical_and(frequencies >= band[0], frequencies <= band[1])]
+    for i in range(psd.shape[0]):
+        psd_channel = psd[i]
+        psd_band = psd_channel[np.logical_and(frequencies >= band[0], frequencies <= band[1])]
         power[i] = scipy.integrate.trapezoid(psd_band, frequencies_band)
 
     return power
@@ -706,6 +706,10 @@ if __name__ == "__main__":
         if subject in excluded_participants:
             print(f"Subject {subject} was excluded from the analysis. Skipping subject...")
             continue
+
+        # Read in events file
+        events_file = data_dir / exp_name / derivative_name / preprocessed_name / "events_experiment.tsv"
+        events_experiment = pd.read_csv(events_file, sep="\t")
 
         # Define the path to the data
         subject_data_path = (
@@ -770,16 +774,23 @@ if __name__ == "__main__":
 
             # Plot the HRV features
             # Plot Clean IBI
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(15, 5))
             ax.plot(times, ibi_mirrored, c=colors["ECG"]["IBI"], linewidth=1)
             ax.set_ylabel("IBI (s)")
+            # Add vertical lines for event markers
+            # Exclude first and last event markers
+            # And only use every second event marker to avoid overlap
+            for _, row in events_experiment.iloc[0:-1:2].iterrows():
+                plt.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
+                plt.text(row["onset"] - 100, min(ibi_mirrored)-0.1*min(ibi_mirrored), row["event_name"], rotation=30,
+                fontsize=8, color="gray")
+
             # Transform x-axis labels to minutes
             x_ticks = ax.get_xticks()
             ax.set_xticks(x_ticks)
             ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
             ax.set_xlabel("Time (min)")
             ax.set_title(f"Clean IBI for subject {subject}")
-            ax.set_xlim([times[0], times[-1]])
 
             # Save the IBI plot
             fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_ecg_ibi.png")
@@ -790,7 +801,7 @@ if __name__ == "__main__":
             plt.close()
 
             # Plot HRV features (all in one plot)
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(15, 5))
             for hrv in ["hrv_power", "hf_power", "lf_power"]:
                 if hrv == "lf_power":
                     ax.plot(times, lf_power, c=colors["ECG"]["LF-HRV"], linewidth=1)
@@ -799,13 +810,20 @@ if __name__ == "__main__":
                 elif hrv == "hrv_power":
                     ax.plot(times, hrv_power, c=colors["ECG"]["HRV"], linewidth=1)
             ax.set_ylabel("Power (a.u.)")
+            # Add vertical lines for event markers
+            # Exclude first and last event markers
+            # And only use every second event marker to avoid overlap
+            for _, row in events_experiment.iloc[0:-1:2].iterrows():
+                plt.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
+                plt.text(row["onset"] - 100, min(lf_power)-1.5*min(lf_power), row["event_name"], rotation=30,
+                fontsize=8, color="gray")
+
             # Transform x-axis labels to minutes
             x_ticks = ax.get_xticks()
             ax.set_xticks(x_ticks)
             ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
             ax.set_xlabel("Time (min)")
             ax.set_title(f"Clean HRV for subject {subject}")
-            ax.set_xlim([times[0], times[-1]])
             ax.legend(["HRV", "HF-HRV", "LF-HRV"])
 
             print("Saving plots...")
@@ -846,17 +864,24 @@ if __name__ == "__main__":
                 power_rois[roi] = power_roi
 
                 # Create a plot of the power values of all frequencies for each ROI
-                figure, ax = plt.subplots(figsize=(20, 5))
+                figure, ax = plt.subplots(figsize=(15, 5))
                 for band in ["delta", "theta", "alpha", "beta", "gamma"]:
                     ax.plot(power_roi["times"], power_roi[band], c=colors["EEG"][band], linewidth=1)
                 ax.set_ylabel("Power (a.u.)")
+
+                # Add vertical lines for event markers
+                # Exclude first and last event markers
+                # And only use every second event marker to avoid overlap
+                for _, row in events_experiment.iloc[0:-1:2].iterrows():
+                    plt.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
+                    plt.text(row["onset"] - 100, max(power_roi["alpha"]) - 0.1 * max(power_roi["alpha"]),
+                    row["event_name"], rotation=30, fontsize=8, color="gray")
                 # Transform x-axis labels to minutes
                 x_ticks = ax.get_xticks()
                 ax.set_xticks(x_ticks)
                 ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
                 ax.set_xlabel("Time (min)")
                 ax.set_title(f"Power of EEG frequency bands for {roi} electrodes for subject {subject}")
-                ax.set_xlim([power_roi["times"][0], power_roi["times"][-1]])
                 ax.legend(["Delta", "Theta", "Alpha", "Beta", "Gamma"])
 
                 # Save the plot
@@ -864,6 +889,8 @@ if __name__ == "__main__":
 
                 if show_plots:
                     plt.show()
+
+            print("Saving plots...")
 
             print("Saving EEG features...")
 

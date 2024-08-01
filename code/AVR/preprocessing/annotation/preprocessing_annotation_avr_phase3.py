@@ -11,19 +11,19 @@ Steps:
 2. PREPROCESS DATA
     2a. Cutting data
     2b. Format data
-    2c. Save preprocessed data for each participant as tsv file
+    2c. Plot arousal and valence data
 
 3. AVERAGE OVER ALL PARTICIPANTS
     3a. Concatenate data of all participants into one dataframe
     3b. Save dataframe with all participants in tsv file ("all_subjects_task-{task}_beh_preprocessed.tsv")
     3c. Calculate averaged data
     3d. Save dataframe with mean arousal data in tsv file ("avg_task-{task}_beh_preprocessed.tsv")
-    3e. Plot mean arousal and valence data as sanity check (downsampled to 1 Hz)
+    3e. Plot mean arousal and valence data as sanity check
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 9 July 2024
+Last update: 1 August 2024
 """
 
 # %% Import
@@ -42,6 +42,12 @@ task = "AVR"
 debug = False
 if debug:
     subjects = [subjects[0]]
+
+# Define if plots should be shown
+show_plots = True
+
+# Define whether missing values should be interpolates
+interpolate_missing_values = True
 
 # Specify the data path info (in BIDS format)
 # change with the directory of data storage
@@ -70,6 +76,14 @@ avg_results_folder.mkdir(parents=True, exist_ok=True)
 cut_off_seconds = 2.5
 
 sampling_frequency = 90  # Sampling frequency of the data in Hz
+downsampling_frequency = 1  # Downsampling frequency in Hz
+resample_rate = sampling_frequency // downsampling_frequency
+
+# Create color palette for plots
+colors = {
+    "valence": "#0072B2",  # dark blue
+    "arousal": "#E69F00" # light orange
+}
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
@@ -125,21 +139,24 @@ if __name__ == "__main__":
             data = data[(data["onset"] >= start_time) & (data["onset"] <= end_time)]
 
         # 2b. Format data
-        # Set time to start at 0
-        data["onset"] = data["onset"] - data["onset"].iloc[0]
-
         # Set event time to start at - cut_off_seconds
         events_experiment["onset"] = events_experiment["onset"] - events_experiment["onset"].iloc[0] - cut_off_seconds
 
         # Remove unnecessary columns
-        data = data.drop(columns=["duration"])
+        data = data.drop(columns=["duration", "onset"])
 
-        # Round onset column to 2 decimal places (10 ms accuracy)
-        # To account for small differences in onset times between participants
-        data["onset"] = data["onset"].round(2)
+        # Downsample data from 90 to 1 Hz
+        data = data.iloc[::resample_rate]
 
         # Reset index
         data = data.reset_index(drop=True)
+
+        # Add timestamp column
+        data.insert(0, "timestamp", data.index)
+
+        # Interpolate missing values
+        if interpolate_missing_values:
+            data = data.interpolate()   # linear interpolation
 
         # Add subject ID to data as first column
         data.insert(0, "subject", subject)
@@ -159,6 +176,37 @@ if __name__ == "__main__":
 
         # Add participant's data to dataframe for all participants
         list_data_all.append(data)
+
+        # 2c. Plot arousal and valence data
+        plt.figure(figsize=(15, 5))
+        plt.plot(data["timestamp"], data["arousal"], label="Arousal", color=colors["arousal"])
+        plt.plot(data["timestamp"], data["valence"], label="Valence", color=colors["valence"])
+        plt.title(f"Ratings for {task} phase 3 for subject {subject}")
+
+        # Add vertical lines for event markers
+        # Exclude first and last event markers
+        # And only use every second event marker to avoid overlap
+        for _, row in events_experiment.iloc[0:-1:2].iterrows():
+            plt.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
+            plt.text(row["onset"] - 100, -1.5, row["event_name"], rotation=30, fontsize=8, color="gray")
+
+        # Transform x-axis to minutes
+        plt.xticks(
+            ticks=range(0, int(data["timestamp"].max()) + 1, 60),
+            labels=[str(int(t / 60)) for t in range(0, int(data["timestamp"].max()) + 1, 60)],
+        )
+        plt.xlabel("Time (min)")
+        plt.ylabel("Ratings")
+        plt.legend(["Arousal", "Valence"])
+        plt.ylim(-1.2, 1.2)
+
+        # Save plot
+        plt.savefig(Path(results_dir) / exp_name  / f"sub-{subject}" / datatype_name /
+        f"sub-{subject}_task-{task}_{datatype_name}_preprocessed.png")
+
+        if show_plots:
+            plt.show()
+
 
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
 
@@ -184,9 +232,9 @@ if __name__ == "__main__":
     data_all = data_all.drop(columns=["subject"])
 
     # 3c. Calculate averaged data
-    data_mean = data_all.groupby("onset").mean()
+    data_mean = data_all.groupby("timestamp").mean()
     # Add time column as first column
-    data_mean.insert(0, "onset", data_mean.index)
+    data_mean.insert(0, "timestamp", data_mean.index)
 
     # 3d. Save dataframe with mean arousal data in tsv file
     data_mean.to_csv(
@@ -202,25 +250,22 @@ if __name__ == "__main__":
     )
 
     # 3e. Plot mean arousal and valence data
-    # Downsampling to 1 Hz for better visualization
-    data_mean = data_mean.iloc[::sampling_frequency]
-
-    plt.figure(figsize=(20, 10))
-    plt.plot(data_mean["onset"], data_mean["arousal"], label="Arousal")
-    plt.plot(data_mean["onset"], data_mean["valence"], label="Valence")
+    plt.figure(figsize=(15, 5))
+    plt.plot(data_mean["timestamp"], data_mean["arousal"], label="Arousal", color=colors["arousal"])
+    plt.plot(data_mean["timestamp"], data_mean["valence"], label="Valence", color=colors["valence"])
     plt.title(f"Mean ratings for {task} phase 3 (n={len(subjects)})")
 
     # Add vertical lines for event markers
     # Exclude first and last event markers
     # And only use every second event marker to avoid overlap
-    for _, row in events_experiment.iloc[1:-1:2].iterrows():
+    for _, row in events_experiment.iloc[0:-1:2].iterrows():
         plt.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
-        plt.text(row["onset"] - 90, -1.52, row["event_name"], rotation=45, fontsize=10, color="gray")
+        plt.text(row["onset"] - 100, -1.5, row["event_name"], rotation=30, fontsize=8, color="gray")
 
     # Transform x-axis to minutes
     plt.xticks(
-        ticks=range(0, int(data_mean["onset"].max()) + 1, 60),
-        labels=[str(int(t / 60)) for t in range(0, int(data_mean["onset"].max()) + 1, 60)],
+        ticks=range(0, int(data_mean["timestamp"].max()) + 1, 60),
+        labels=[str(int(t / 60)) for t in range(0, int(data_mean["timestamp"].max()) + 1, 60)],
     )
     plt.xlabel("Time (min)")
     plt.ylabel("Ratings")

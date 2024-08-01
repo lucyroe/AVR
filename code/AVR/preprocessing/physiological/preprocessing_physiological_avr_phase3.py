@@ -41,7 +41,7 @@ Required packages: mne, neurokit, systole, seaborn, autoreject
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 24 July 2024
+Last update: 1 August 2024
 """
 # %% Import
 import gzip
@@ -66,13 +66,13 @@ subjects = ["001", "002", "003"]  # Adjust as needed
 task = "AVR"
 
 # Only analyze one subject when debug mode is on
-debug = True
+debug = False
 if debug:
     subjects = [subjects[0]]
 
 # Defne preprocessing steps to perform
-steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG"]  # Adjust as needed
-# "Averaging"
+steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Averaging"]  # Adjust as needed
+# "Preprocessing EEG"
 
 # Define if plots for preprocessing steps should be shown
 show_plots = False
@@ -796,6 +796,11 @@ if __name__ == "__main__":
                 x_ticks = ax.get_xticks()
                 ax.set_xticks(x_ticks)
                 ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
+                # Add vertical lines for event markers
+                # Exclude first and last event markers
+                # And only use every second event marker to avoid overlap
+                for _, row in events_experiment.iloc[0:-1:2].iterrows():
+                    ax.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
 
             # Save plot to results directory
             plt.savefig(subject_results_folder / f"sub-{subject}_task-{task}_IBI-HR.png")
@@ -1218,6 +1223,12 @@ if __name__ == "__main__":
             ) as f:
                 json.dump(participant_metadata, f)
 
+    # Save event markers to tsv file
+    events_experiment.to_csv(
+        data_dir / exp_name / derivative_name / preprocessed_name / "events_experiment.tsv", sep="\t",
+        index=False
+        )
+
     # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
     if "Averaging" in steps:
         print("********** Averaging over all participants **********\n")
@@ -1482,22 +1493,11 @@ if __name__ == "__main__":
             x_ticks = ax.get_xticks()
             ax.set_xticks(x_ticks)
             ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
-
             # Add vertical lines for event markers
             # Exclude first and last event markers
             # And only use every second event marker to avoid overlap
             for _, row in events_experiment.iloc[0:-1:2].iterrows():
                 ax.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
-
-                if ax in (axs[1, 0], axs[1, 1]):
-                    ax.text(
-                        row["onset"],
-                        (-0.2 if ax == axs[1, 0] else -20),
-                        row["event_name"],
-                        rotation=-45,
-                        fontsize=6,
-                        color="gray",
-                    )
 
         # Save plot to results directory
         plt.savefig(
