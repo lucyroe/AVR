@@ -1,94 +1,91 @@
 """
 Script to preprocess annotation data for AVR phase 3.
 
-Inputs: Raw annotation data
-
-Outputs: Preprocessed annotation data as tsv file (both for subjects separately and averaged over all subjects)
-
-Steps:
-1. LOAD DATA
-
-2. PREPROCESS DATA
-    2a. Cutting data
-    2b. Format data
-    2c. Plot arousal and valence data
-
-3. AVERAGE OVER ALL PARTICIPANTS
-    3a. Concatenate data of all participants into one dataframe
-    3b. Save dataframe with all participants in tsv file ("all_subjects_task-{task}_beh_preprocessed.tsv")
-    3c. Calculate averaged data
-    3d. Save dataframe with mean arousal data in tsv file ("avg_task-{task}_beh_preprocessed.tsv")
-    3e. Plot mean arousal and valence data as sanity check
-
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
 Last update: 1 August 2024
 """
 
-# %% Import
-import gzip
-from pathlib import Path
+def preprocess_annotations(subjects=[],  # noqa: PLR0915, B006
+            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/",
+            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/",
+            show_plots=False,
+            debug=False):
+    """
+    Preprocess annotation data for AVR phase 3.
 
-import matplotlib.pyplot as plt
-import pandas as pd
+    Inputs: Raw annotation data
+    Outputs: Preprocessed annotation data as tsv file (both for subjects separately and averaged over all subjects)
 
-# %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+    Steps:
+    1. LOAD DATA
+    2. PREPROCESS DATA
+        2a. Cutting data
+        2b. Format data
+        2c. Plot arousal and valence data
+    3. AVERAGE OVER ALL PARTICIPANTS
+        3a. Concatenate data of all participants into one dataframe
+        3b. Save dataframe with all participants in tsv file ("all_subjects_task-{task}_beh_preprocessed.tsv")
+        3c. Calculate averaged data
+        3d. Save dataframe with mean arousal data in tsv file ("avg_task-{task}_beh_preprocessed.tsv")
+        3e. Plot mean arousal and valence data as sanity check
+    """
+    # %% Import
+    import gzip
+    from pathlib import Path
 
-subjects = ["001", "002", "003"]  # Adjust as needed
-task = "AVR"
+    import matplotlib.pyplot as plt
+    import pandas as pd
 
-# Only analyze one subject when debug mode is on
-debug = False
-if debug:
-    subjects = [subjects[0]]
+    # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
+    task = "AVR"
 
-# Define if plots should be shown
-show_plots = True
+    # Only analyze one subject when debug mode is on
+    if debug:
+        subjects = [subjects[0]]
 
-# Define whether missing values should be interpolates
-interpolate_missing_values = True
+    # Define whether missing values should be interpolates
+    interpolate_missing_values = True
 
-# Specify the data path info (in BIDS format)
-# change with the directory of data storage
-data_dir = Path("/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/")
-exp_name = "AVR"
-rawdata_name = "rawdata"  # rawdata folder
-derivative_name = "derivatives"  # derivates folder
-preprocessed_name = "preproc"  # preprocessed folder (inside derivatives)
-averaged_name = "avg"  # averaged data folder (inside preprocessed)
-datatype_name = "beh"  # data type specification
-results_dir = Path("/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/")
+    # Specify the data path info (in BIDS format)
+    # change with the directory of data storage
+    data_dir = Path(data_dir)
+    exp_name = "AVR"
+    rawdata_name = "rawdata"  # rawdata folder
+    derivative_name = "derivatives"  # derivates folder
+    preprocessed_name = "preproc"  # preprocessed folder (inside derivatives)
+    averaged_name = "avg"  # averaged data folder (inside preprocessed)
+    datatype_name = "beh"  # data type specification
+    results_dir = Path(results_dir)
 
-# Create the preprocessed data folder if it does not exist
-for subject in subjects:
-    subject_preprocessed_folder = (
-        data_dir / exp_name / derivative_name / preprocessed_name / f"sub-{subject}" / datatype_name
-    )
-    subject_preprocessed_folder.mkdir(parents=True, exist_ok=True)
-avg_preprocessed_folder = data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name
-avg_preprocessed_folder.mkdir(parents=True, exist_ok=True)
-avg_results_folder = results_dir / exp_name / averaged_name / datatype_name
-avg_results_folder.mkdir(parents=True, exist_ok=True)
+    # Create the preprocessed data folder if it does not exist
+    for subject in subjects:
+        subject_preprocessed_folder = (
+            data_dir / exp_name / derivative_name / preprocessed_name / f"sub-{subject}" / datatype_name
+        )
+        subject_preprocessed_folder.mkdir(parents=True, exist_ok=True)
+    avg_preprocessed_folder = data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name
+    avg_preprocessed_folder.mkdir(parents=True, exist_ok=True)
+    avg_results_folder = results_dir / exp_name / averaged_name / datatype_name
+    avg_results_folder.mkdir(parents=True, exist_ok=True)
 
-# Define if the first and last 2.5 seconds of the data should be cut off
-# To avoid any potential artifacts at the beginning and end of the experiment
-cut_off_seconds = 2.5
+    # Define if the first and last 2.5 seconds of the data should be cut off
+    # To avoid any potential artifacts at the beginning and end of the experiment
+    cut_off_seconds = 2.5
 
-sampling_frequency = 90  # Sampling frequency of the data in Hz
-downsampling_frequency = 1  # Downsampling frequency in Hz
-resample_rate = sampling_frequency // downsampling_frequency
+    sampling_frequency = 90  # Sampling frequency of the data in Hz
+    downsampling_frequency = 1  # Downsampling frequency in Hz
+    resample_rate = sampling_frequency // downsampling_frequency
 
-# Create color palette for plots
-colors = {
-    "valence": "#0072B2",  # dark blue
-    "arousal": "#E69F00" # light orange
-}
+    # Create color palette for plots
+    colors = {
+        "valence": "#0072B2",  # dark blue
+        "arousal": "#E69F00" # light orange
+    }
 
-# %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-# %% STEP 1. LOAD DATA
-if __name__ == "__main__":
+    # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><<
+    # %% STEP 1. LOAD DATA
     # Initialize list to store data of all participants
     list_data_all = []
     # Loop over all subjects
@@ -277,4 +274,10 @@ if __name__ == "__main__":
     f"avg_task-{task}_{datatype_name}_preprocessed.png")
 
     plt.show()
-# %%
+
+# %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+if __name__ == "__main__":
+    # Run the main function
+    preprocess_annotations()
+
+# o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END

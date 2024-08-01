@@ -1,41 +1,6 @@
 """
 Script to preprocess physiological data (EEG, ECG, PPG) for AVR phase 3.
 
-Inputs:     Raw EEG data in .edf files
-            ECG and PPG data in tsv.gz files
-            Event markers in tsv files
-            Event mapping in tsv files
-            BrainVision actiCap montage file ("CACS-64_REF.bvef")
-
-Outputs:    Preprocessed data (EEG, ECG, PPG) in tsv files (ECG & PPG) and fif files (EEG, before and after ICA)
-            Participant metadata in json files
-            Excluded participants (with too many bad channels) in a list
-            Plots of preprocessing steps
-            Data of all participants concatenated in tsv files (ECG & PPG) and fif files (EEG, after ICA)
-            Averaged data over all participants in tsv files (ECG & PPG)
-
-Functions:
-    plot_peaks(): Plot ECG or PPG signal with peaks.
-    preprocess_eeg(): Preprocess EEG data using the MNE toolbox.
-    run_ica(): Run Independent Component Analysis (ICA) on the preprocessed EEG data (in epochs).
-    ica_correlation(): Select ICA components semi-automatically using a correlation approach with eye movements
-                        and cardiac data.
-
-Steps:
-1. LOAD DATA
-    1a. Load EEG data
-    1b. Load ECG and PPG data
-    1c. Load event markers
-    1d. Load event mapping
-2. PREPROCESS DATA
-    2a. Cutting data
-    2b. Format data
-    2c. Preprocess ECG and PPG data & save to tsv files
-    2d. Preprocess EEG data & save to fif files
-3. AVERAGE OVER ALL PARTICIPANTS
-    3a. Concatenate all ECG & PPG data
-    3b. Average over all participants (ECG & PPG) & save to tsv files
-
 Required packages: mne, neurokit, systole, seaborn, autoreject
 
 Author: Lucy Roellecke
@@ -43,398 +8,434 @@ Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
 Last update: 1 August 2024
 """
-# %% Import
-import gzip
-import json
-import sys
-import time
-from pathlib import Path
 
-import matplotlib.pyplot as plt
-import mne
-import neurokit2 as nk
-import numpy as np
-import pandas as pd
-import seaborn as sns
-from autoreject import AutoReject
-from IPython.display import display
-from systole.interact import Editor
-
-# %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-
-subjects = ["001", "002", "003"]  # Adjust as needed
-task = "AVR"
-
-# Only analyze one subject when debug mode is on
-debug = False
-if debug:
-    subjects = [subjects[0]]
-
-# Defne preprocessing steps to perform
-steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Averaging"]  # Adjust as needed
-# "Preprocessing EEG"
-
-# Define if plots for preprocessing steps should be shown
-show_plots = False
-
-# Define whether manual cleaning of R-peaks should be done
-manual_cleaning = False
-
-# Define whether scaling of the ECG and PPG data should be done
-scaling = True
-if scaling:
-    scale_factor = 0.01
-
-# Define power line frequency
-powerline = 50  # in Hz
-
-# Define cutoff frequencies for bandfiltering EEG data
-low_frequency = 0.1  # in Hz
-high_frequency = 45  # in Hz
-
-low_frequency_ica = 1  # in Hz
-
-# Define the percentage of bad epochs that should be tolerated
-bad_epochs_threshold = 30  # in percent
-
-# Define the artifact threshold for epochs
-artifact_threshold = 100  # in microvolts
-
-# Define if the first and last 2.5 seconds of the data should be cut off
-# To avoid any potential artifacts at the beginning and end of the experiment
-cut_off_seconds = 2.5
-
-# Specify the data path info (in BIDS format)
-# Change with the directory of data storage
-data_dir = Path("/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/")
-exp_name = "AVR"
-rawdata_name = "rawdata"  # rawdata folder
-derivative_name = "derivatives"  # derivates folder
-preprocessed_name = "preproc"  # preprocessed folder (inside derivatives)
-averaged_name = "avg"  # averaged data folder (inside preprocessed)
-datatype_name = "eeg"  # data type specification
-results_dir = Path("/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/")
-
-# Create the preprocessed data folder if it does not exist
-for subject in subjects:
-    subject_preprocessed_folder = (
-        data_dir / exp_name / derivative_name / preprocessed_name / f"sub-{subject}" / datatype_name
-    )
-    subject_preprocessed_folder.mkdir(parents=True, exist_ok=True)
-avg_preprocessed_folder = data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name
-avg_preprocessed_folder.mkdir(parents=True, exist_ok=True)
-avg_results_folder = results_dir / exp_name / averaged_name / datatype_name
-avg_results_folder.mkdir(parents=True, exist_ok=True)
-
-# Create color palette for plots
-colors = {
-    "ECG": ["#F0E442", "#D55E00"],  # yellow and dark orange
-    "PPG": ["#E69F00", "#CC79A7"],  # light orange and pink
-    "EEG": ["#56B4E9", "#0072B2", "#009E73"],  # light blue, dark blue, and green
-    "others": ["#FFFFFF", "#6C6C6C", "#000000"],  # white, gray, and black
-}
-
-# Get rid of the sometimes excessive logging of MNE
-mne.set_log_level("error")
-
-# Enable interactive plots (only works when running in interactive mode)
-# %matplotlib qt
-
-
-# %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-def plot_peaks(
-    cleaned_signal: dict | np.ndarray,
-    peaks: np.ndarray,
-    time_range: tuple[float, float],
-    plot_title: str,
-    sampling_rate: int,
-):
+def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
+            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/",
+            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/",
+            show_plots=False,
+            debug=False,
+            manual_cleaning=False):
     """
-    Plot ECG or PPG signal with peaks.
+    Preprocess physiological data for AVR phase 3.
 
-    Arguments:
-    ---------
-    cleaned_signal : dict or np.ndarray
-        The signal data to be plotted. Can be a dictionary or a NumPy ndarray.
-    peaks : np.ndarry
-        Indices of the peaks within the signal.
-    time_range : tuple
-        A tuple containing the starting and ending times (in seconds) of the interval to be plotted.
-    plot_title : str
-        The title of the plot. This argument is optional.
-    sampling_rate : int
-        The sampling rate of the signal, in Hz.
+    Inputs:     Raw EEG data in .edf files
+                ECG and PPG data in tsv.gz files
+                Event markers in tsv files
+                Event mapping in tsv files
+                BrainVision actiCap montage file ("CACS-64_REF.bvef")
+
+    Outputs:    Preprocessed data (EEG, ECG, PPG) in tsv files (ECG & PPG) and fif files (EEG, before and after ICA)
+                Participant metadata in json files
+                Excluded participants (with too many bad channels) in a list
+                Plots of preprocessing steps
+                Data of all participants concatenated in tsv files (ECG & PPG) and fif files (EEG, after ICA)
+                Averaged data over all participants in tsv files (ECG & PPG)
+
+    Functions:
+        plot_peaks(): Plot ECG or PPG signal with peaks.
+        preprocess_eeg(): Preprocess EEG data using the MNE toolbox.
+        run_ica(): Run Independent Component Analysis (ICA) on the preprocessed EEG data (in epochs).
+        ica_correlation(): Select ICA components semi-automatically using a correlation approach with eye movements
+                            and cardiac data.
+
+    Steps:
+    1. LOAD DATA
+        1a. Load EEG data
+        1b. Load ECG and PPG data
+        1c. Load event markers
+        1d. Load event mapping
+    2. PREPROCESS DATA
+        2a. Cutting data
+        2b. Format data
+        2c. Preprocess ECG and PPG data & save to tsv files
+        2d. Preprocess EEG data & save to fif files
+    3. AVERAGE OVER ALL PARTICIPANTS
+        3a. Concatenate all ECG & PPG data
+        3b. Average over all participants (ECG & PPG) & save to tsv files
 
     """
-    # Transform min_time and max_time to samples
-    min_sample = int(time_range[0] * sampling_rate)
-    max_sample = int(time_range[1] * sampling_rate)
-    # Create a time vector (samples)
-    time = np.arange(min_sample, max_sample)
-    fig, axs = plt.subplots(figsize=(15, 5))
+    # %% Import
+    import gzip
+    import json
+    import sys
+    import time
+    from pathlib import Path
 
-    # Select signal and peaks interval to plot
-    selected_signal = cleaned_signal[min_sample:max_sample]
-    selected_peaks = peaks[(peaks < max_sample) & (peaks >= min_sample)]
+    import matplotlib.pyplot as plt
+    import mne
+    import neurokit2 as nk
+    import numpy as np
+    import pandas as pd
+    import seaborn as sns
+    from autoreject import AutoReject
+    from IPython.display import display
+    from systole.interact import Editor
 
-    # Transform data from mV to V
-    selected_signal = selected_signal / 1000
+    # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
+    task = "AVR"
 
-    # Choose color palette based on the plot title
-    if "ECG" in plot_title:
-        linecolor = colors["ECG"][1]
-        circlecolor = colors["ECG"][0]
-    elif "PPG" in plot_title:
-        linecolor = colors["PPG"][1]
-        circlecolor = colors["PPG"][0]
+    # Only analyze one subject when debug mode is on
+    if debug:
+        subjects = [subjects[0]]
 
-    axs.plot(time, selected_signal, linewidth=1, label="Signal", color=linecolor)
-    axs.scatter(
-        selected_peaks,
-        selected_signal[selected_peaks - min_sample],
-        color=circlecolor,
-        edgecolor=circlecolor,
-        linewidth=1,
-        alpha=0.6,
-    )
-    axs.set_ylabel("ECG" if "ECG" in plot_title else "PPG")
-    axs.set_xlabel("Time (s)")
-    x_ticks = axs.get_xticks()
-    axs.set_xticks(x_ticks)
-    # Transform x-axis to seconds
-    axs.set_xticklabels([f"{x/sampling_rate}" for x in x_ticks])
-    if plot_title:
-        axs.set_title(plot_title)
+    # Defne preprocessing steps to perform
+    steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG", "Averaging"]  # Adjust as needed
 
-    sns.despine()
-    plt.show()
-    plt.close()
+    # Define whether scaling of the ECG and PPG data should be done
+    scaling = True
+    if scaling:
+        scale_factor = 0.01
 
+    # Define power line frequency
+    powerline = 50  # in Hz
 
-def preprocess_eeg(  # noqa: PLR0915
-    raw_data: mne.io.Raw, low_frequency: float, high_frequency: int, autoreject: bool
-):
-    """
-    Preprocess EEG data using the MNE toolbox.
+    # Define cutoff frequencies for bandfiltering EEG data
+    low_frequency = 0.1  # in Hz
+    high_frequency = 45  # in Hz
 
-    Remove Line-noise of power line, rereference to average, filter the data with a bandpass filter,
-    segment it into epochs of 10s, and use Autoreject to detect bad channels and epochs.
+    low_frequency_ica = 1  # in Hz
 
-    Arguments:
-    ---------
-    raw_data: mne.io.Raw
-        The raw EEG data to be preprocessed. This should be an instance of mne.io.Raw, which contains the EEG signal
-        data along with additional information about the recording.
-    low_frequency: float
-        Low cut-off frequency in Hz for the bandpass filter.
-    high_frequency: int
-        High cut-off frequency in Hz for the bandpass filter.
-    autoreject: bool
-        If True, autoreject is used to detect and interpolate bad channels and epochs automatically.
+    # Define the percentage of bad epochs that should be tolerated
+    bad_epochs_threshold = 30  # in percent
 
-    Returns:
-    -------
-    filtered_data: mne.io.Raw
-        The filtered raw data after preprocessing.
-    epochs: mne.epochs.Epochs
-        The segmented epochs extracted from the filtered data.
-    reject_log: autoreject.autoreject.RejectLog (if autoreject=True)
-        A log of the rejected epochs and channels.
-    """
-    # Line-noise removal
-    print("Removing line noise...")
-    raw_data_50 = raw_data.copy().notch_filter(freqs=powerline, method="spectrum_fit")
+    # Define the artifact threshold for epochs
+    artifact_threshold = 100  # in microvolts
 
-    # Rereference to average
-    print("Rereferencing to average...")
-    rereferenced_data = raw_data_50.copy().set_eeg_reference("average", projection=True)
+    # Define if the first and last 2.5 seconds of the data should be cut off
+    # To avoid any potential artifacts at the beginning and end of the experiment
+    cut_off_seconds = 2.5
 
-    # Filtering
-    print("Filtering data...")
-    filtered_data = rereferenced_data.copy().filter(l_freq=low_frequency, h_freq=high_frequency)
+    # Specify the data path info (in BIDS format)
+    # Change with the directory of data storage
+    data_dir = Path(data_dir)
+    exp_name = "AVR"
+    rawdata_name = "rawdata"  # rawdata folder
+    derivative_name = "derivatives"  # derivates folder
+    preprocessed_name = "preproc"  # preprocessed folder (inside derivatives)
+    averaged_name = "avg"  # averaged data folder (inside preprocessed)
+    datatype_name = "eeg"  # data type specification
+    results_dir = Path(results_dir)
 
-    # Segment data into epochs of 10s
-    # Even though data is continuous, it is good practice to break it into epochs
-    # before detecting bad channels and running ICA
-    print("Segmenting data into epochs...")
-    tstep = 10  # in seconds
-    events = mne.make_fixed_length_events(filtered_data, duration=tstep)
-    epochs = mne.Epochs(filtered_data, events, tmin=0, tmax=tstep, baseline=None, preload=True)
-
-    if autoreject:
-        # Pick only EEG channels for Autoreject bad channel detection
-        picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
-
-        # Use Autoreject to detect bad channels
-        # Autoreject interpolates bad channels, takes quite long and identifies a lot of epochs
-        # Here we do not remove any data, we only identify bad channels and epochs and store them in a log
-        # Define random state to ensure reproducibility
-        # Print the running time that it takes to perform Autoreject
-        start_time = time.ctime()
-        print("Detecting bad channels and epochs...")
-        print("This may take a while...")
-        print("Start time: ", start_time)
-        ar = AutoReject(random_state=42, picks=picks, n_jobs=3, verbose="progressbar")
-        ar.fit(epochs)
-        reject_log = ar.get_reject_log(epochs)
-
-        end_time = time.ctime()
-        print("Done with preprocessing and creating clean epochs at time: ", end_time)
-
-        # Convert time strings to struct_time
-        start_time_struct = time.strptime(start_time, "%a %b %d %H:%M:%S %Y")
-        end_time_struct = time.strptime(end_time, "%a %b %d %H:%M:%S %Y")
-        # Convert struct_time to epoch timestamp
-        start_timestamp = time.mktime(start_time_struct)
-        end_timestamp = time.mktime(end_time_struct)
-        # Calculate the total duration of the preprocessing
-        duration_seconds = end_timestamp - start_timestamp
-        # Convert seconds to more readable format
-        hours, remainder = divmod(duration_seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        print(f"Total duration of preprocessing: {int(minutes)} minutes, {int(seconds)} seconds")
-
-        # Get the number of bad epochs and channels
-        n_bad_epochs = np.sum(reject_log.bad_epochs)
-        n_bad_channels = np.sum(reject_log.labels == 1)
-
-        # Get the number of interpolated channels
-        n_interpolated_channels = np.sum(reject_log.labels == 2)  # noqa: PLR2004
-
-        # Get the number of all epochs and channels
-        n_epochs = len(epochs)
-        n_channels = len(reject_log.ch_names) * n_epochs
-
-        # Get the percentage of bad epochs and channels
-        perc_bad_epochs = (n_bad_epochs / n_epochs) * 100
-        perc_bad_channels = (n_bad_channels / n_channels) * 100
-
-        # Get the percentage of interpolated channels * epochs
-        perc_interpolated_channels = (n_interpolated_channels / n_channels) * 100
-
-        print(f"Number of bad epochs: {n_bad_epochs} of {n_epochs} ({perc_bad_epochs:.2f}%).")
-        print(
-            f"Number of bad channels across all epochs: {n_bad_channels} of {n_channels} ({perc_bad_channels:.2f}%)."
+    # Create the preprocessed data folder if it does not exist
+    for subject in subjects:
+        subject_preprocessed_folder = (
+            data_dir / exp_name / derivative_name / preprocessed_name / f"sub-{subject}" / datatype_name
         )
-        print(
-            "Number of interpolated channels across all epochs: "
-            f"{n_interpolated_channels} of {n_channels} ({perc_interpolated_channels:.2f}%)."
+        subject_preprocessed_folder.mkdir(parents=True, exist_ok=True)
+    avg_preprocessed_folder = data_dir / exp_name / derivative_name / preprocessed_name / averaged_name / datatype_name
+    avg_preprocessed_folder.mkdir(parents=True, exist_ok=True)
+    avg_results_folder = results_dir / exp_name / averaged_name / datatype_name
+    avg_results_folder.mkdir(parents=True, exist_ok=True)
+
+    # Create color palette for plots
+    colors = {
+        "ECG": ["#F0E442", "#D55E00"],  # yellow and dark orange
+        "PPG": ["#E69F00", "#CC79A7"],  # light orange and pink
+        "EEG": ["#56B4E9", "#0072B2", "#009E73"],  # light blue, dark blue, and green
+        "others": ["#FFFFFF", "#6C6C6C", "#000000"],  # white, gray, and black
+    }
+
+    # Get rid of the sometimes excessive logging of MNE
+    mne.set_log_level("error")
+
+    # Enable interactive plots (only works when running in interactive mode)
+    # %matplotlib qt
+
+
+    # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+    def plot_peaks(
+        cleaned_signal: dict | np.ndarray,
+        peaks: np.ndarray,
+        time_range: tuple[float, float],
+        plot_title: str,
+        sampling_rate: int,
+    ):
+        """
+        Plot ECG or PPG signal with peaks.
+
+        Arguments:
+        ---------
+        cleaned_signal : dict or np.ndarray
+            The signal data to be plotted. Can be a dictionary or a NumPy ndarray.
+        peaks : np.ndarry
+            Indices of the peaks within the signal.
+        time_range : tuple
+            A tuple containing the starting and ending times (in seconds) of the interval to be plotted.
+        plot_title : str
+            The title of the plot. This argument is optional.
+        sampling_rate : int
+            The sampling rate of the signal, in Hz.
+
+        """
+        # Transform min_time and max_time to samples
+        min_sample = int(time_range[0] * sampling_rate)
+        max_sample = int(time_range[1] * sampling_rate)
+        # Create a time vector (samples)
+        time = np.arange(min_sample, max_sample)
+        fig, axs = plt.subplots(figsize=(15, 5))
+
+        # Select signal and peaks interval to plot
+        selected_signal = cleaned_signal[min_sample:max_sample]
+        selected_peaks = peaks[(peaks < max_sample) & (peaks >= min_sample)]
+
+        # Transform data from mV to V
+        selected_signal = selected_signal / 1000
+
+        # Choose color palette based on the plot title
+        if "ECG" in plot_title:
+            linecolor = colors["ECG"][1]
+            circlecolor = colors["ECG"][0]
+        elif "PPG" in plot_title:
+            linecolor = colors["PPG"][1]
+            circlecolor = colors["PPG"][0]
+
+        axs.plot(time, selected_signal, linewidth=1, label="Signal", color=linecolor)
+        axs.scatter(
+            selected_peaks,
+            selected_signal[selected_peaks - min_sample],
+            color=circlecolor,
+            edgecolor=circlecolor,
+            linewidth=1,
+            alpha=0.6,
         )
-        if perc_bad_epochs > bad_epochs_threshold or perc_bad_channels > bad_epochs_threshold:
+        axs.set_ylabel("ECG" if "ECG" in plot_title else "PPG")
+        axs.set_xlabel("Time (s)")
+        x_ticks = axs.get_xticks()
+        axs.set_xticks(x_ticks)
+        # Transform x-axis to seconds
+        axs.set_xticklabels([f"{x/sampling_rate}" for x in x_ticks])
+        if plot_title:
+            axs.set_title(plot_title)
+
+        sns.despine()
+        plt.show()
+        plt.close()
+
+
+    def preprocess_eeg(  # noqa: PLR0915
+        raw_data: mne.io.Raw, low_frequency: float, high_frequency: int, autoreject: bool
+    ):
+        """
+        Preprocess EEG data using the MNE toolbox.
+
+        Remove Line-noise of power line, rereference to average, filter the data with a bandpass filter,
+        segment it into epochs of 10s, and use Autoreject to detect bad channels and epochs.
+
+        Arguments:
+        ---------
+        raw_data: mne.io.Raw
+            The raw EEG data to be preprocessed. This should be an instance of mne.io.Raw, which contains the EEG
+            signal data along with additional information about the recording.
+        low_frequency: float
+            Low cut-off frequency in Hz for the bandpass filter.
+        high_frequency: int
+            High cut-off frequency in Hz for the bandpass filter.
+        autoreject: bool
+            If True, autoreject is used to detect and interpolate bad channels and epochs automatically.
+
+        Returns:
+        -------
+        filtered_data: mne.io.Raw
+            The filtered raw data after preprocessing.
+        epochs: mne.epochs.Epochs
+            The segmented epochs extracted from the filtered data.
+        reject_log: autoreject.autoreject.RejectLog (if autoreject=True)
+            A log of the rejected epochs and channels.
+        """
+        # Line-noise removal
+        print("Removing line noise...")
+        raw_data_50 = raw_data.copy().notch_filter(freqs=powerline, method="spectrum_fit")
+
+        # Rereference to average
+        print("Rereferencing to average...")
+        rereferenced_data = raw_data_50.copy().set_eeg_reference("average", projection=True)
+
+        # Filtering
+        print("Filtering data...")
+        filtered_data = rereferenced_data.copy().filter(l_freq=low_frequency, h_freq=high_frequency)
+
+        # Segment data into epochs of 10s
+        # Even though data is continuous, it is good practice to break it into epochs
+        # before detecting bad channels and running ICA
+        print("Segmenting data into epochs...")
+        tstep = 10  # in seconds
+        events = mne.make_fixed_length_events(filtered_data, duration=tstep)
+        epochs = mne.Epochs(filtered_data, events, tmin=0, tmax=tstep, baseline=None, preload=True)
+
+        if autoreject:
+            # Pick only EEG channels for Autoreject bad channel detection
+            picks = mne.pick_types(epochs.info, eeg=True, eog=False, ecg=False)
+
+            # Use Autoreject to detect bad channels
+            # Autoreject interpolates bad channels, takes quite long and identifies a lot of epochs
+            # Here we do not remove any data, we only identify bad channels and epochs and store them in a log
+            # Define random state to ensure reproducibility
+            # Print the running time that it takes to perform Autoreject
+            start_time = time.ctime()
+            print("Detecting bad channels and epochs...")
+            print("This may take a while...")
+            print("Start time: ", start_time)
+            ar = AutoReject(random_state=42, picks=picks, n_jobs=3, verbose="progressbar")
+            ar.fit(epochs)
+            reject_log = ar.get_reject_log(epochs)
+
+            end_time = time.ctime()
+            print("Done with preprocessing and creating clean epochs at time: ", end_time)
+
+            # Convert time strings to struct_time
+            start_time_struct = time.strptime(start_time, "%a %b %d %H:%M:%S %Y")
+            end_time_struct = time.strptime(end_time, "%a %b %d %H:%M:%S %Y")
+            # Convert struct_time to epoch timestamp
+            start_timestamp = time.mktime(start_time_struct)
+            end_timestamp = time.mktime(end_time_struct)
+            # Calculate the total duration of the preprocessing
+            duration_seconds = end_timestamp - start_timestamp
+            # Convert seconds to more readable format
+            hours, remainder = divmod(duration_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            print(f"Total duration of preprocessing: {int(minutes)} minutes, {int(seconds)} seconds")
+
+            # Get the number of bad epochs and channels
+            n_bad_epochs = np.sum(reject_log.bad_epochs)
+            n_bad_channels = np.sum(reject_log.labels == 1)
+
+            # Get the number of interpolated channels
+            n_interpolated_channels = np.sum(reject_log.labels == 2)  # noqa: PLR2004
+
+            # Get the number of all epochs and channels
+            n_epochs = len(epochs)
+            n_channels = len(reject_log.ch_names) * n_epochs
+
+            # Get the percentage of bad epochs and channels
+            perc_bad_epochs = (n_bad_epochs / n_epochs) * 100
+            perc_bad_channels = (n_bad_channels / n_channels) * 100
+
+            # Get the percentage of interpolated channels * epochs
+            perc_interpolated_channels = (n_interpolated_channels / n_channels) * 100
+
+            print(f"Number of bad epochs: {n_bad_epochs} of {n_epochs} ({perc_bad_epochs:.2f}%).")
             print(
-                f"WARNING! More than {bad_epochs_threshold}% of epochs or channels are bad."
-                "Excluding the participant is recommended."
+                f"Number of bad channels across all epochs: {n_bad_channels} of {n_channels}"
+                "({perc_bad_channels:.2f}%)."
             )
+            print(
+                "Number of interpolated channels across all epochs: "
+                f"{n_interpolated_channels} of {n_channels} ({perc_interpolated_channels:.2f}%)."
+            )
+            if perc_bad_epochs > bad_epochs_threshold or perc_bad_channels > bad_epochs_threshold:
+                print(
+                    f"WARNING! More than {bad_epochs_threshold}% of epochs or channels are bad."
+                    "Excluding the participant is recommended."
+                )
 
-        answer = input("Do you want to exclude this participant? (Y/n): ")
-        if answer == "Y":
-            exclude = True
-            print("Participant will be added to the list of excluded participants.")
-        else:
-            exclude = False
-            print("Participant will not be excluded.")
+            answer = input("Do you want to exclude this participant? (Y/n): ")
+            if answer == "Y":
+                exclude = True
+                print("Participant will be added to the list of excluded participants.")
+            else:
+                exclude = False
+                print("Participant will not be excluded.")
 
-        print("Continuing with the preprocessing...")
+            print("Continuing with the preprocessing...")
 
-    return filtered_data, epochs, (reject_log if autoreject else None), (exclude if autoreject else None)
-
-
-def run_ica(epochs: mne.epochs.Epochs, rejected_epochs: np.array):
-    """
-    Run Independent Component Analysis (ICA) on the preprocessed EEG data (in epochs).
-
-    Arguments:
-    ---------
-    epochs: mne.epochs.Epochs
-        The epochs on which ICA will be run. This should be the output from the preprocess_eeg().
-    rejected_epochs: np.array
-        An array of indices for epochs that have been marked as bad and should be excluded from the ICA.
-
-    Returns:
-    -------
-    ica: mne.preprocessing.ICA
-        The ICA object after fitting it to the epochs data, excluding the rejected epochs.
-    ica_n_components: float
-    n_components: int
-    """
-    # Set ICA parameters
-    random_state = 42  # ensures ICA is reproducible each time it's run
-    ica_n_components = 0.99  # Specify n_components as a decimal to set % explained variance
-
-    # Fit ICA
-    print("Fitting ICA...")
-    ica = mne.preprocessing.ICA(n_components=ica_n_components, random_state=random_state)
-    ica.fit(epochs[~rejected_epochs], decim=3)  # decim reduces the number of time points to speed up computation
-    print("Done with ICA.")
-
-    # Get the number of components
-    n_components = ica.n_components_
-
-    print(f"{n_components} components were found to explain {ica_n_components * 100}% of the variance.")
-
-    return ica, ica_n_components, n_components
+        return filtered_data, epochs, (reject_log if autoreject else None), (exclude if autoreject else None)
 
 
-def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
-    """
-    Select ICA components semi-automatically using a correlation approach.
+    def run_ica(epochs: mne.epochs.Epochs, rejected_epochs: np.array):
+        """
+        Run Independent Component Analysis (ICA) on the preprocessed EEG data (in epochs).
 
-    Arguments:
-    ---------
-    ica: mne.preprocessing.ICA
-        The ICA object containing the components to be examined. This should be the output from run_ica().
-    epochs: mne.epochs.Epochs
-        The epochs data (1 Hz) used for correlating with the ICA components.
-        This should be the output from preprocess_eeg().
+        Arguments:
+        ---------
+        epochs: mne.epochs.Epochs
+            The epochs on which ICA will be run. This should be the output from the preprocess_eeg().
+        rejected_epochs: np.array
+            An array of indices for epochs that have been marked as bad and should be excluded from the ICA.
 
-    Returns:
-    -------
-    ica: mne.preprocessing.ICA
-        The ICA object with the bad components marked for exclusion.
-    eog_indices: list
-        Indices of the ICA components identified as related to eye movements.
-    eog_scores: list
-        Correlation scores for the eye movement components.
-    ecg_indices: list
-        Indices of the ICA components identified as related to cardiac activity.
-    ecg_scores: list
-        Correlation scores for the cardiac components.
-    emg_indices: list
-        Indices of the ICA components identified as related to muscle activity.
-    emg_scores: list
-        Correlation scores for the muscle activity components.
-    """
-    # Create list of components to exclude
-    ica.exclude = []
+        Returns:
+        -------
+        ica: mne.preprocessing.ICA
+            The ICA object after fitting it to the epochs data, excluding the rejected epochs.
+        ica_n_components: float
+        n_components: int
+        """
+        # Set ICA parameters
+        random_state = 42  # ensures ICA is reproducible each time it's run
+        ica_n_components = 0.99  # Specify n_components as a decimal to set % explained variance
 
-    # Correlate with EOG channels
-    print("Correlating ICs with EOG channels...")
-    eog_indices, eog_scores = ica.find_bads_eog(epochs, ch_name=eog_channels, threshold="auto", measure="zscore")
-    print("Number of EOG components identified: " + str(len(eog_indices)))
+        # Fit ICA
+        print("Fitting ICA...")
+        ica = mne.preprocessing.ICA(n_components=ica_n_components, random_state=random_state)
+        ica.fit(epochs[~rejected_epochs], decim=3)  # decim reduces the number of time points to speed up computation
+        print("Done with ICA.")
 
-    # Correlate with ECG channels
-    print("Correlating ICs with ECG channels...")
-    ecg_indices, ecg_scores = ica.find_bads_ecg(
-        epochs, ch_name="ECG", method="correlation", measure="zscore", threshold="auto"
-    )
-    print("Number of ECG components identified: " + str(len(ecg_indices)))
+        # Get the number of components
+        n_components = ica.n_components_
 
-    # Correlate with muscle ativity
-    print("Correlating ICs with muscle activity...")
-    emg_indices, emg_scores = ica.find_bads_muscle(epochs, threshold=0.8)
-    print("Number of muscle components identified: " + str(len(emg_indices)))
+        print(f"{n_components} components were found to explain {ica_n_components * 100}% of the variance.")
 
-    # Assign the bad EOG components to the ICA.exclude attribute so they can be removed later
-    ica.exclude = eog_indices + ecg_indices + emg_indices
-    print("Correlation done.")
-
-    return ica, eog_indices, eog_scores, ecg_indices, ecg_scores, emg_indices, emg_scores
+        return ica, ica_n_components, n_components
 
 
-# %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+    def ica_correlation(ica: mne.preprocessing.ICA, epochs: mne.epochs.Epochs):
+        """
+        Select ICA components semi-automatically using a correlation approach.
 
-# %% STEP 1. LOAD DATA
-if __name__ == "__main__":
+        Arguments:
+        ---------
+        ica: mne.preprocessing.ICA
+            The ICA object containing the components to be examined. This should be the output from run_ica().
+        epochs: mne.epochs.Epochs
+            The epochs data (1 Hz) used for correlating with the ICA components.
+            This should be the output from preprocess_eeg().
+
+        Returns:
+        -------
+        ica: mne.preprocessing.ICA
+            The ICA object with the bad components marked for exclusion.
+        eog_indices: list
+            Indices of the ICA components identified as related to eye movements.
+        eog_scores: list
+            Correlation scores for the eye movement components.
+        ecg_indices: list
+            Indices of the ICA components identified as related to cardiac activity.
+        ecg_scores: list
+            Correlation scores for the cardiac components.
+        emg_indices: list
+            Indices of the ICA components identified as related to muscle activity.
+        emg_scores: list
+            Correlation scores for the muscle activity components.
+        """
+        # Create list of components to exclude
+        ica.exclude = []
+
+        # Correlate with EOG channels
+        print("Correlating ICs with EOG channels...")
+        eog_indices, eog_scores = ica.find_bads_eog(epochs, ch_name=eog_channels, threshold="auto", measure="zscore")
+        print("Number of EOG components identified: " + str(len(eog_indices)))
+
+        # Correlate with ECG channels
+        print("Correlating ICs with ECG channels...")
+        ecg_indices, ecg_scores = ica.find_bads_ecg(
+            epochs, ch_name="ECG", method="correlation", measure="zscore", threshold="auto"
+        )
+        print("Number of ECG components identified: " + str(len(ecg_indices)))
+
+        # Correlate with muscle ativity
+        print("Correlating ICs with muscle activity...")
+        emg_indices, emg_scores = ica.find_bads_muscle(epochs, threshold=0.8)
+        print("Number of muscle components identified: " + str(len(emg_indices)))
+
+        # Assign the bad EOG components to the ICA.exclude attribute so they can be removed later
+        ica.exclude = eog_indices + ecg_indices + emg_indices
+        print("Correlation done.")
+
+        return ica, eog_indices, eog_scores, ecg_indices, ecg_scores, emg_indices, emg_scores
+
+
+    # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
+
+    # %% STEP 1. LOAD DATA
     # Initialize list to store data of all participants
     list_data_all = {"ECG": [], "PPG": [], "EEG": []}
 
@@ -1509,4 +1510,10 @@ if __name__ == "__main__":
 
         plt.close()
 
-# %%
+# %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+if __name__ == "__main__":
+    # Run the main function
+    preprocess_physiological()
+
+# o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END
+
