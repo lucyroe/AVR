@@ -1,9 +1,9 @@
 """
 Main module for AVR project.
 
-Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys
-                    mne, neurokit2, systole, autoreject
-                    fcwt, scipy, foof
+Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
+                    mne, neurokit2, systole, autoreject,
+                    fcwt, scipy, foof, statsmodels,
                     matplotlib, seaborn, IPython
 
 Author: Lucy Roellecke
@@ -25,6 +25,8 @@ def main():
         3. Extract features: Extract features from the physiological data.
     """
     # %% Import
+    from AVR.datacomparison.compare_variability_phase1_phase3 import compare_variability_phase1_phase3
+    from AVR.datavisualization.raincloud_plot import raincloud_plot
     from AVR.preprocessing.annotation.preprocessing_annotation_avr_phase3 import preprocess_annotations
     from AVR.preprocessing.physiological.feature_extraction import extract_features
     from AVR.preprocessing.physiological.preprocessing_physiological_avr_phase3 import (
@@ -33,14 +35,22 @@ def main():
     from AVR.preprocessing.read_xdf import read_xdf
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Load data", "Preprocess data", "Extract features"]    # Adjust as needed
+    steps = ["Descriptive Statistics"]    # Adjust as needed
+    # "Load data", "Preprocess data", "Extract features",
 
     subjects = ["001", "002", "003"]  # Adjust as needed
 
+    # Only needed for comparison of phase 3 with phase 1
+    subjects_phase1 = ["06", "08", "10", "12", "14", "16", "18", "19", "20",
+                        "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
+                        "31", "32", "33", "34", "35", "36", "37", "38", "39", "40",
+                        "41", "42", "43", "44", "45", "46", "47", "48", "49", "51",
+                        "53", "55", "57", "59", "61", "63", "65", "67", "69", "71", "73", "75"]
+
     # Specify the data path info (in BIDS format)
     # change with the directory of data storage
-    data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/"
-    results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/"
+    data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
+    results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"
 
     # Define if plots should be shown
     show_plots = False
@@ -68,6 +78,13 @@ def main():
 
         elif step == "Extract features":
             extract_features(subjects, data_dir, results_dir, show_plots, debug)
+
+        elif step == "Descriptive Statistics":
+            # TODO: this is not working yet
+            print("\nPerforming statistical comparison of variability between phase 1 and phase 3...\n")
+            compare_variability_phase1_phase3(subjects, subjects_phase1, data_dir, results_dir, show_plots)
+            print("\nCreating raincloud plots to compare variability between phase 1 and phase 3...\n")
+            raincloud_plot(data_dir, results_dir, show_plots)
 
         else:
             print(f"Step {step} not found")

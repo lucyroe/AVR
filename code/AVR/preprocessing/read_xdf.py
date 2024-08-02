@@ -10,8 +10,8 @@ Last update: 1 August 2024
 """
 
 def read_xdf(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
-            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/",
-            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/",
+            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
+            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
             show_plots=False,
             debug=False):
     """
@@ -68,8 +68,8 @@ def read_xdf(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
     if debug:
         subjects = [subjects[0]]
 
-    data_dir = Path(data_dir)
-    results_dir = Path(results_dir)
+    data_dir = Path(data_dir) / "phase3"
+    results_dir = Path(results_dir) / "phase3"
     exp_name = "AVR"
     sourcedata_name = "sourcedata"  # sourcedata folder
     rawdata_name = "rawdata"  # rawdata folder

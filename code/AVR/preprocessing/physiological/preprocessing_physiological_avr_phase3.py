@@ -10,8 +10,8 @@ Last update: 1 August 2024
 """
 
 def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
-            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/",
-            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/",
+            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
+            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
             show_plots=False,
             debug=False,
             manual_cleaning=False):
@@ -107,14 +107,14 @@ def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912,
 
     # Specify the data path info (in BIDS format)
     # Change with the directory of data storage
-    data_dir = Path(data_dir)
+    data_dir = Path(data_dir) / "phase3"
     exp_name = "AVR"
     rawdata_name = "rawdata"  # rawdata folder
     derivative_name = "derivatives"  # derivates folder
     preprocessed_name = "preproc"  # preprocessed folder (inside derivatives)
     averaged_name = "avg"  # averaged data folder (inside preprocessed)
     datatype_name = "eeg"  # data type specification
-    results_dir = Path(results_dir)
+    results_dir = Path(results_dir) / "phase3"
 
     # Create the preprocessed data folder if it does not exist
     for subject in subjects:

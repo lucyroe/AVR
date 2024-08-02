@@ -10,8 +10,8 @@ Last update: 1 August 2024
 """
 
 def extract_features(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
-            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/phase3/",
-            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/phase3/",
+            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
+            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
             show_plots=False,
             debug=False):
     """
@@ -65,14 +65,14 @@ def extract_features(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
     # Define which steps to run
     steps = ["Load Data", "Feature Extraction ECG", "Feature Extraction EEG"]
 
-    data_dir = Path(data_dir)
+    data_dir = Path(data_dir) / "phase3"
     exp_name = "AVR"
     derivative_name = "derivatives"  # derivates folder
     preprocessed_name = "preproc"  # preprocessed folder (inside derivatives)
     averaged_name = "avg"  # averaged data folder (inside preprocessed)
     feature_name = "features"  # feature extraction folder (inside derivatives)
     datatype_name = "eeg"  # data type specification
-    results_dir = Path(results_dir)
+    results_dir = Path(results_dir) / "phase3"
 
     # Create the features data folder if it does not exist
     for subject in subjects:
