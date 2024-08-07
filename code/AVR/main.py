@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 1 August 2024
+Last update: 7 August 2024
 """
 
 def main():
@@ -35,8 +35,8 @@ def main():
     from AVR.preprocessing.read_xdf import read_xdf
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Descriptive Statistics"]    # Adjust as needed
-    # "Load data", "Preprocess data", "Extract features",
+    steps = []    # Adjust as needed
+    # "Load data", "Preprocess data", "Extract features", "Descriptive Statistics", "Plot results"
 
     subjects = ["001", "002", "003"]  # Adjust as needed
 
@@ -80,10 +80,12 @@ def main():
             extract_features(subjects, data_dir, results_dir, show_plots, debug)
 
         elif step == "Descriptive Statistics":
-            # TODO: this is not working yet
             print("\nPerforming statistical comparison of variability between phase 1 and phase 3...\n")
             compare_variability_phase1_phase3(subjects, subjects_phase1, data_dir, results_dir, show_plots)
             print("\nCreating raincloud plots to compare variability between phase 1 and phase 3...\n")
+
+        elif step == "Plot results":
+            print("\nPlotting results...\n")
             raincloud_plot(data_dir, results_dir, show_plots)
 
         else:

@@ -1,0 +1,21 @@
+	Group	Variable	Statistic	Samples	p-value	Significance
+0	phase1 HP	mean valence	0.88	51	0.0	True
+1	phase1 HP	std_dev valence	0.98	51	0.364	False
+2	phase1 HP	mean arousal	0.87	51	0.0	True
+3	phase1 HP	std_dev arousal	0.95	51	0.045	True
+4	phase1 HN	mean valence	0.74	51	0.0	True
+5	phase1 HN	std_dev valence	0.98	51	0.621	False
+6	phase1 HN	mean arousal	0.92	51	0.003	True
+7	phase1 HN	std_dev arousal	0.95	51	0.037	True
+8	phase1 LP	mean valence	0.75	51	0.0	True
+9	phase1 LP	std_dev valence	0.95	51	0.028	True
+10	phase1 LP	mean arousal	0.8	51	0.0	True
+11	phase1 LP	std_dev arousal	0.96	51	0.071	False
+12	phase1 LN	mean valence	0.96	51	0.102	False
+13	phase1 LN	std_dev valence	0.98	51	0.39	False
+14	phase1 LN	mean arousal	0.74	51	0.0	True
+15	phase1 LN	std_dev arousal	0.94	51	0.011	True
+16	phase3	mean valence	0.81	3	0.14	False
+17	phase3	std_dev valence	0.94	3	0.511	False
+18	phase3	mean arousal	0.85	3	0.237	False
+19	phase3	std_dev arousal	0.96	3	0.594	False

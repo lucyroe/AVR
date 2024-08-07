@@ -4,7 +4,7 @@ Plotting raincloud plot to compare the variability between AVR phase 1 and phase
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 21 May 2024
-Last updated: 1 August 2024
+Last updated: 7 August 2024
 """
 
 
@@ -34,15 +34,14 @@ def raincloud_plot(  # noqa: C901, PLR0915
     phases = ["phase1", "phase3"]  # Phases for which the raincloud plot should be plotted
 
     # Path where results should be saved
-    results_dir_comparison = results_dir / f"comparison_{phases[0]}_{phases[1]}"
+    results_dir_comparison = Path(results_dir) / f"comparison_{phases[0]}_{phases[1]}"
 
     variable_names = ["valence", "arousal"]
     statistics = ["mean", "std_dev"]  # statistics for which the raincloud plot should be plotted
-    statistic_names = {"mean": "Mean", "std_dev": "Standard Deviation"}
 
     # Colors
     colors = {
-        "valence": ["#56B4E9", "#0072B2", "#6C6C6C", "CC79A7", "#009E73"],  # light blue, dark blue, grey, pink, green
+        "valence": ["#56B4E9", "#0072B2", "#6C6C6C", "#CC79A7", "#009E73"],  # light blue, dark blue, grey, pink, green
         "arousal": [
             "#F0E442",
             "#E69F00",
@@ -78,11 +77,11 @@ def raincloud_plot(  # noqa: C901, PLR0915
         None.
         """
         # Divide data for each part of the plot
-        data_phase1_hn = data[(data["phase"] == "phase1") & (data["quadrant"] == "HN")][f"{statistic}_{variable}"]
-        data_phase1_hp = data[(data["phase"] == "phase1") & (data["quadrant"] == "HP")][f"{statistic}_{variable}"]
-        data_phase1_ln = data[(data["phase"] == "phase1") & (data["quadrant"] == "LN")][f"{statistic}_{variable}"]
-        data_phase1_lp = data[(data["phase"] == "phase1") & (data["quadrant"] == "LP")][f"{statistic}_{variable}"]
-        data_other_phase = data[data["phase"] == phases[1]][f"{statistic}_{variable}"]
+        data_phase1_hn = data[data["group"] == "phase1 HN"][f"{statistic}_{variable}"]
+        data_phase1_hp = data[data["group"] == "phase1 HP"][f"{statistic}_{variable}"]
+        data_phase1_ln = data[data["group"] == "phase1 LN"][f"{statistic}_{variable}"]
+        data_phase1_lp = data[data["group"] == "phase1 LP"][f"{statistic}_{variable}"]
+        data_other_phase = data[data["group"] == phases[1]][f"{statistic}_{variable}"]
 
         # Combine data for all phases in a list
         data_list = [data_phase1_hn, data_phase1_hp, data_phase1_ln, data_phase1_lp, data_other_phase]
@@ -128,8 +127,8 @@ def raincloud_plot(  # noqa: C901, PLR0915
 
         # Set labels
         plt.xticks([1, 2, 3, 4, 5], ["Phase 1 HN", "Phase 1 HP", "Phase 1 LN", "Phase 1 LP", "Phase 3"])
-        plt.ylabel(f"{statistic_names[statistic]} of {variable}")
-        plt.title(f"Comparison of the {statistic_names[statistic]} of {variable} for Phase 1 and Phase 3")
+        plt.ylabel(f"{statistic} of {variable}")
+        plt.title(f"Comparison of the {statistic} of {variable} for Phase 1 and Phase 3")
 
         if mark_significant_differences:
             # Mark significant differences with an asterisk and a line above the two groups
@@ -188,7 +187,8 @@ def raincloud_plot(  # noqa: C901, PLR0915
     combined_data = pd.DataFrame()
     # Loop over phases and read in dataframes
     for phase in phases:
-        file_directory = data_dir / phase if phase == "phase1" else data_dir / phase / "AVR" / "derivatives"
+        file_directory = (Path(data_dir) / phase / "preprocessed" / "annotations" if phase == "phase1"
+            else Path(data_dir) / phase / "AVR" / "derivatives" / "preproc")
         data = pd.read_csv(file_directory / f"stats_{phase}.tsv", sep="\t")
         # Append data to combined_data
         combined_data = combined_data._append(data)
@@ -208,7 +208,7 @@ def raincloud_plot(  # noqa: C901, PLR0915
             if mark_significant_differences:
                 # Get significant differences for the current variable and statistic
                 significant_differences_current = significant_differences_dataframe[
-                    significant_differences_dataframe["Variable"] == f"{variable} {statistic_names[statistic]}"
+                    significant_differences_dataframe["Variable"] == f"{variable} {statistic}"
                 ]
                 # Put the significant differences in a list (pairs of groups)
                 significant_differences = [
@@ -232,7 +232,7 @@ def raincloud_plot(  # noqa: C901, PLR0915
             # Save figure
             figure.savefig(
                 Path(results_dir_comparison)
-                / f"raincloud_{phases[0]}_{phases[1]}_{statistic_names[statistic]}_{variable}.png"
+                / f"raincloud_{phases[0]}_{phases[1]}_{statistic}_{variable}.png"
             )
 
 
