@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 7 August 2024
+Last update: 8 August 2024
 """
 
 def main():
@@ -23,6 +23,9 @@ def main():
         1. Load data: Load the data from the data directory.
         2. Preprocess data: Preprocess the data, including annotations and physiological data.
         3. Extract features: Extract features from the physiological data.
+        4. Univariate statistics: Perform univariate statistical analysis.
+        5. Modelling: Perform Hidden Markov Model (HMM) analysis.
+        6. Plot results: Plot the results of the analysis.
     """
     # %% Import
     from AVR.datacomparison.compare_variability_phase1_phase3 import compare_variability_phase1_phase3
@@ -35,10 +38,16 @@ def main():
     from AVR.preprocessing.read_xdf import read_xdf
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = []    # Adjust as needed
-    # "Load data", "Preprocess data", "Extract features", "Descriptive Statistics", "Plot results"
+    steps = ["Preprocess data"]    # Adjust as needed
+    # "Load data", "Extract features", "Univariate statistics", "Modelling", "Plot results"
 
-    subjects = ["001", "002", "003"]  # Adjust as needed
+    subjects = ["001", "002", "003","004", "005"]
+    #"006", "007", "009",
+                #"011", "012", "014", "015", "016", "017", "018", "019", "020",
+                #"021", "022", "023", "024", "025", "026", "027", "028", "029", "030",
+                #"031", "032", "033", "034", "035", "036", "037", "038", "039", "040",
+                #"041", "042", "043", "044", "045", "046", "047"]
+    # subjects "008", "010", "013" were excluded due to missing data
 
     # Only needed for comparison of phase 3 with phase 1
     subjects_phase1 = ["06", "08", "10", "12", "14", "16", "18", "19", "20",
@@ -53,10 +62,10 @@ def main():
     results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"
 
     # Define if plots should be shown
-    show_plots = False
+    show_plots = True
 
     # Define whether manual cleaning of the data is required (cleaning of R-peaks for ECG data)
-    manual_cleaning = False
+    manual_cleaning = True
 
     # Only analyze one subject when debug mode is on
     debug = False
@@ -79,14 +88,17 @@ def main():
         elif step == "Extract features":
             extract_features(subjects, data_dir, results_dir, show_plots, debug)
 
-        elif step == "Descriptive Statistics":
+        elif step == "Univariate statistics":
             print("\nPerforming statistical comparison of variability between phase 1 and phase 3...\n")
             compare_variability_phase1_phase3(subjects, subjects_phase1, data_dir, results_dir, show_plots)
-            print("\nCreating raincloud plots to compare variability between phase 1 and phase 3...\n")
 
         elif step == "Plot results":
             print("\nPlotting results...\n")
+            print("\nCreating raincloud plots to compare variability between phase 1 and phase 3...\n")
             raincloud_plot(data_dir, results_dir, show_plots)
+
+        elif step == "Modelling":
+            print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
 
         else:
             print(f"Step {step} not found")

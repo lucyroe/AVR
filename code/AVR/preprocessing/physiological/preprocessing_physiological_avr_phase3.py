@@ -6,15 +6,15 @@ Required packages: mne, neurokit, systole, seaborn, autoreject
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 1 August 2024
+Last update: 8 August 2024
 """
-
-def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
+#%%
+def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
             data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
             results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
-            show_plots=False,
+            show_plots=True,
             debug=False,
-            manual_cleaning=False):
+            manual_cleaning=True):
     """
     Preprocess physiological data for AVR phase 3.
 
@@ -316,7 +316,7 @@ def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912,
             print(f"Number of bad epochs: {n_bad_epochs} of {n_epochs} ({perc_bad_epochs:.2f}%).")
             print(
                 f"Number of bad channels across all epochs: {n_bad_channels} of {n_channels}"
-                "({perc_bad_channels:.2f}%)."
+                f"({perc_bad_channels:.2f}%)."
             )
             print(
                 "Number of interpolated channels across all epochs: "
@@ -741,7 +741,7 @@ def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912,
                 print("Loading corrected R-peaks and PPG-peaks...")
                 # Load corrected R-peaks
                 with ecg_corr_fpath.open("r") as f:
-                    corrected_rpeaks = f.read()
+                    corrected_rpeaks = json.load(f)
                 # Load corrected PPG-peaks
                 with ppg_corr_fpath.open("r") as f:
                     corrected_ppg_peaks = json.load(f)
@@ -947,26 +947,27 @@ def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912,
 
             # Artifact rejection with ICA using run_ica function
             print("Running ICA for artifact rejection...")
-            ica, ica_variance, ica_n_components = run_ica(epochs_ica, reject_log_ica.bad_epochs)
+            ica_all, ica_variance, ica_n_components = run_ica(epochs_ica, reject_log_ica.bad_epochs)
 
             # Semi-automatic selection of ICA components using ica_correlation function
             # Correlates ICA components with EOG, ECG and muscle data
             print("Selecting ICA components semi-automatically...")
             ica, eog_indices, eog_scores, ecg_indices, ecg_scores, emg_indices, emg_scores = ica_correlation(
-                ica, epochs_ica
+                ica_all, epochs_ica
             )
 
-            other_components = set(ica.exclude)
+            # Get remaining components
+            list_all_components = list(range(ica_all.n_components_))
+            other_components = set(list_all_components)
             for sublist in [eog_indices, ecg_indices, emg_indices]:
                 other_components -= set(sublist)
-            list_other_components = list(other_components)
+            list_remaining_components = list(other_components)
 
             # Number of components identified automatically
             print(f"Number of components identified automatically: {len(ica.exclude)} (out of {ica.n_components_}).")
             print(
                 f"Components identified automatically: {ica.exclude} ({len(eog_indices)} EOG components, "
-                f"{len(ecg_indices)} ECG components, {len(emg_indices)} EMG components, "
-                f"{len(list_other_components)} other components)."
+                f"{len(ecg_indices)} ECG components, {len(emg_indices)} EMG components)."
             )
 
             # Plot components (with properties)
@@ -1011,17 +1012,18 @@ def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912,
                     plt.show()
                 plt.close()
 
-            if list_other_components != []:
-                # Combine all other components plots into one figure
-                fig, axs = plt.subplots(len(list_other_components), 5, figsize=(30, len(list_other_components) * 4))
-                for index, component in enumerate(list_other_components):
-                    ica.plot_properties(filtered_data_ica, picks=component, show=False, axes=axs[index])
-                fig.suptitle(f"Other components for subject {subject}", fontsize=16)
-                # Save plot to results directory
-                fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_other_components.png")
-                if show_plots:
-                    plt.show()
-                plt.close()
+
+            # Plot remaining ICA components
+            fig, axs = plt.subplots(len(list_remaining_components), 5,
+                figsize=(30, (len(list_remaining_components) * 4)))
+            for index, component in enumerate(list_remaining_components):
+                ica.plot_properties(filtered_data_ica, picks=component, show=False, axes=axs[index])
+            fig.suptitle(f"Remaining ICA components for subject {subject}", fontsize=16)
+            # Save plot to results directory
+            fig.savefig(subject_results_folder / f"sub-{subject}_task-{task}_remaining_components.png")
+            if show_plots:
+                plt.show()
+            plt.close()
 
             # Manual rejection of components
             answer = input("Do you want to remove any of the automatically identified components? (Y/n): ")
@@ -1065,39 +1067,34 @@ def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912,
                     emg_indices = list(emg_indices)
                     print(f"EMG components {manual_rejection_emg} removed from list of components.")
 
-                print("Other components identified: " + str(list_other_components))
-                remove = input("Do you want to remove any of the other components? (Y/n): ")
-                if remove == "Y":
-                    manual_rejection_other = input(
-                        "Enter the indices of the other components you want to remove (separated by commas): "
+            print("Remaining components not identified by the correlation approach: " + str(list_remaining_components))
+            remove = input("Do you want to add any of the remaining components to the list of rejected components? (Y/n): ")
+            if remove == "Y":
+                manual_rejection_other = input(
+                    "Enter the indices of the remaining components you want to add to the list of rejected components (separated by commas): "
                     )
-                    manual_rejection_other = [int(i) for i in manual_rejection_other.split(",")]
-                    list_other_components = set(list_other_components)
-                    for sublist in manual_rejection_other:
-                        list_other_components -= {sublist}
-                    list_other_components = list(list_other_components)
-                    print(f"Other components {manual_rejection_other} removed from list of components.")
+                manual_rejection_other = [int(i) for i in manual_rejection_other.split(",")]
+                print(f"Remaining components {manual_rejection_other} added to the list of rejected components.")
 
-                ica.exclude = eog_indices + ecg_indices + emg_indices + list_other_components
-                print(
-                    f"Number of components identified after manual removal of invalid components: {len(ica.exclude)} "
-                    f"(out of {ica.n_components_})."
+            ica.exclude = eog_indices + ecg_indices + emg_indices + manual_rejection_other
+            print(
+                f"Number of components identified after manual removal of invalid components: {len(ica.exclude)} "
+                f"(out of {ica.n_components_})."
                 )
-                print(
-                    f"Components identified after manual removal of invalid components: {ica.exclude} "
-                    f"({len(eog_indices)} EOG components, {len(ecg_indices)} ECG components, {len(emg_indices)}"
-                    f" EMG components, {len(other_components)} other components)."
+            print(
+                f"Components identified after manual removal of invalid components: {ica.exclude} "
+                f"({len(eog_indices)} EOG components, {len(ecg_indices)} ECG components, {len(emg_indices)}"
+                f" EMG components, {len(manual_rejection_other)} other components)."
                 )
-            else:
-                print("No components removed manually. Keeping the automatically identified components.")
-
-            # Get the explained variance of the ICA components
-            explained_variance_ratio = ica.get_explained_variance_ratio(epochs_ica)["eeg"]
-            print(f"Explained variance ratio of ICA components: {explained_variance_ratio}")
 
             # Finally reject components in the filtered data (0.1 Hz) that are not brain related
             print("Rejecting components in the filtered data (0.1 Hz) that are not brain related...")
             eeg_clean = ica.apply(filtered_data.copy())
+
+            # Get the explained variance of the ICA components
+            explained_variance_ratio = ica.get_explained_variance_ratio(epochs_ica, components=ica.exclude)["eeg"]
+            print(f"Explained variance ratio of excluded ICA components: {explained_variance_ratio}")
+
 
             # Plot results of ICA for the first 2.5s
             fig = ica.plot_overlay(
@@ -1200,11 +1197,15 @@ def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912,
             # Append more information to the participant metadata json file
             participant_metadata["number_of_bad_epochs"] = int(np.sum(reject_log_ica.bad_epochs))
             participant_metadata["number_of_all_epochs"] = int(len(epochs_ica))
-            participant_metadata["number_of_bad_channels"] = int(np.sum(reject_log_ica.labels == 1))
-            participant_metadata["number_of_interpolated_channels"] = int(np.sum(reject_log_ica.labels == 2))  # noqa: PLR2004
-            participant_metadata["number_of_all_channels_across_epochs"] = int(
-                len(epochs_ica.info["ch_names"]) * len(epochs_ica)
+            participant_metadata["percentage_bad_epochs"] = float(int(np.sum(reject_log_ica.bad_epochs)) / len(epochs_ica))
+            participant_metadata["number_of_bad_channels_x_epochs"] = int(np.sum(reject_log_ica.labels == 1))
+            participant_metadata["number_of_interpolated_channels_x_epochs"] = int(np.sum(reject_log_ica.labels == 2))  # noqa: PLR2004
+            participant_metadata["number_of_all_channels_x_epochs"] = int(
+                (len(epochs_ica.info["ch_names"])-len(eog_channels)-1) * len(epochs_ica)
             )
+            participant_metadata["percentage_interpolated_channels_x_epochs"] = float(
+                int(np.sum(reject_log_ica.labels == 2)) /
+                (int(len(epochs_ica.info["ch_names"])-len(eog_channels)-1) * len(epochs_ica)))
             participant_metadata["participant_excluded"] = exclude
             participant_metadata["number_of_all_components"] = int(ica_n_components)
             participant_metadata["number_of_removed_components"] = int(len(ica.exclude))
@@ -1212,7 +1213,7 @@ def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912,
             participant_metadata["eog_components"] = [int(index) for index in eog_indices]
             participant_metadata["ecg_components"] = [int(index) for index in ecg_indices]
             participant_metadata["emg_components"] = [int(index) for index in emg_indices]
-            participant_metadata["other_components"] = [int(index) for index in list_other_components]
+            participant_metadata["other_components"] = [int(index) for index in list_remaining_components]
             participant_metadata["explained_variance_ratio"] = float(explained_variance_ratio)
 
             # Include the end time of the preprocessing

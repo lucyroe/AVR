@@ -732,7 +732,8 @@ def extract_features(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
 
             print("Loading ECG data...")
             # Read the preprocessed ECG data
-            ecg_file = subject_data_path / f"sub-{subject}_task-{task}_physio_ecg_preprocessed_scaled.tsv"
+            ecg_file = (subject_data_path /
+                f"sub-{subject}_task-{task}_physio_ecg_preprocessed_scaled_manually-cleaned.tsv")
             ecg_data = pd.read_csv(ecg_file, sep="\t")
 
             print("Loading EEG data...\n")

@@ -1,10 +1,28 @@
 """
-Script to perform a Hidden Markov Model (HMM) analysis on Annotation, ECG and EEG Data.
+Script to perform a Hidden Markov Model (HMM) analysis on Affective VR cardiac and neural data.
 
-Inputs: Preprocessed Annotation, ECG and EEG data.
+Required packages: hmmlearn
+
+Author: Lucy Roellecke
+Contact: lucy.roellecke[at]tuta.com
+Created on: 22 May 2024
+Last update: 8 August 2024
+"""
+
+# %%
+data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
+results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"
+subjects = ["001", "002", "003"]
+debug = True
+show_plots = True
+# TODO: wrap everything in a function
+"""
+Function to perform a Hidden Markov Model (HMM) analysis on Affective VR cardiac and neural data.
+
+Inputs: Extracted ECG and EEG features.
 
 Outputs:
-- Hidden Markov Model (HMM) for Annotation, ECG and EEG data.
+- Three Hidden Markov Models (HMMs): Cardiac Model, Neural Model, Integrated Model.
 - Plot of the data with the hidden states marked in color vertically.
 
 Functions:
@@ -13,82 +31,76 @@ Functions:
 
 Steps:
 1. GET DATA
-2. HIDDEN MARKOV MODEL (HMM)
-    2a. Create and train the Hidden Markov Model for the physiological data.
-    2b. Create and train the Hidden Markov Model for the annotations.
-    2c. Save the Hidden Markov Model.
-    2d. Plot the data with the hidden states marked in color vertically.
-
-Required packages: hmmlearn
-
-Author: Lucy Roellecke
-Contact: lucy.roellecke@fu-berlin.de
-Last update: May 28th, 2024
+2. HIDDEN MARKOV MODELs (HMMs) TODO: adapt if necessary
+    2a. Create and train the Cardiac Hidden Markov Model.
+    2b. Create and train the Neural Hidden Markov Model.
+    2c. Create and train the Integrated Hidden Markov Model.
+    2d. Save the HMMs.
+    2e. Plot the data with the hidden states marked in color vertically.
 """
-
 # %% Import
-import glob
-import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from hmmlearn.hmm import GaussianHMM
+from hmmlearn.hmm import GMMHMM
 
 # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-datapath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/NeVRo/preprocessed/"
-resultpath = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/NeVRo/hmm/"
+datapath = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "features"
+resultpath = Path(results_dir) / "phase3" / "AVR"
 
-# create the result folder if it does not exist
-Path(resultpath).mkdir(parents=True, exist_ok=True)
-
-modalities = ["physiological", "annotations"]
-# which preprocessing mode to use for physiological data
-preprocessing_mode = "Antonin"
-# "Lucy",
-# which physiological measures to analyze
-physiological_measures = ["IBI", "HF_HRV", "posterior_alpha_power"]
-
-modalities_scales = {
-    "physiological": {"IBI": [0.4, 1.8], "HF_HRV": [0, 0.12], "posterior_alpha_power": [1e-11, 1e-8]},
-    "annotations": [-1, 1],
+# Which HMMs to create
+models = ["cardiac","neural", "integrated"]
+# Which features are used for which HMM
+models_features = {
+    "cardiac": ["ibi", "hf-hrv"],
+    "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "gamma", "beta"],
+    "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "gamma", "beta"],
 }
 
-# if debug is True, only one subject will be analyzed
-debug = False
+# Define whether features should be z-scored to have mean 0 and standard deviation 1
+z_score = True
 
-# Number of states (low and high HR) = hyperparameter that needs to be chosen
-number_of_states = 2
+# Number of states (four quadrants of the Affect Grid) = hyperparameter that needs to be chosen
+number_of_states = 4
 
 # Number of iterations for training the HMM
 iterations = 1000
 
+# Colors TODO
+
+# Only analyze one subject if debug is True
+if debug:
+    subjects = [subjects[0]]
 
 # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-def create_model(data, num_states, iterations=1000):
+def create_model(data, lengths, num_states, iterations=1000):
     """
     Create and train a Hidden Markov Model (HMM) on the given data. Then predicts the hidden states.
 
     Args:
     ----
-        data (np.array): The data to train the HMM on.
+        data (np.array): The data to train the HMM on, can contain multiple features.
+        lengths (list): The lengths of the sequences in the data.
         num_states (int): The number of states of the HMM.
         iterations (int): The number of iterations to train the HMM (defaults to 1000).
 
     Returns:
     -------
-        model (GaussianHMM): The trained HMM model.
+        model (GMMHMM): The trained HMM model.
         hidden_states (np.array): The predicted hidden states.
     """
-    model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=iterations)
-    model.fit(data)
-    hidden_states = model.predict(data)
+    # Set the random seed for reproducibility
+    seed = 42
+    model = GMMHMM(n_components=num_states, n_iter=iterations, random_state=seed, covariance_type="tied")
+    model.fit(data, lengths)
+    hidden_states = model.predict(data, lengths)
 
     return model, hidden_states
 
 
-def plot_hidden_states(data, hidden_states, num_states, title, ylabel, scale):
+def plot_hidden_states(data, hidden_states, axis, num_states, title, ylabel):
     """
     Plot the data with the hidden states marked in color vertically.
 
@@ -96,194 +108,147 @@ def plot_hidden_states(data, hidden_states, num_states, title, ylabel, scale):
     ----
         data (np.array): The data to plot.
         hidden_states (np.array): The hidden states of the data.
+        axis (matplotlib.axis): The axis to plot on.
         num_states (int): The number of states.
         title (str): The title of the plot.
         ylabel (str): The label of the y-axis.
-        scale (list): The scale of the data.
     """
-    plt.plot(data)
-    plt.title(title)
+    axis.plot(data)
+    axis.set_title(title)
     for i in range(num_states):
-        plt.fill_between(
-            np.arange(len(data)), scale[0], scale[1], where=(hidden_states == i), color="C" + str(i), alpha=0.3
+        axis.fill_between(
+            np.arange(len(data)), min(data), max(data), where=(hidden_states == i), color="C" + str(i), alpha=0.3
         )
 
-    plt.xlabel("Time (s)")
-    plt.ylabel(ylabel)
+    axis.set_xlabel("Time (s)")
+    axis.set_ylabel(ylabel)
 
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 
 # %% STEP 1. GET DATA
-if __name__ == "__main__":
-    for modality in modalities:
-        print(f"\nProcessing {modality} data...")
+# Loop over all models
+for model in models:
+    print("+++++++++++++++++++++++++++++++++")
+    print(f"Initiating {model} model...")
+    print("+++++++++++++++++++++++++++++++++\n")
 
-        # get right file path for the dataset
-        filepath = Path(datapath) / modality
-        if modality == "physiological":
-            filepath = filepath / preprocessing_mode
-            for physiological_measure in physiological_measures:
-                print(f"\nProcessing {physiological_measure} data...")
+    # Loop over all subjects
+    for subject_index, subject in enumerate(subjects):
+        print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subject)) + "...")
+        # Get the right datapath
+        subject_datapath = datapath / f"sub-{subject}" / "eeg"
 
-                # list all files in the physiological folder corresponding to the physiological measure
-                pattern_measure = f"*_{physiological_measure}_preprocessed.tsv"
-                file_list = glob.fnmatch.filter(os.listdir(filepath), pattern_measure)
+        # Create empty list to store the data of all features
+        all_features = []
+        # Loop over all features
+        for feature in models_features[model]:
+            print(f"Loading {feature} data...")
 
-                # delete all files that are not subject files
-                file_list = [file for file in file_list if file.startswith("sub")]
+            # Load the data for the feature
+            if model == "cardiac":
+                feature_datafile = f"sub-{subject}_task-AVR_ecg_features.tsv"
+                feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature]
+            elif model == "neural":
+                if feature in ["posterior_alpha", "frontal_alpha", "frontal_theta"]:
+                    feature_datafile = f"sub-{subject}_task-AVR_eeg_features_{feature.split('_')[0]}_power.tsv"
+                    feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature.split("_")[1]]
+                else:
+                    feature_datafile = f"sub-{subject}_task-AVR_eeg_features_whole-brain_power.tsv"
+                    feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature]
+            else:   # integrated model
+                if feature in ["ibi", "hf-hrv"]:
+                    feature_datafile = f"sub-{subject}_task-AVR_ecg_features.tsv"
+                    feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature]
+                elif feature in ["posterior_alpha", "frontal_alpha", "frontal_theta"]:
+                    feature_datafile = f"sub-{subject}_task-AVR_eeg_features_{feature.split('_')[0]}_power.tsv"
+                    feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature.split("_")[1]]
+                else:
+                    feature_datafile = f"sub-{subject}_task-AVR_eeg_features_whole-brain_power.tsv"
+                    feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature]
+            
+            # Z-score the data if necessary
+            if z_score:
+                feature_data = (feature_data - feature_data.mean()) / feature_data.std()
+            
+            # Append the feature data to the list
+            all_features.append(feature_data.values.reshape(-1, 1))
 
-                # sort the list in ascending order
-                file_list = sorted(file_list)
+        # Check if the lengths of the features are the same
+        if len(set([len(feature) for feature in all_features])) != 1:
+            # Cut the features to the same length
+            min_length = min([len(feature) for feature in all_features])
+            all_features = [feature[:min_length] for feature in all_features]
 
-                # get participant list from the file list
-                subject_list = [file.split("_")[1][0:3] for file in file_list]
+        # Concatenate all features
+        print("Concatenating all features...\n")
+        data = np.concatenate(all_features)
+        lengths = [len(feature) for feature in all_features]
 
-                # only analyze one subject if debug is True
-                if debug:
-                    subject_list = [subject_list[0]]
+        # %% STEP 2. HMMs
 
-                # Loop over all subjects
-                for subject_index, subject in enumerate(subject_list):
-                    print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subject_list)) + "...")
+        # Create and train the Hidden Markov Model
+        print("Creating and training the Hidden Markov Model...")
 
-                    # Get the right file for the subject
-                    pattern_subject = f"sub_{subject}_mov_Space_{physiological_measure}_preprocessed.tsv"
-                    subject_file = glob.fnmatch.filter(file_list, pattern_subject)[0]
+        hmm, hidden_states = create_model(data, lengths, number_of_states, iterations)
 
-                    # Read in data
-                    subject_data = pd.read_csv(filepath / subject_file, sep="\t")
+        # Define the file path to save the model
+        model_path = resultpath / f"sub-{subject}" / "hmm"
 
-                    # Get measure
-                    data = subject_data[physiological_measure].values.reshape(-1, 1)
+        # Create the model directory if it does not exist yet
+        model_path.mkdir(parents=True, exist_ok=True)
 
-                    # STEP 2. HMM
+        # Create a dataframe with the state sequence corresponding to each timepoint of each feature
+        hidden_states_df = pd.DataFrame()
+        for feature_index, feature in enumerate(models_features[model]):
+            hidden_states_sequence = hidden_states[feature_index*len(all_features[feature_index]): (feature_index+1)*len(all_features[feature_index])]
+            hidden_states_df[feature] = hidden_states_sequence
 
-                    # Create and train the Hidden Markov Model
-                    print("\nCreating and training the Hidden Markov Model...")
+        # Add a column with the time as first column
+        hidden_states_df.insert(0, "timepoint", np.arange(len(hidden_states_df)))
 
-                    model_physiological, hidden_states_physiological = create_model(data, number_of_states, iterations)
+        # Create a dataframe with the summary statistics of the hidden states
+        means = hmm.means_
+        variances = hmm.covars_
+        hidden_states_df_stats = pd.DataFrame(
+            {
+                "subject": subject,
+                "model": model,
+                "hidden_state": np.arange(1, number_of_states + 1),
+                "mean": means.flatten(),
+                "variance": variances.flatten(),
+            }
+        )
 
-                    # Define the file path to save the model
-                    model_path = Path(resultpath) / modality / subject
+        print("Saving results...")
 
-                    # Create a dataframe with the means and variances of the hidden states
-                    means = model_physiological.means_
-                    variances = model_physiological.covars_
-                    hidden_states_df = pd.DataFrame(
-                        {
-                            "Hidden State": np.arange(1, number_of_states + 1),
-                            "Mean": means.flatten(),
-                            "Variance": variances.flatten(),
-                        }
-                    )
+        # Save both dataframes to a tsv file
+        # TODO
 
-                    # Save the dataframe as tsv file
-                    hidden_states_file = f"sub_{subject}_{physiological_measure}_hmm.tsv"
-                    hidden_states_physiological_file = model_path / hidden_states_file
-                    hidden_states_physiological_file.parent.mkdir(parents=True, exist_ok=True)
-                    hidden_states_df.to_csv(hidden_states_physiological_file, sep="\t", index=False)
+        # Create a plot for the model with a subplot for each feature
+        fig, axs = plt.subplots(len(all_features), 1, figsize=(10, 5 * len(all_features)))
+        for feature_index, feature in enumerate(models_features[model]):
+            plot_hidden_states(
+                all_features[feature_index],
+                hidden_states[feature_index*len(all_features[feature_index]): (feature_index+1)*len(all_features[feature_index])],
+                axs[feature_index],
+                number_of_states,
+                f"{feature}",
+                feature,
+            )
 
-                    # Plot the physiological measure with the hidden states marked in color vertically
-                    plot_hidden_states(
-                        data,
-                        hidden_states_physiological,
-                        number_of_states,
-                        f"{physiological_measure} with Hidden States",
-                        physiological_measure,
-                        modalities_scales[modality][physiological_measure],
-                    )
+        # Set the title of the plot
+        fig.suptitle(f"{model.capitalize()} Hidden Markov Model for subject {subject}", fontsize=16)
 
-                    # Save the plot
-                    plot_file = f"sub_{subject}_{physiological_measure}_hmm.png"
-                    plot_physiological_file = model_path / plot_file
-                    plt.savefig(plot_physiological_file)
+        # Save the plot
+        plot_file = f"sub_{subject}_{model}_hmm.png"
+        plt.savefig(model_path / plot_file)
 
-                    # Show the plot
-                    # plt.show()  # noqa: ERA001
+        # Show the plot
+        if show_plots:
+            plt.show()
 
-                    plt.close()
+        plt.close()
 
-        else:
-            # list all files in the annotations folder
-            file_list = os.listdir(filepath)
-
-            # deletes all hidden files from the list
-            file_list = [file for file in file_list if not file.startswith(".")]
-
-            # delete all files that are not subject files
-            file_list = [file for file in file_list if file.startswith("sub")]
-
-            # sort the list in ascending order
-            file_list = sorted(file_list)
-
-            # get participant list from the file list
-            subject_list = [file.split("_")[1][0:3] for file in file_list]
-
-            # only analyze one subject if debug is True
-            if debug:
-                subject_list = [subject_list[0]]
-
-            # Loop over all subjects
-            for subject_index, subject in enumerate(subject_list):
-                print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subject_list)) + "...")
-
-                # Get the right file for the subject
-                pattern_subject = f"sub_{subject}_mov_space_arousal_preprocessed.tsv"
-                subject_file = glob.fnmatch.filter(file_list, pattern_subject)[0]
-
-                # Read in data
-                subject_data = pd.read_csv(filepath / subject_file, sep="\t")
-
-                # Get the annotations
-                arousal = subject_data["cr_a"].dropna().values.reshape(-1, 1)
-
-                # STEP 2. HMM
-
-                # Create and train the Hidden Markov Model
-                print("\nCreating and training the Hidden Markov Model...")
-
-                model_arousal, hidden_states_arousal = create_model(arousal, number_of_states, iterations)
-
-                # Define the file path to save the model
-                model_path = Path(resultpath) / modality / subject
-
-                # Create a dataframe with the means and variances of the hidden states
-                means = model_arousal.means_
-                variances = model_arousal.covars_
-                hidden_states_df = pd.DataFrame(
-                    {
-                        "Hidden State": np.arange(1, number_of_states + 1),
-                        "Mean": means.flatten(),
-                        "Variance": variances.flatten(),
-                    }
-                )
-
-                # Save the dataframe as tsv file
-                hidden_states_file = f"sub_{subject}_{modality}_hmm.tsv"
-                hidden_states_annotation_file = model_path / hidden_states_file
-                hidden_states_annotation_file.parent.mkdir(parents=True, exist_ok=True)
-                hidden_states_df.to_csv(hidden_states_annotation_file, sep="\t", index=False)
-
-                # Plot the annotations with the hidden states marked in color vertically
-                plot_hidden_states(
-                    arousal,
-                    hidden_states_arousal,
-                    number_of_states,
-                    "Arousal with Hidden States",
-                    "Arousal",
-                    modalities_scales[modality],
-                )
-
-                # Save the plot
-                plot_file = f"sub_{subject}_{modality}_hmm.png"
-                plot_annotation_file = model_path / plot_file
-                plt.savefig(plot_annotation_file)
-
-                # Show the plot
-                # plt.show()  # noqa: ERA001
-
-                plt.close()
-
-
+        print(f"Finished {model} model.\n")
 # %%
