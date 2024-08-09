@@ -2,80 +2,80 @@
 0	valence mean	Phase 1 HP	51	Phase 1 HN	51	11.5	0.0	True
 1	valence mean	Phase 1 HP	51	Phase 1 LP	51	-3.32	0.001	False
 2	valence mean	Phase 1 HP	51	Phase 1 LN	51	6.32	0.0	True
-3	valence mean	Phase 1 HP	51	Phase 3	3	0.61	0.547	False
+3	valence mean	Phase 1 HP	51	Phase 3	44	4.23	0.0	True
 4	valence mean	Phase 1 HN	51	Phase 1 HP	51	-11.5	0.0	True
 5	valence mean	Phase 1 HN	51	Phase 1 LP	51	-21.1	0.0	True
 6	valence mean	Phase 1 HN	51	Phase 1 LN	51	-4.97	0.0	True
-7	valence mean	Phase 1 HN	51	Phase 3	3	-4.49	0.0	True
+7	valence mean	Phase 1 HN	51	Phase 3	44	-10.34	0.0	True
 8	valence mean	Phase 1 LP	51	Phase 1 HP	51	3.32	0.001	False
 9	valence mean	Phase 1 LP	51	Phase 1 HN	51	21.1	0.0	True
 10	valence mean	Phase 1 LP	51	Phase 1 LN	51	11.93	0.0	True
-11	valence mean	Phase 1 LP	51	Phase 3	3	2.67	0.01	False
+11	valence mean	Phase 1 LP	51	Phase 3	44	11.16	0.0	True
 12	valence mean	Phase 1 LN	51	Phase 1 HP	51	-6.32	0.0	True
 13	valence mean	Phase 1 LN	51	Phase 1 HN	51	4.97	0.0	True
 14	valence mean	Phase 1 LN	51	Phase 1 LP	51	-11.93	0.0	True
-15	valence mean	Phase 1 LN	51	Phase 3	3	-1.64	0.106	False
-16	valence mean	Phase 3	3	Phase 1 HP	51	-0.61	0.547	False
-17	valence mean	Phase 3	3	Phase 1 HN	51	4.49	0.0	True
-18	valence mean	Phase 3	3	Phase 1 LP	51	-2.67	0.01	False
-19	valence mean	Phase 3	3	Phase 1 LN	51	1.64	0.106	False
+15	valence mean	Phase 1 LN	51	Phase 3	44	-3.11	0.003	False
+16	valence mean	Phase 3	44	Phase 1 HP	51	-4.23	0.0	True
+17	valence mean	Phase 3	44	Phase 1 HN	51	10.34	0.0	True
+18	valence mean	Phase 3	44	Phase 1 LP	51	-11.16	0.0	True
+19	valence mean	Phase 3	44	Phase 1 LN	51	3.11	0.003	False
 20	valence std_dev	Phase 1 HP	51	Phase 1 HN	51	1.62	0.109	False
 21	valence std_dev	Phase 1 HP	51	Phase 1 LP	51	1.58	0.117	False
 22	valence std_dev	Phase 1 HP	51	Phase 1 LN	51	0.35	0.726	False
-23	valence std_dev	Phase 1 HP	51	Phase 3	3	-2.88	0.006	False
+23	valence std_dev	Phase 1 HP	51	Phase 3	44	-8.95	0.0	True
 24	valence std_dev	Phase 1 HN	51	Phase 1 HP	51	-1.62	0.109	False
 25	valence std_dev	Phase 1 HN	51	Phase 1 LP	51	0.12	0.903	False
 26	valence std_dev	Phase 1 HN	51	Phase 1 LN	51	-1.34	0.183	False
-27	valence std_dev	Phase 1 HN	51	Phase 3	3	-5.1	0.0	True
+27	valence std_dev	Phase 1 HN	51	Phase 3	44	-13.95	0.0	True
 28	valence std_dev	Phase 1 LP	51	Phase 1 HP	51	-1.58	0.117	False
 29	valence std_dev	Phase 1 LP	51	Phase 1 HN	51	-0.12	0.903	False
 30	valence std_dev	Phase 1 LP	51	Phase 1 LN	51	-1.32	0.19	False
-31	valence std_dev	Phase 1 LP	51	Phase 3	3	-4.05	0.0	True
+31	valence std_dev	Phase 1 LP	51	Phase 3	44	-12.1	0.0	True
 32	valence std_dev	Phase 1 LN	51	Phase 1 HP	51	-0.35	0.726	False
 33	valence std_dev	Phase 1 LN	51	Phase 1 HN	51	1.34	0.183	False
 34	valence std_dev	Phase 1 LN	51	Phase 1 LP	51	1.32	0.19	False
-35	valence std_dev	Phase 1 LN	51	Phase 3	3	-3.42	0.001	False
-36	valence std_dev	Phase 3	3	Phase 1 HP	51	2.88	0.006	False
-37	valence std_dev	Phase 3	3	Phase 1 HN	51	5.1	0.0	True
-38	valence std_dev	Phase 3	3	Phase 1 LP	51	4.05	0.0	True
-39	valence std_dev	Phase 3	3	Phase 1 LN	51	3.42	0.001	False
+35	valence std_dev	Phase 1 LN	51	Phase 3	44	-10.29	0.0	True
+36	valence std_dev	Phase 3	44	Phase 1 HP	51	8.95	0.0	True
+37	valence std_dev	Phase 3	44	Phase 1 HN	51	13.95	0.0	True
+38	valence std_dev	Phase 3	44	Phase 1 LP	51	12.1	0.0	True
+39	valence std_dev	Phase 3	44	Phase 1 LN	51	10.29	0.0	True
 40	arousal mean	Phase 1 HP	51	Phase 1 HN	51	2.5	0.014	False
 41	arousal mean	Phase 1 HP	51	Phase 1 LP	51	13.08	0.0	True
 42	arousal mean	Phase 1 HP	51	Phase 1 LN	51	14.17	0.0	True
-43	arousal mean	Phase 1 HP	51	Phase 3	3	2.99	0.004	False
+43	arousal mean	Phase 1 HP	51	Phase 3	44	10.53	0.0	True
 44	arousal mean	Phase 1 HN	51	Phase 1 HP	51	-2.5	0.014	False
 45	arousal mean	Phase 1 HN	51	Phase 1 LP	51	8.96	0.0	True
 46	arousal mean	Phase 1 HN	51	Phase 1 LN	51	9.83	0.0	True
-47	arousal mean	Phase 1 HN	51	Phase 3	3	1.5	0.14	False
+47	arousal mean	Phase 1 HN	51	Phase 3	44	6.05	0.0	True
 48	arousal mean	Phase 1 LP	51	Phase 1 HP	51	-13.08	0.0	True
 49	arousal mean	Phase 1 LP	51	Phase 1 HN	51	-8.96	0.0	True
 50	arousal mean	Phase 1 LP	51	Phase 1 LN	51	0.81	0.422	False
-51	arousal mean	Phase 1 LP	51	Phase 3	3	-1.56	0.125	False
+51	arousal mean	Phase 1 LP	51	Phase 3	44	-3.99	0.0	True
 52	arousal mean	Phase 1 LN	51	Phase 1 HP	51	-14.17	0.0	True
 53	arousal mean	Phase 1 LN	51	Phase 1 HN	51	-9.83	0.0	True
 54	arousal mean	Phase 1 LN	51	Phase 1 LP	51	-0.81	0.422	False
-55	arousal mean	Phase 1 LN	51	Phase 3	3	-1.89	0.065	False
-56	arousal mean	Phase 3	3	Phase 1 HP	51	-2.99	0.004	False
-57	arousal mean	Phase 3	3	Phase 1 HN	51	-1.5	0.14	False
-58	arousal mean	Phase 3	3	Phase 1 LP	51	1.56	0.125	False
-59	arousal mean	Phase 3	3	Phase 1 LN	51	1.89	0.065	False
+55	arousal mean	Phase 1 LN	51	Phase 3	44	-4.98	0.0	True
+56	arousal mean	Phase 3	44	Phase 1 HP	51	-10.53	0.0	True
+57	arousal mean	Phase 3	44	Phase 1 HN	51	-6.05	0.0	True
+58	arousal mean	Phase 3	44	Phase 1 LP	51	3.99	0.0	True
+59	arousal mean	Phase 3	44	Phase 1 LN	51	4.98	0.0	True
 60	arousal std_dev	Phase 1 HP	51	Phase 1 HN	51	-0.31	0.757	False
 61	arousal std_dev	Phase 1 HP	51	Phase 1 LP	51	3.07	0.003	False
 62	arousal std_dev	Phase 1 HP	51	Phase 1 LN	51	3.76	0.0	True
-63	arousal std_dev	Phase 1 HP	51	Phase 3	3	-5.01	0.0	True
+63	arousal std_dev	Phase 1 HP	51	Phase 3	44	-8.98	0.0	True
 64	arousal std_dev	Phase 1 HN	51	Phase 1 HP	51	0.31	0.757	False
 65	arousal std_dev	Phase 1 HN	51	Phase 1 LP	51	3.28	0.001	False
 66	arousal std_dev	Phase 1 HN	51	Phase 1 LN	51	3.94	0.0	True
-67	arousal std_dev	Phase 1 HN	51	Phase 3	3	-4.59	0.0	True
+67	arousal std_dev	Phase 1 HN	51	Phase 3	44	-8.4	0.0	True
 68	arousal std_dev	Phase 1 LP	51	Phase 1 HP	51	-3.07	0.003	False
 69	arousal std_dev	Phase 1 LP	51	Phase 1 HN	51	-3.28	0.001	False
 70	arousal std_dev	Phase 1 LP	51	Phase 1 LN	51	0.89	0.378	False
-71	arousal std_dev	Phase 1 LP	51	Phase 3	3	-6.42	0.0	True
+71	arousal std_dev	Phase 1 LP	51	Phase 3	44	-12.05	0.0	True
 72	arousal std_dev	Phase 1 LN	51	Phase 1 HP	51	-3.76	0.0	True
 73	arousal std_dev	Phase 1 LN	51	Phase 1 HN	51	-3.94	0.0	True
 74	arousal std_dev	Phase 1 LN	51	Phase 1 LP	51	-0.89	0.378	False
-75	arousal std_dev	Phase 1 LN	51	Phase 3	3	-6.02	0.0	True
-76	arousal std_dev	Phase 3	3	Phase 1 HP	51	5.01	0.0	True
-77	arousal std_dev	Phase 3	3	Phase 1 HN	51	4.59	0.0	True
-78	arousal std_dev	Phase 3	3	Phase 1 LP	51	6.42	0.0	True
-79	arousal std_dev	Phase 3	3	Phase 1 LN	51	6.02	0.0	True
+75	arousal std_dev	Phase 1 LN	51	Phase 3	44	-12.2	0.0	True
+76	arousal std_dev	Phase 3	44	Phase 1 HP	51	8.98	0.0	True
+77	arousal std_dev	Phase 3	44	Phase 1 HN	51	8.4	0.0	True
+78	arousal std_dev	Phase 3	44	Phase 1 LP	51	12.05	0.0	True
+79	arousal std_dev	Phase 3	44	Phase 1 LN	51	12.2	0.0	True

@@ -79,7 +79,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
         subjects = [subjects[0]]
 
     # Defne preprocessing steps to perform
-    steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG", "Averaging"]  # Adjust as needed
+    steps = ["Cutting", "Formatting", "Preprocessing EEG", "Averaging"]  # Adjust as needed
+    # "Preprocessing ECG + PPG",
 
     # Define whether scaling of the ECG and PPG data should be done
     scaling = True

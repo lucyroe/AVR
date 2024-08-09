@@ -39,15 +39,16 @@ def main():
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     steps = ["Preprocess data"]    # Adjust as needed
-    # "Load data", "Extract features", "Univariate statistics", "Modelling", "Plot results"
+    # "Load data", "Extract features", "Univariate statistics", "Plot results", "Modelling", 
 
-    subjects = ["001", "002", "003","004", "005"]
-    #"006", "007", "009",
-                #"011", "012", "014", "015", "016", "017", "018", "019", "020",
-                #"021", "022", "023", "024", "025", "026", "027", "028", "029", "030",
+    subjects = ["011", "012", "014", "015", "016", "017", "018", "019", "020",]
+                #"021", "022", "024", "025", "026", "027", "028", "029", "030",
                 #"031", "032", "033", "034", "035", "036", "037", "038", "039", "040",
                 #"041", "042", "043", "044", "045", "046", "047"]
+    # "001", "002", "003","004", "005", "006", "007", "009",    # Already done
+
     # subjects "008", "010", "013" were excluded due to missing data
+    # subject "023" was excluded because of bad quality of ECG data
 
     # Only needed for comparison of phase 3 with phase 1
     subjects_phase1 = ["06", "08", "10", "12", "14", "16", "18", "19", "20",
@@ -80,8 +81,8 @@ def main():
             read_xdf(subjects, data_dir, results_dir, show_plots, debug)
 
         elif step == "Preprocess data":
-            print("\nPreprocessing annotations...\n")
-            preprocess_annotations(subjects, data_dir, results_dir, show_plots, debug)
+            #print("\nPreprocessing annotations...\n")
+            #preprocess_annotations(subjects, data_dir, results_dir, show_plots, debug)
             print("\nPreprocessing physiological data...\n")
             preprocess_physiological(subjects, data_dir, results_dir, show_plots, debug, manual_cleaning)
 
