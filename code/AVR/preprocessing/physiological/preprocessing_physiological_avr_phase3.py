@@ -712,6 +712,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
 
                 display(editor_ecg.commands_box)
 
+                plt.show()
+
                 # Manual correction of PPG-peaks
                 # Save JSON file with corrected PPG-peaks and bad segments indices
                 ppg_corr_fname = f"sub-{subject}_task-{exp_name}_ppg-peaks-corrected.json"
@@ -731,6 +733,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
 
                 display(editor_ppg.commands_box)
 
+                plt.show()
+
             # Execute only when manual peak correction is done
             if manual_cleaning:
                 print("Saving corrected R-peaks and PPG-peaks...")
@@ -746,8 +750,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 # Load corrected PPG-peaks
                 with ppg_corr_fpath.open("r") as f:
                     corrected_ppg_peaks = json.load(f)
-
-            input("Press Enter to Continue with IBI and HR Calculation. [Enter]")
 
             print("Calculating IBI and HR from ECG and PPG data...")
             # Calculate inter-beat-intervals (IBI) from peaks
