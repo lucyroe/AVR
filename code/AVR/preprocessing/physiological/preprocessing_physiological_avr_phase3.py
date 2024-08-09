@@ -210,7 +210,7 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
         sns.despine()
         if show_plots:
             plt.show()
-        
+
         plt.close()
 
 
@@ -1070,10 +1070,12 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                     print(f"EMG components {manual_rejection_emg} removed from list of components.")
 
             print("Remaining components not identified by the correlation approach: " + str(list_remaining_components))
-            remove = input("Do you want to add any of the remaining components to the list of rejected components? (Y/n): ")
+            remove = input("Do you want to add any of the remaining components to the list of rejected components?"
+                "(Y/n): ")
             if remove == "Y":
                 manual_rejection_other = input(
-                    "Enter the indices of the remaining components you want to add to the list of rejected components (separated by commas): "
+                    "Enter the indices of the remaining components you want to add to the list of rejected components"
+                    "(separated by commas): "
                     )
                 manual_rejection_other = [int(i) for i in manual_rejection_other.split(",")]
                 print(f"Remaining components {manual_rejection_other} added to the list of rejected components.")
@@ -1199,14 +1201,15 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             # Append more information to the participant metadata json file
             participant_metadata["number_of_bad_epochs"] = int(np.sum(reject_log_ica.bad_epochs))
             participant_metadata["number_of_all_epochs"] = int(len(epochs_ica))
-            participant_metadata["percentage_bad_epochs"] = float(int(np.sum(reject_log_ica.bad_epochs)) / len(epochs_ica))
+            participant_metadata["percentage_bad_epochs"] = float(int(np.sum(reject_log_ica.bad_epochs)) /
+                len(epochs_ica))
             participant_metadata["number_of_bad_channels_x_epochs"] = int(np.sum(reject_log_ica.labels == 1))
             participant_metadata["number_of_interpolated_channels_x_epochs"] = int(np.sum(reject_log_ica.labels == 2))  # noqa: PLR2004
             participant_metadata["number_of_all_channels_x_epochs"] = int(
                 (len(epochs_ica.info["ch_names"])-len(eog_channels)-1) * len(epochs_ica)
             )
             participant_metadata["percentage_interpolated_channels_x_epochs"] = float(
-                int(np.sum(reject_log_ica.labels == 2)) /
+                int(np.sum(reject_log_ica.labels == 2)) /  # noqa: PLR2004
                 (int(len(epochs_ica.info["ch_names"])-len(eog_channels)-1) * len(epochs_ica)))
             participant_metadata["participant_excluded"] = exclude
             participant_metadata["number_of_all_components"] = int(ica_n_components)
