@@ -50,14 +50,14 @@ def preprocess_annotations(subjects=[],  # noqa: PLR0915, B006
 
     # Specify the data path info (in BIDS format)
     # change with the directory of data storage
-    data_dir = Path(data_dir) / "phase3"
+    data_dir = Path(data_dir)
     exp_name = "AVR"
     rawdata_name = "rawdata"  # rawdata folder
     derivative_name = "derivatives"  # derivates folder
     preprocessed_name = "preproc"  # preprocessed folder (inside derivatives)
     averaged_name = "avg"  # averaged data folder (inside preprocessed)
     datatype_name = "beh"  # data type specification
-    results_dir = Path(results_dir) / "phase3"
+    results_dir = Path(results_dir)
 
     # Create the preprocessed data folder if it does not exist
     for subject in subjects:

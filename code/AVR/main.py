@@ -41,7 +41,12 @@ def main():
     steps = ["Preprocess data"]    # Adjust as needed
     # "Load data", "Extract features", "Univariate statistics", "Modelling", "Plot results"
 
-    subjects = ["001", "002", "003","004", "005"]
+    # subjects = ["026", "027", "028", "029", "030",
+    #             "031", "032", "033", "034", "035", "036", "037", "038", "039", "040",
+    #             "041", "042", "043", "044", "045", "046", "047"]
+    
+    subjects = ["023"]
+    
     #"006", "007", "009",
                 #"011", "012", "014", "015", "016", "017", "018", "019", "020",
                 #"021", "022", "023", "024", "025", "026", "027", "028", "029", "030",
@@ -58,8 +63,8 @@ def main():
 
     # Specify the data path info (in BIDS format)
     # change with the directory of data storage
-    data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
-    results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"
+    data_dir = "E:/AffectiveVR/Phase_3/Data/"
+    results_dir = "E:/AffectiveVR/Phase_3/Results/"
 
     # Define if plots should be shown
     show_plots = True
@@ -68,7 +73,7 @@ def main():
     manual_cleaning = True
 
     # Only analyze one subject when debug mode is on
-    debug = False
+    debug = True
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><<
     for index, step in enumerate(steps):
@@ -80,8 +85,8 @@ def main():
             read_xdf(subjects, data_dir, results_dir, show_plots, debug)
 
         elif step == "Preprocess data":
-            print("\nPreprocessing annotations...\n")
-            preprocess_annotations(subjects, data_dir, results_dir, show_plots, debug)
+            #print("\nPreprocessing annotations...\n")
+            #preprocess_annotations(subjects, data_dir, results_dir, show_plots, debug)
             print("\nPreprocessing physiological data...\n")
             preprocess_physiological(subjects, data_dir, results_dir, show_plots, debug, manual_cleaning)
 

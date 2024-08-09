@@ -68,8 +68,8 @@ def read_xdf(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
     if debug:
         subjects = [subjects[0]]
 
-    data_dir = Path(data_dir) / "phase3"
-    results_dir = Path(results_dir) / "phase3"
+    data_dir = Path(data_dir) 
+    results_dir = Path(results_dir)
     exp_name = "AVR"
     sourcedata_name = "sourcedata"  # sourcedata folder
     rawdata_name = "rawdata"  # rawdata folder

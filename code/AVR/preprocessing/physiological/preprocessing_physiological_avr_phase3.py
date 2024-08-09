@@ -79,7 +79,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
         subjects = [subjects[0]]
 
     # Defne preprocessing steps to perform
-    steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG", "Averaging"]  # Adjust as needed
+    #steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG", "Averaging"]  # Adjust as needed
+    steps = ["Cutting", "Formatting", "Preprocessing EEG"]
 
     # Define whether scaling of the ECG and PPG data should be done
     scaling = True
@@ -107,14 +108,14 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
 
     # Specify the data path info (in BIDS format)
     # Change with the directory of data storage
-    data_dir = Path(data_dir) / "phase3"
+    data_dir = Path(data_dir)
     exp_name = "AVR"
     rawdata_name = "rawdata"  # rawdata folder
     derivative_name = "derivatives"  # derivates folder
     preprocessed_name = "preproc"  # preprocessed folder (inside derivatives)
     averaged_name = "avg"  # averaged data folder (inside preprocessed)
     datatype_name = "eeg"  # data type specification
-    results_dir = Path(results_dir) / "phase3"
+    results_dir = Path(results_dir)
 
     # Create the preprocessed data folder if it does not exist
     for subject in subjects:
@@ -908,6 +909,17 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 )
                 # Exit the program if no montage file is found
                 sys.exit()
+
+            #TODO: WIP Open ECG cleaned data
+            cleaned_ecg_dir = Path(subject_preprocessed_folder)
+            cleaned_ecg_file = [file.name for file in cleaned_ecg_dir.iterdir() if file.is_file() and file.name.startswith("sub-" + subject + "_task-" + task + "_physio_ecg_preprocessed")]
+            if len(cleaned_ecg_file) != 1:
+                print("ERROR! No or multiple cleaned ECG files found. Make sure to run the preprocessing for ECG data first.")
+                # Exit the program if no or multiple cleaned ECG files are found
+                sys.exit()
+            cleaned_ecg = pd.read_csv(Path(cleaned_ecg_dir, cleaned_ecg_file[0]), sep="\t")
+            # keep only the ECG column
+            cleaned_ecg = cleaned_ecg[["ECG"]].values.flatten()
 
             # Add NaNs to the ECG data to match the EEG data
             if len(cleaned_ecg) < len(cropped_eeg_data.times):
