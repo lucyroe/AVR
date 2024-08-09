@@ -208,7 +208,9 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             axs.set_title(plot_title)
 
         sns.despine()
-        plt.show()
+        if show_plots:
+            plt.show()
+        
         plt.close()
 
 
