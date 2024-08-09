@@ -1079,6 +1079,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                     )
                 manual_rejection_other = [int(i) for i in manual_rejection_other.split(",")]
                 print(f"Remaining components {manual_rejection_other} added to the list of rejected components.")
+            else:
+                manual_rejection_other = []
 
             ica.exclude = eog_indices + ecg_indices + emg_indices + manual_rejection_other
             print(
