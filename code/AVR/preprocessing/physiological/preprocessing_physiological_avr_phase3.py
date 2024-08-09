@@ -701,7 +701,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 # Display interactive plot
                 # TODO: make this better by scaling it to 10 seconds for each window # noqa: FIX002
                 # and then clicking through them
-                # Also, how do I actually correct anything?!
                 editor_ecg = Editor(
                     signal=cleaned_ecg,
                     corrected_json=ecg_corr_fpath,
@@ -748,6 +747,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 with ppg_corr_fpath.open("r") as f:
                     corrected_ppg_peaks = json.load(f)
 
+            input("Press Enter to Continue with IBI and HR Calculation. [Enter]")
+
             print("Calculating IBI and HR from ECG and PPG data...")
             # Calculate inter-beat-intervals (IBI) from peaks
             r_peaks_indices = (
@@ -790,7 +791,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 f"IBI and HR from ECG and PPG data for subject {subject} "
                 "(no manual cleaning)"
                 if not manual_cleaning
-                else "(after manual cleaning)",
+                else f"IBI and HR from ECG and PPG data for subject {subject} "
+                "(after manual cleaning)",
                 fontsize=16,
             )
             # Set x-axis labels to minutes instead of seconds for all axes
@@ -1493,7 +1495,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             f"Mean IBI and HR from ECG and PPG data for AVR phase 3 (n={len(subjects)}), "
             "(no manual cleaning)"
             if not manual_cleaning
-            else "(after manual cleaning)",
+            else f"Mean IBI and HR from ECG and PPG data for AVR phase 3 (n={len(subjects)}), "
+            "(after manual cleaning)",
             fontsize=16,
         )
         # Set x-axis labels to minutes instead of seconds for all axes
