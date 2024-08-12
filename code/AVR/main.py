@@ -37,6 +37,7 @@ def main():
     )
     from AVR.preprocessing.read_xdf import read_xdf
     from AVR.statistics.univariate_statistics import univariate_statistics
+    from AVR.datacomparison.plot_descriptives import plot_descriptives
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     steps = ["Univariate statistics"]    # Adjust as needed
@@ -100,6 +101,8 @@ def main():
 
         elif step == "Plot results":
             print("\nPlotting results...\n")
+            print("\nCreating descriptives plots...\n")
+            plot_descriptives(data_dir, results_dir, show_plots)
             print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
             raincloud_plot(data_dir, results_dir, show_plots)
 

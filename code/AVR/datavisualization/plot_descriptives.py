@@ -7,11 +7,11 @@ Created on: 12 August 2024
 Last updated: 12 August 2024
 """
 
-
+# %%
 def plot_descriptives(  # noqa: C901, PLR0915
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
-    show_plots=False,
+    show_plots=True,
 ):
     """
     Plot descriptive statistics for the AVR data.
