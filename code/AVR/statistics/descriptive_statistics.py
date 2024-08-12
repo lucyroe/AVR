@@ -1,10 +1,12 @@
 """
 Script to read in and calculate descriptive statistics of the participants of AVR phase 3.
 
+Required packages: statsmodels
+
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 9 August 2024
-Last update: 10 August 2024
+Last update: 11 August 2024
 """
 #%%
 def descriptive_statistics(subjects=["001", "002", "003"],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
@@ -38,6 +40,8 @@ def descriptive_statistics(subjects=["001", "002", "003"],  # noqa: PLR0915, B00
     import sys
     import time
     from pathlib import Path
+    from statsmodels.stats.anova import AnovaRM
+    from statsmodels.multivariate.manova import MANOVA
 
     import matplotlib.pyplot as plt
     import numpy as np
@@ -240,8 +244,114 @@ def descriptive_statistics(subjects=["001", "002", "003"],  # noqa: PLR0915, B00
 
     # %% STEP 2. CALCULATE DESCRIPTIVE STATISTICS
 
-    # 2a. Demographics
+    # Define results directory
+    results_filepath_stats = results_dir / exp_name / averaged_name / "stats"
 
+    # Create directory if it does not exist
+    results_filepath_stats.mkdir(parents=True, exist_ok=True)
+
+    # 2a. Demographics
+    # Calculate descriptive statistics of age
+    age_stats = demographics["age"].describe()
+
+    # Calculate descriptive statistics of gender
+    gender_stats = demographics["gender"].value_counts()
+
+    # Add all stats to a dataframe
+    demographics_stats = pd.DataFrame()
+    demographics_stats.loc[0, "number_of_participants"] = age_stats["count"]
+    demographics_stats.loc[0, "mean_age"] = age_stats["mean"]
+    demographics_stats.loc[0, "std_age"] = age_stats["std"]
+    demographics_stats.loc[0, "min_age"] = age_stats["min"]
+    demographics_stats.loc[0, "max_age"] = age_stats["max"]
+    demographics_stats.loc[0, "number_female"] = gender_stats[1]
+    demographics_stats.loc[0, "number_male"] = gender_stats[2]
+    demographics_stats.loc[0, "number_non_binary"] = gender_stats[3]
+
+    # Save dataframe as tsv file
+    demographics_stats.to_csv(results_filepath_stats / "demographics_stats.tsv", sep="\t", index=False)
+
+    # 2b. Annotation Data
+    # Calculate descriptive statistics of valence and arousal ratings
+    valence_stats = annotation_data["valence"].describe()
+    arousal_stats = annotation_data["arousal"].describe()
+
+    # Calculate stats for each video
+    video_stats_annotation = pd.DataFrame()
+    for video in videos:
+        valence_stats_video = annotation_data[annotation_data["video"] == video]["valence"].describe()
+        arousal_stats_video = annotation_data[annotation_data["video"] == video]["arousal"].describe()
+        video_stats_annotation.loc[video, "mean_valence"] = valence_stats_video["mean"]
+        video_stats_annotation.loc[video, "std_valence"] = valence_stats_video["std"]
+        video_stats_annotation.loc[video, "min_valence"] = valence_stats_video["min"]
+        video_stats_annotation.loc[video, "max_valence"] = valence_stats_video["max"]
+        video_stats_annotation.loc[video, "mean_arousal"] = arousal_stats_video["mean"]
+        video_stats_annotation.loc[video, "std_arousal"] = arousal_stats_video["std"]
+        video_stats_annotation.loc[video, "min_arousal"] = arousal_stats_video["min"]
+        video_stats_annotation.loc[video, "max_arousal"] = arousal_stats_video["max"]
+    
+    # Add overall stats to the dataframe
+    video_stats_annotation.loc["overall", "mean_valence"] = valence_stats["mean"]
+    video_stats_annotation.loc["overall", "std_valence"] = valence_stats["std"]
+    video_stats_annotation.loc["overall", "min_valence"] = valence_stats["min"]
+    video_stats_annotation.loc["overall", "max_valence"] = valence_stats["max"]
+    video_stats_annotation.loc["overall", "mean_arousal"] = arousal_stats["mean"]
+    video_stats_annotation.loc["overall", "std_arousal"] = arousal_stats["std"]
+    video_stats_annotation.loc["overall", "min_arousal"] = arousal_stats["min"]
+    video_stats_annotation.loc["overall", "max_arousal"] = arousal_stats["max"]
+    
+    # Save dataframe as tsv file
+    video_stats_annotation.to_csv(results_filepath_stats / "annotation_stats.tsv", sep="\t", index=True)
+    
+    # Perform repeated measures ANOVA to test for significant differences in valence and arousal ratings between the videos
+    # For valence
+    anova_valence = AnovaRM(annotation_data, 'valence', 'subject', within=['video'], aggregate_func="mean")
+    results_valence = anova_valence.fit()
+
+    # For arousal
+    anova_arousal = AnovaRM(annotation_data, 'arousal', 'subject', within=['video'], aggregate_func="mean")
+    results_arousal = anova_arousal.fit()
+
+    # Multi-factor ANOVA (MANOVA) for both valence and arousal
+    manova_annotation = MANOVA.from_formula('valence + arousal ~ video', data=annotation_data, aggregate_func="mean")
+    results_manova_annotation = manova_annotation.mv_test()
+
+    # Create a dataframe to store the results
+    results_annotation_anova = pd.DataFrame()
+    results_annotation_anova.loc["rmANOVA valence", "F"] = results_valence.anova_table["F Value"][0]
+    results_annotation_anova.loc["rmANOVA valence", "Num DF"] = results_valence.anova_table["Num DF"][0]
+    results_annotation_anova.loc["rmANOVA valence", "Den DF"] = results_valence.anova_table["Den DF"][0]
+    results_annotation_anova.loc["rmANOVA valence", "p"] = results_valence.anova_table["Pr > F"][0]
+    results_annotation_anova.loc["rmANOVA arousal", "F"] = results_arousal.anova_table["F Value"][0]
+    results_annotation_anova.loc["rmANOVA arousal", "Num DF"] = results_arousal.anova_table["Num DF"][0]
+    results_annotation_anova.loc["rmANOVA arousal", "Den DF"] = results_arousal.anova_table["Den DF"][0]
+    results_annotation_anova.loc["rmANOVA arousal", "p"] = results_arousal.anova_table["Pr > F"][0]
+
+    results_annotation_manova = pd.DataFrame()
+    results_annotation_manova.loc["MANOVA Wilks' lambda", "Value"] = results_manova_annotation.results["video"]["stat"]["Value"]["Wilks' lambda"]
+    results_annotation_manova.loc["MANOVA Wilks' lambda", "Num DF"] = results_manova_annotation.results["video"]["stat"]["Num DF"]["Wilks' lambda"]
+    results_annotation_manova.loc["MANOVA Wilks' lambda", "Den DF"] = results_manova_annotation.results["video"]["stat"]["Den DF"]["Wilks' lambda"]
+    results_annotation_manova.loc["MANOVA Wilks' lambda", "F"] = results_manova_annotation.results["video"]["stat"]["F Value"]["Wilks' lambda"]
+    results_annotation_manova.loc["MANOVA Wilks' lambda", "p"] = results_manova_annotation.results["video"]["stat"]["Pr > F"]["Wilks' lambda"]
+    results_annotation_manova.loc["MANOVA Pillai's trace", "Value"] = results_manova_annotation.results["video"]["stat"]["Value"]["Pillai's trace"]
+    results_annotation_manova.loc["MANOVA Pillai's trace", "Num DF"] = results_manova_annotation.results["video"]["stat"]["Num DF"]["Pillai's trace"]
+    results_annotation_manova.loc["MANOVA Pillai's trace", "Den DF"] = results_manova_annotation.results["video"]["stat"]["Den DF"]["Pillai's trace"]
+    results_annotation_manova.loc["MANOVA Pillai's trace", "F"] = results_manova_annotation.results["video"]["stat"]["F Value"]["Pillai's trace"]
+    results_annotation_manova.loc["MANOVA Pillai's trace", "p"] = results_manova_annotation.results["video"]["stat"]["Pr > F"]["Pillai's trace"]
+    results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "Value"] = results_manova_annotation.results["video"]["stat"]["Value"]["Hotelling-Lawley trace"]
+    results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "Num DF"] = results_manova_annotation.results["video"]["stat"]["Num DF"]["Hotelling-Lawley trace"]
+    results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "Den DF"] = results_manova_annotation.results["video"]["stat"]["Den DF"]["Hotelling-Lawley trace"]
+    results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "F"] = results_manova_annotation.results["video"]["stat"]["F Value"]["Hotelling-Lawley trace"]
+    results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "p"] = results_manova_annotation.results["video"]["stat"]["Pr > F"]["Hotelling-Lawley trace"]
+    results_annotation_manova.loc["MANOVA Roy's largest root", "Value"] = results_manova_annotation.results["video"]["stat"]["Value"]["Roy's largest root"]
+    results_annotation_manova.loc["MANOVA Roy's largest root", "Num DF"] = results_manova_annotation.results["video"]["stat"]["Num DF"]["Roy's largest root"]
+    results_annotation_manova.loc["MANOVA Roy's largest root", "Den DF"] = results_manova_annotation.results["video"]["stat"]["Den DF"]["Roy's largest root"]
+    results_annotation_manova.loc["MANOVA Roy's largest root", "F"] = results_manova_annotation.results["video"]["stat"]["F Value"]["Roy's largest root"]
+    results_annotation_manova.loc["MANOVA Roy's largest root", "p"] = results_manova_annotation.results["video"]["stat"]["Pr > F"]["Roy's largest root"]
+
+    # Save results to a tsv file
+    results_annotation_anova.to_csv(results_filepath_stats / "annotation_anova.tsv", sep="\t", index=True)
+    results_annotation_manova.to_csv(results_filepath_stats / "annotation_manova.tsv", sep="\t", index=True)
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 if __name__ == "__main__":
