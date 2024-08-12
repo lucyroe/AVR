@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 8 August 2024
+Last update: 12 August 2024
 """
 
 def main():
@@ -36,16 +36,19 @@ def main():
         preprocess_physiological,
     )
     from AVR.preprocessing.read_xdf import read_xdf
+    from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Preprocess data"]    # Adjust as needed
-    # "Load data", "Extract features", "Univariate statistics", "Plot results", "Modelling", 
+    steps = ["Univariate statistics"]    # Adjust as needed
+    # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Plot results", "Modelling"
 
-    subjects = ["011", "012", "014", "015", "016", "017", "018", "019", "020",]
-                #"021", "022", "024", "025", "026", "027", "028", "029", "030",
+    subjects = []
+                #"026", "027", "028", "029", "030",
                 #"031", "032", "033", "034", "035", "036", "037", "038", "039", "040",
                 #"041", "042", "043", "044", "045", "046", "047"]
     # "001", "002", "003","004", "005", "006", "007", "009",    # Already done
+    # "011", "012", "014", "015", "016", "017", "018", "019",   # Already done
+    # "020", "021", "022", "024", "025"                        # Already done
 
     # subjects "008", "010", "013" were excluded due to missing data
     # subject "023" was excluded because of bad quality of ECG data
@@ -63,7 +66,7 @@ def main():
     results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"
 
     # Define if plots should be shown
-    show_plots = True
+    show_plots = False
 
     # Define whether manual cleaning of the data is required (cleaning of R-peaks for ECG data)
     manual_cleaning = True
@@ -81,8 +84,8 @@ def main():
             read_xdf(subjects, data_dir, results_dir, show_plots, debug)
 
         elif step == "Preprocess data":
-            #print("\nPreprocessing annotations...\n")
-            #preprocess_annotations(subjects, data_dir, results_dir, show_plots, debug)
+            print("\nPreprocessing annotations...\n")
+            preprocess_annotations(subjects, data_dir, results_dir, show_plots, debug)
             print("\nPreprocessing physiological data...\n")
             preprocess_physiological(subjects, data_dir, results_dir, show_plots, debug, manual_cleaning)
 
@@ -90,12 +93,14 @@ def main():
             extract_features(subjects, data_dir, results_dir, show_plots, debug)
 
         elif step == "Univariate statistics":
-            print("\nPerforming statistical comparison of variability between phase 1 and phase 3...\n")
+            print("\nPerforming univariate statistical analysis...\n")
+            univariate_statistics(subjects, data_dir, results_dir, show_plots, debug)
+            print("\nPerforming statistical comparison of variability in ratings between phase 1 and phase 3...\n")
             compare_variability_phase1_phase3(subjects, subjects_phase1, data_dir, results_dir, show_plots)
 
         elif step == "Plot results":
             print("\nPlotting results...\n")
-            print("\nCreating raincloud plots to compare variability between phase 1 and phase 3...\n")
+            print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
             raincloud_plot(data_dir, results_dir, show_plots)
 
         elif step == "Modelling":

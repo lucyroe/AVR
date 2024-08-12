@@ -6,7 +6,7 @@ Required packages: mne, neurokit, systole, seaborn, autoreject
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 8 August 2024
+Last update: 12 August 2024
 """
 #%%
 def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
@@ -909,6 +909,19 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 )
                 # Exit the program if no montage file is found
                 sys.exit()
+
+            # Open cleaned ECG data
+            cleaned_ecg_dir = Path(subject_preprocessed_folder)
+            cleaned_ecg_file = [file.name for file in cleaned_ecg_dir.iterdir() if file.is_file() and
+                file.name.startswith("sub-" + subject + "_task-" + task + "_physio_ecg_preprocessed")]
+            if len(cleaned_ecg_file) != 1:
+                print("ERROR! No or multiple cleaned ECG files found."
+                "Make sure to run the preprocessing for ECG data first.")
+                # Exit the program if no or multiple cleaned ECG files are found
+                sys.exit()
+            cleaned_ecg = pd.read_csv(Path(cleaned_ecg_dir, cleaned_ecg_file[0]), sep="\t")
+            # Keep only the ECG column
+            cleaned_ecg = cleaned_ecg[["ECG"]].to_numpy().flatten()
 
             # Add NaNs to the ECG data to match the EEG data
             if len(cleaned_ecg) < len(cropped_eeg_data.times):
