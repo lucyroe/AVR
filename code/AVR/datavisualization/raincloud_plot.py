@@ -4,7 +4,7 @@ Plotting raincloud plot to compare the variability between AVR phase 1 and phase
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 21 May 2024
-Last updated: 7 August 2024
+Last updated: 13 August 2024
 """
 
 
@@ -41,7 +41,7 @@ def raincloud_plot(  # noqa: C901, PLR0915
 
     # Colors
     colors = {
-        "valence": ["#56B4E9", "#0072B2", "#6C6C6C", "#CC79A7", "#009E73"],  # light blue, dark blue, grey, pink, green
+        "valence": ["#56B4E9", "#0072B2", "#6C6C6C", "#7a86d1", "#009E73"],  # light blue, dark blue, grey, blue, green
         "arousal": [
             "#F0E442",
             "#E69F00",
@@ -55,7 +55,7 @@ def raincloud_plot(  # noqa: C901, PLR0915
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     def plot_raincloud(
-        data: pd.DataFrame, variable: str, statistic: str, significant_differences: list
+        data: pd.DataFrame, variable: str, statistic: str, significant_differences: list, axes: plt.Axes
     ) -> plt.figure():
         """
         Plot a raincloud plot for the given data.
@@ -71,6 +71,7 @@ def raincloud_plot(  # noqa: C901, PLR0915
         variable: variable for which the raincloud plot should be plotted.
         statistic: statistic for which the raincloud plot should be plotted (mean or std_dev).
         significant_differences: list of significant differences between the groups.
+        axes: axes on which the plot should be plotted.
 
         Returns:
         -------
@@ -85,8 +86,6 @@ def raincloud_plot(  # noqa: C901, PLR0915
 
         # Combine data for all phases in a list
         data_list = [data_phase1_hn, data_phase1_hp, data_phase1_ln, data_phase1_lp, data_other_phase]
-
-        figure, axes = plt.subplots(figsize=(10, 5))
 
         # Boxplots
         # Boxplot data
@@ -123,12 +122,14 @@ def raincloud_plot(  # noqa: C901, PLR0915
             rng = np.random.default_rng()
             out.flat[idxs] += rng.uniform(low=-0.05, high=0.05, size=len(idxs))
             x = out
-            plt.scatter(x, features, s=3, c=colors[variable][idx])
+            axes.scatter(x, features, s=3, c=colors[variable][idx])
 
         # Set labels
-        plt.xticks([1, 2, 3, 4, 5], ["Phase 1 HN", "Phase 1 HP", "Phase 1 LN", "Phase 1 LP", "Phase 3"])
-        plt.ylabel(f"{statistic} of {variable}")
-        plt.title(f"Comparison of the {statistic} of {variable} for Phase 1 and Phase 3")
+        axes.set_xticklabels(["Phase 1 HN", "Phase 1 HP", "Phase 1 LN", "Phase 1 LP", "Phase 3"])
+        axes.set_ylabel(f"{statistic.capitalize() if statistic == 'mean' else 'Standard Deviation'}")
+
+        # Set title
+        axes.set_title(f"{variable.capitalize()}", fontsize=14, fontweight="bold", pad=20)
 
         if mark_significant_differences:
             # Mark significant differences with an asterisk and a line above the two groups
@@ -158,14 +159,14 @@ def raincloud_plot(  # noqa: C901, PLR0915
                 color = "black" if first_group == "Phase 3" or second_group == "Phase 3" else "grey"
 
                 # Plot a line between the two groups
-                plt.plot(
+                axes.plot(
                     [specific_xtick_position_first_group, specific_xtick_position_second_group],
                     [max_value + distance + counter, max_value + distance + counter],
                     color=color,
                 )
 
                 # Add an asterisk in the middle of the line
-                plt.text(
+                axes.text(
                     (specific_xtick_position_first_group + specific_xtick_position_second_group) / 2,
                     max_value + distance + counter,
                     "*",
@@ -175,11 +176,10 @@ def raincloud_plot(  # noqa: C901, PLR0915
 
                 counter += 0.1
 
-        # Show plot
-        if show_plots:
-            plt.show()
-
-        return figure
+        # Set final labels
+        axes.set_xticklabels(
+            ["Selection Phase HN", "Selection Phase HP", "Selection Phase LN", "Selection Phase LP", "Physio Phase"]
+        )
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     # %% LOAD STATISTICS FOR PHASE 1 AND PHASE 2 OR 3
@@ -187,8 +187,11 @@ def raincloud_plot(  # noqa: C901, PLR0915
     combined_data = pd.DataFrame()
     # Loop over phases and read in dataframes
     for phase in phases:
-        file_directory = (Path(data_dir) / phase / "preprocessed" / "annotations" if phase == "phase1"
-            else Path(data_dir) / phase / "AVR" / "derivatives" / "preproc")
+        file_directory = (
+            Path(data_dir) / phase / "preprocessed" / "annotations"
+            if phase == "phase1"
+            else Path(data_dir) / phase / "AVR" / "derivatives" / "preproc"
+        )
         data = pd.read_csv(file_directory / f"stats_{phase}.tsv", sep="\t")
         # Append data to combined_data
         combined_data = combined_data._append(data)
@@ -204,6 +207,9 @@ def raincloud_plot(  # noqa: C901, PLR0915
     # %% PLOT RAINCLOUD PLOTS AND SAVE
     # Create raincloud plot for each variable and each statistic
     for statistic in statistics:
+        # Create a figure for each statistic and both variables
+        figure, axes = plt.subplots(2, 1, figsize=(10, 10))
+
         for variable in variable_names:
             if mark_significant_differences:
                 # Get significant differences for the current variable and statistic
@@ -228,12 +234,23 @@ def raincloud_plot(  # noqa: C901, PLR0915
                 significant_differences = []
 
             # Plot raincloud plot
-            figure = plot_raincloud(combined_data, variable, statistic, significant_differences)
-            # Save figure
-            figure.savefig(
-                Path(results_dir_comparison)
-                / f"raincloud_{phases[0]}_{phases[1]}_{statistic}_{variable}.png"
+            plot_raincloud(
+                combined_data, variable, statistic, significant_differences, axes[variable_names.index(variable)]
             )
+
+        # Remove the x-axis label from the upper plot
+        axes[0].set_xticklabels("")
+        axes[0].set_xticks([])
+
+        # More space between the two plots
+        plt.tight_layout()
+
+        # Save figure
+        figure.savefig(Path(results_dir_comparison) / f"raincloud_{phases[0]}_{phases[1]}_{statistic}_annotation.svg")
+
+        # Show plot
+        if show_plots:
+            plt.show()
 
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o

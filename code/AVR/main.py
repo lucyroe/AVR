@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 12 August 2024
+Last update: 13 August 2024
 """
 
 def main():
@@ -29,6 +29,7 @@ def main():
     """
     # %% Import
     from AVR.datacomparison.compare_variability_phase1_phase3 import compare_variability_phase1_phase3
+    from AVR.datavisualization.plot_descriptives import plot_descriptives
     from AVR.datavisualization.raincloud_plot import raincloud_plot
     from AVR.preprocessing.annotation.preprocessing_annotation_avr_phase3 import preprocess_annotations
     from AVR.preprocessing.physiological.feature_extraction import extract_features
@@ -37,11 +38,10 @@ def main():
     )
     from AVR.preprocessing.read_xdf import read_xdf
     from AVR.statistics.univariate_statistics import univariate_statistics
-    from AVR.datacomparison.plot_descriptives import plot_descriptives
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Univariate statistics"]    # Adjust as needed
-    # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Plot results", "Modelling"
+    steps = ["Plot results"]    # Adjust as needed
+    # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Modelling"
 
     subjects = []
                 #"026", "027", "028", "029", "030",
