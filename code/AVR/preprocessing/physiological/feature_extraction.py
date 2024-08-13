@@ -6,10 +6,10 @@ Required packages:  mne, neurokit2, fcwt, scipy, fooof
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 23 July 2024
-Last update: 1 August 2024
+Last update: 13 August 2024
 """
-
-def extract_features(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
+# %%
+def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, PLR0915, B006
             data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
             results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
             show_plots=False,
@@ -40,6 +40,7 @@ def extract_features(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
         3b. Calculate the mean power of the EEG frequency bands for a region of interest (ROI)
         3c. Save EEG power features in a tsv file
         3d. Plot EEG power features
+    4. AVERAGE SELECTED FEATURES ACROSS PARTICIPANTS
     """
     # %% Import
     import json
@@ -63,7 +64,8 @@ def extract_features(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
         subjects = [subjects[0]]
 
     # Define which steps to run
-    steps = ["Load Data", "Feature Extraction ECG", "Feature Extraction EEG"]
+    steps = []
+    # "Load Data", "Feature Extraction ECG", "Feature Extraction EEG", "Average Across Participants"
 
     data_dir = Path(data_dir) / "phase3"
     exp_name = "AVR"
@@ -259,6 +261,10 @@ def extract_features(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
         "EEG": {"delta": "#F0E442", "theta": "#D55E00", "alpha": "#CC79A7", "beta": "#56B4E9", "gamma": "#009E73"},
         # yellow, dark orange, pink, light blue, green
     }
+
+    # Features for averaging across participants
+    features_averaging = {"ecg": ["ibi", "hrv", "lf-hrv", "hf-hrv"],
+                "eeg": ["posterior_alpha", "frontal_alpha", "frontal_theta", "gamma", "beta"]}
 
     # Get rid of the sometimes excessive logging of MNE
     mne.set_log_level("error")
@@ -927,6 +933,86 @@ def extract_features(subjects=[],  # noqa: C901, PLR0912, PLR0915, B006
                 json.dump(metadata, file)
 
             print("Done with EEG feature extraction!\n")
+
+    # %% STEP 4. AVERAGE SELECTED FEATURES ACROSS PARTICIPANTS
+    if "Average Across Participants" in steps:
+        print("********** Averaging features across participants **********\n")
+
+        # Initiate empty dataframes for the features
+        ecg_features_all = pd.DataFrame()
+        eeg_features_all = pd.DataFrame()
+
+        # Load the features of all participants
+        for subject in subjects:
+            ecg_features = pd.read_csv(
+                data_dir / exp_name / derivative_name / feature_name / f"sub-{subject}" / datatype_name /
+                f"sub-{subject}_task-{task}_ecg_features.tsv",
+                sep="\t",
+            )
+            ecg_features_selected = pd.DataFrame()
+            for feature in features_averaging["ecg"]:
+                ecg_features_selected[feature] = ecg_features[feature]
+
+            # Add timestamp column as first column
+            ecg_features_selected.insert(0, "timestamp", ecg_features["timestamp"])
+
+            # Add column with subject ID as second column
+            ecg_features_selected.insert(1, "subject", subject)
+
+            # Add the features of the participant to the dataframe
+            ecg_features_all = pd.concat([ecg_features_all, ecg_features_selected], axis=0)
+
+            eeg_features_selected = pd.DataFrame()
+            for feature in features_averaging["eeg"]:
+                if len(feature.split("_")) == 2:
+                    feature_roi, feature_band = feature.split("_")
+                    eeg_features = pd.read_csv(
+                        data_dir / exp_name / derivative_name / feature_name / f"sub-{subject}" / datatype_name /
+                        f"sub-{subject}_task-{task}_eeg_features_{feature_roi}_power.tsv",
+                        sep="\t",
+                    )
+                    eeg_features_selected[feature] = eeg_features[feature_band]
+                else:
+                    eeg_features = pd.read_csv(
+                        data_dir / exp_name / derivative_name / feature_name / f"sub-{subject}" / datatype_name /
+                        f"sub-{subject}_task-{task}_eeg_features_whole-brain_power.tsv",
+                        sep="\t",
+                    )
+                    eeg_features_selected[feature] = eeg_features[feature]
+
+            # Add timestamp column as first column
+            eeg_features_selected.insert(0, "timestamp", eeg_features["timestamp"])
+
+            # Add column with subject ID as second column
+            eeg_features_selected.insert(1, "subject", subject)
+
+            # Add the features of the participant to the dataframe
+            eeg_features_all = pd.concat([eeg_features_all, eeg_features_selected], axis=0)
+
+        # Select only numeric columns
+        numeric_columns_ecg = ecg_features_all.select_dtypes(include=[np.number]).columns
+        numeric_columns_eeg = eeg_features_all.select_dtypes(include=[np.number]).columns
+
+        # Average the features across participants
+        ecg_features_mean = ecg_features_all[numeric_columns_ecg].groupby("timestamp").mean().reset_index()
+        eeg_features_mean = eeg_features_all[numeric_columns_eeg].groupby("timestamp").mean().reset_index()
+
+        # Make sure both dataframes have the same length
+        min_length = min(len(ecg_features_mean), len(eeg_features_mean))
+        ecg_features_mean = ecg_features_mean.iloc[:min_length]
+        eeg_features_mean = eeg_features_mean.iloc[:min_length]
+
+        # Add the features to one dataframe
+        features_all = pd.concat([ecg_features_mean, eeg_features_mean], axis=1)
+
+        # Delete the timestamp column of the second dataframe
+        features_all = features_all.loc[:, ~features_all.columns.duplicated()]
+
+        # Save the averaged features in a tsv file
+        features_all.to_csv(
+            data_dir / exp_name / derivative_name / feature_name / averaged_name / datatype_name /
+            f"avg_task-{task}_physio_features.tsv", sep="\t", index=False
+        )
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 if __name__ == "__main__":
