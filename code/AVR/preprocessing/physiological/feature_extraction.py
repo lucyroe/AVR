@@ -8,12 +8,15 @@ Contact: lucy.roellecke[at]tuta.com
 Created on: 23 July 2024
 Last update: 13 August 2024
 """
-# %%
-def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, PLR0915, B006
-            data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
-            results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
-            show_plots=False,
-            debug=False):
+
+
+def extract_features(  # noqa: PLR0915, C901, PLR0912
+    subjects=["001", "002", "003"],  # noqa: B006
+    data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
+    results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
+    show_plots=False,
+    debug=False,
+):
     """
     Extract features from EEG and ECG data for AVR phase 3.
 
@@ -64,8 +67,8 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
         subjects = [subjects[0]]
 
     # Define which steps to run
-    steps = []
-    # "Load Data", "Feature Extraction ECG", "Feature Extraction EEG", "Average Across Participants"
+    steps = ["Load Data", "Feature Extraction ECG", "Feature Extraction EEG"]
+    # "Average Across Participants"
 
     data_dir = Path(data_dir) / "phase3"
     exp_name = "AVR"
@@ -78,8 +81,9 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
 
     # Create the features data folder if it does not exist
     for subject in subjects:
-        subject_features_folder = (data_dir / exp_name / derivative_name / feature_name / f"sub-{subject}" /
-        datatype_name)
+        subject_features_folder = (
+            data_dir / exp_name / derivative_name / feature_name / f"sub-{subject}" / datatype_name
+        )
         subject_features_folder.mkdir(parents=True, exist_ok=True)
     avg_features_folder = data_dir / exp_name / derivative_name / feature_name / averaged_name / datatype_name
     avg_features_folder.mkdir(parents=True, exist_ok=True)
@@ -103,8 +107,9 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
     # Define frequency bands of interest
     # Berger, 1929: delta (δ; 0.3-4 Hz), theta (θ; 4-8 Hz),
     # alpha (α; 8-12 Hz), beta (β; 12-30 Hz) and gamma (γ; 30-45 Hz)  # noqa: RUF003
-    bands = fooof.bands.Bands({"delta": [0.3, 4], "theta": [4, 8], "alpha": [8, 13], "beta": [13, 30],
-    "gamma": [30, 45]})
+    bands = fooof.bands.Bands(
+        {"delta": [0.3, 4], "theta": [4, 8], "alpha": [8, 13], "beta": [13, 30], "gamma": [30, 45]}
+    )
 
     # Define channels for the ROIs of interest
     rois = {
@@ -263,15 +268,16 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
     }
 
     # Features for averaging across participants
-    features_averaging = {"ecg": ["ibi", "hrv", "lf-hrv", "hf-hrv"],
-                "eeg": ["posterior_alpha", "frontal_alpha", "frontal_theta", "gamma", "beta"]}
+    features_averaging = {
+        "ecg": ["ibi", "hrv", "lf-hrv", "hf-hrv"],
+        "eeg": ["posterior_alpha", "frontal_alpha", "frontal_theta", "gamma", "beta"],
+    }
 
     # Get rid of the sometimes excessive logging of MNE
     mne.set_log_level("error")
 
     # Enable interactive plots (only works when running in interactive mode)
     # %matplotlib qt
-
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     def calculate_hrv(  # noqa: PLR0915, PLR0913
@@ -438,7 +444,6 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
 
         return lf_power_mirrored, hf_power_mirrored, hrv_power_mirrored, times_mirrored, ibi_mirrored_final, fig
 
-
     def calculate_power(eeg, sampling_frequency, bands, frequencies, mirror_length, window_length, overlap):  # noqa: PLR0913, PLR0915
         """
         Calculate the power of all EEG frequency bands.
@@ -520,8 +525,10 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
         print(f"End time: {end_time}")
         print("CWT for TFR on EEG data completed.")
 
-        print("Smoothing the Time-Frequency representation by averaging over 2s windows, "
-        "thereby downsampling to 1 Hz...")
+        print(
+            "Smoothing the Time-Frequency representation by averaging over 2s windows, "
+            "thereby downsampling to 1 Hz..."
+        )
         # Smooth the Time-Frequency representation
         # Average over 2s windows with 50% overlap
         # This down-samples the power timeseries to 1 Hz
@@ -635,7 +642,6 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
 
         return power
 
-
     def calculate_power_roi(power, roi):
         """
         Calculate the mean power of the EEG frequency bands for a region of interest (ROI).
@@ -662,7 +668,6 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
             power_roi[band] = np.mean(power_roi_band, axis=1)
 
         return power_roi
-
 
     def integrate_power(frequencies, psd, band):
         """
@@ -696,7 +701,6 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
             power[i] = scipy.integrate.trapezoid(psd_band, frequencies_band)
 
         return power
-
 
     # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
 
@@ -738,8 +742,9 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
 
             print("Loading ECG data...")
             # Read the preprocessed ECG data
-            ecg_file = (subject_data_path /
-                f"sub-{subject}_task-{task}_physio_ecg_preprocessed_scaled_manually-cleaned.tsv")
+            ecg_file = (
+                subject_data_path / f"sub-{subject}_task-{task}_physio_ecg_preprocessed_scaled_manually-cleaned.tsv"
+            )
             ecg_data = pd.read_csv(ecg_file, sep="\t")
 
             print("Loading EEG data...\n")
@@ -783,8 +788,14 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
             # And only use every second event marker to avoid overlap
             for _, row in events_experiment.iloc[0:-1:2].iterrows():
                 plt.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
-                plt.text(row["onset"] - 100, min(ibi_mirrored)-0.1*min(ibi_mirrored), row["event_name"], rotation=30,
-                fontsize=8, color="gray")
+                plt.text(
+                    row["onset"] - 100,
+                    min(ibi_mirrored) - 0.1 * min(ibi_mirrored),
+                    row["event_name"],
+                    rotation=30,
+                    fontsize=8,
+                    color="gray",
+                )
 
             # Transform x-axis labels to minutes
             x_ticks = ax.get_xticks()
@@ -816,8 +827,14 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
             # And only use every second event marker to avoid overlap
             for _, row in events_experiment.iloc[0:-1:2].iterrows():
                 plt.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
-                plt.text(row["onset"] - 100, min(lf_power)-1.5*min(lf_power), row["event_name"], rotation=30,
-                fontsize=8, color="gray")
+                plt.text(
+                    row["onset"] - 100,
+                    min(lf_power) - 1.5 * min(lf_power),
+                    row["event_name"],
+                    rotation=30,
+                    fontsize=8,
+                    color="gray",
+                )
 
             # Transform x-axis labels to minutes
             x_ticks = ax.get_xticks()
@@ -875,8 +892,14 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
                 # And only use every second event marker to avoid overlap
                 for _, row in events_experiment.iloc[0:-1:2].iterrows():
                     plt.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
-                    plt.text(row["onset"] - 100, max(power_roi["alpha"]) - 0.1 * max(power_roi["alpha"]),
-                    row["event_name"], rotation=30, fontsize=8, color="gray")
+                    plt.text(
+                        row["onset"] - 100,
+                        max(power_roi["alpha"]) - 0.1 * max(power_roi["alpha"]),
+                        row["event_name"],
+                        rotation=30,
+                        fontsize=8,
+                        color="gray",
+                    )
                 # Transform x-axis labels to minutes
                 x_ticks = ax.get_xticks()
                 ax.set_xticks(x_ticks)
@@ -890,6 +913,8 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
 
                 if show_plots:
                     plt.show()
+
+                plt.close()
 
             print("Saving plots...")
 
@@ -945,8 +970,13 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
         # Load the features of all participants
         for subject in subjects:
             ecg_features = pd.read_csv(
-                data_dir / exp_name / derivative_name / feature_name / f"sub-{subject}" / datatype_name /
-                f"sub-{subject}_task-{task}_ecg_features.tsv",
+                data_dir
+                / exp_name
+                / derivative_name
+                / feature_name
+                / f"sub-{subject}"
+                / datatype_name
+                / f"sub-{subject}_task-{task}_ecg_features.tsv",
                 sep="\t",
             )
             ecg_features_selected = pd.DataFrame()
@@ -967,15 +997,25 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
                 if len(feature.split("_")) == 2:
                     feature_roi, feature_band = feature.split("_")
                     eeg_features = pd.read_csv(
-                        data_dir / exp_name / derivative_name / feature_name / f"sub-{subject}" / datatype_name /
-                        f"sub-{subject}_task-{task}_eeg_features_{feature_roi}_power.tsv",
+                        data_dir
+                        / exp_name
+                        / derivative_name
+                        / feature_name
+                        / f"sub-{subject}"
+                        / datatype_name
+                        / f"sub-{subject}_task-{task}_eeg_features_{feature_roi}_power.tsv",
                         sep="\t",
                     )
                     eeg_features_selected[feature] = eeg_features[feature_band]
                 else:
                     eeg_features = pd.read_csv(
-                        data_dir / exp_name / derivative_name / feature_name / f"sub-{subject}" / datatype_name /
-                        f"sub-{subject}_task-{task}_eeg_features_whole-brain_power.tsv",
+                        data_dir
+                        / exp_name
+                        / derivative_name
+                        / feature_name
+                        / f"sub-{subject}"
+                        / datatype_name
+                        / f"sub-{subject}_task-{task}_eeg_features_whole-brain_power.tsv",
                         sep="\t",
                     )
                     eeg_features_selected[feature] = eeg_features[feature]
@@ -1010,9 +1050,17 @@ def extract_features(subjects = ["001", "002", "003"],  # noqa: C901, PLR0912, P
 
         # Save the averaged features in a tsv file
         features_all.to_csv(
-            data_dir / exp_name / derivative_name / feature_name / averaged_name / datatype_name /
-            f"avg_task-{task}_physio_features.tsv", sep="\t", index=False
+            data_dir
+            / exp_name
+            / derivative_name
+            / feature_name
+            / averaged_name
+            / datatype_name
+            / f"avg_task-{task}_physio_features.tsv",
+            sep="\t",
+            index=False,
         )
+
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 if __name__ == "__main__":

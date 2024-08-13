@@ -40,19 +40,26 @@ def main():
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Plot results"]    # Adjust as needed
-    # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Modelling"
+    steps = ["Extract features"]    # Adjust as needed
+    # "Load data", "Preprocess data", "Univariate statistics", "Plot results", "Modelling"
 
     subjects = []
-                #"026", "027", "028", "029", "030",
+                # "001", "002", "003","004", "005", "006", "007", "009",
+                # "011", "012", "014", "015", "016", "017", "018", "019",
+                # "020", "021", "022", "024", "025", "026", "027", "028", "029", "030",
                 #"031", "032", "033", "034", "035", "036", "037", "038", "039", "040",
-                #"041", "042", "043", "044", "045", "046", "047"]
-    # "001", "002", "003","004", "005", "006", "007", "009",    # Already done
-    # "011", "012", "014", "015", "016", "017", "018", "019",   # Already done
-    # "020", "021", "022", "024", "025"                        # Already done
+                #"041", "042", "043", "044", "045", "046", "047"
 
     # subjects "008", "010", "013" were excluded due to missing data
     # subject "023" was excluded because of bad quality of ECG data
+
+    # Preprocessing of the following subjects was already done:
+    # "001", "002", "003","004", "005", "006", "007", "009",
+    # "011", "012", "014", "015", "016", "017", "018", "019",
+    # "020", "021", "022", "024", "025"
+    # Features were already extracted for the following subjects:
+    # "001", "002", "003", "004", "005", "006", "007", "009"
+    # "011", "012", "014", "015", "016", "017", "018", "019"
 
     # Only needed for comparison of phase 3 with phase 1
     subjects_phase1 = ["06", "08", "10", "12", "14", "16", "18", "19", "20",
