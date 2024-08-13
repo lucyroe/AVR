@@ -912,7 +912,7 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
 
             #TODO: WIP Open ECG cleaned data
             cleaned_ecg_dir = Path(subject_preprocessed_folder)
-            cleaned_ecg_file = [file.name for file in cleaned_ecg_dir.iterdir() if file.is_file() and file.name.startswith("sub-" + subject + "_task-" + task + "_physio_ecg_preprocessed")]
+            cleaned_ecg_file = [file.name for file in cleaned_ecg_dir.iterdir() if file.is_file() and "_ecg_preprocessed" in file.name]
             if len(cleaned_ecg_file) != 1:
                 print("ERROR! No or multiple cleaned ECG files found. Make sure to run the preprocessing for ECG data first.")
                 # Exit the program if no or multiple cleaned ECG files are found
