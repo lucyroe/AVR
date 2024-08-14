@@ -58,7 +58,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha"],
-        "integrated": ["ibi", "hf-hrv", "posterior_alpha"],
+        "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
     }
 
     # Define whether features should be z-scored to have mean 0 and standard deviation 1
@@ -159,7 +159,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         axis.set_ylabel(ylabel)
         axis.legend(loc="upper right")
 
-    # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
+    # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
 
     # %% STEP 1. GET DATA
     # Loop over all models
