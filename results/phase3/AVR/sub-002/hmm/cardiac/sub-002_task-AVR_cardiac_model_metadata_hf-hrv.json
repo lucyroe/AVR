@@ -1,0 +1,1 @@
+{"subject": "002", "model": "cardiac", "number_of_states": 4, "iterations": 1000, "number_of_mixtures": 1, "covariance_type": "diag", "features": ["hf-hrv"], "number_of_features": 1, "z_score": true}

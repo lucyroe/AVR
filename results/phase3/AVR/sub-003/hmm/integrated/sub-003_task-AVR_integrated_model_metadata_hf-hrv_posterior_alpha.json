@@ -1,0 +1,1 @@
+{"subject": "003", "model": "integrated", "number_of_states": 4, "iterations": 1000, "number_of_mixtures": 1, "covariance_type": "diag", "features": ["hf-hrv", "posterior_alpha"], "number_of_features": 2, "z_score": true}
