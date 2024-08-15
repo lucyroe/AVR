@@ -1,1 +1,0 @@
-{"subject": "001", "model": "neural", "number_of_states": 4, "iterations": 1000, "number_of_mixtures": 1, "covariance_type": "diag", "features": ["posterior_alpha", "frontal_alpha", "frontal_theta", "gamma", "beta"], "number_of_features": 5, "z_score": true}

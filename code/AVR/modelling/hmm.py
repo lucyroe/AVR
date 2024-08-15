@@ -6,10 +6,10 @@ Required packages: hmmlearn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 22 May 2024
-Last update: 14 August 2024
+Last update: 15 August 2024
 """
 
-
+# %%
 def hmm(  # noqa: C901, PLR0912, PLR0915
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
@@ -31,13 +31,9 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
     - plot_hidden_states: Plot the data with the hidden states marked in color vertically.
 
     Steps:
-    1. GET DATA
-    2. HIDDEN MARKOV MODELs (HMMs) TODO: adapt if necessary
-        2a. Create and train the Cardiac Hidden Markov Model.
-        2b. Create and train the Neural Hidden Markov Model.
-        2c. Create and train the Integrated Hidden Markov Model.
-        2d. Save the HMMs.
-        2e. Plot the data with the hidden states marked in color vertically.
+    1. Get data: Load the extracted ECG and EEG features.
+    2. HMMs: Create and train the Hidden Markov Models.
+    3. Save results: Save the models, hidden states, data, metadata, and parameters.
     """
     # %% Import
     import json
@@ -57,7 +53,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
-        "neural": ["posterior_alpha"],
+        "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
     }
 
@@ -85,7 +81,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         subjects = [subjects[0]]
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-    def create_model(data, number_of_states, iterations=1000):
+    def create_model(data, number_of_states, lengths, iterations=1000):
         """
         Create and train a Hidden Markov Model (HMM) on the given data. Then predict the hidden states.
 
@@ -93,6 +89,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         ----
             data (np.array): The data to train the HMM on, can contain multiple features.
             number_of_states (int): The number of hidden states of the HMM.
+            lengths (np.array): The lengths of the sequences in the data.
             iterations (int): The number of iterations to train the HMM (defaults to 1000).
 
         Returns:
@@ -109,8 +106,8 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             random_state=seed,
             covariance_type=covariance_type,
         )
-        model.fit(data)
-        hidden_states = model.predict(data)
+        model.fit(data, lengths)
+        hidden_states = model.predict(data, lengths)
 
         return model, hidden_states
 
@@ -167,6 +164,9 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         print("+++++++++++++++++++++++++++++++++")
         print(f"Initiating {model} model...")
         print("+++++++++++++++++++++++++++++++++\n")
+
+        # Create empty dataframe to store the data of all subjects
+        data_all_subjects = pd.DataFrame()
 
         # Loop over all subjects
         for subject_index, subject in enumerate(subjects):
@@ -225,88 +225,101 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             print("Combining all features into one array...\n")
             data = np.column_stack(tuple(all_features))
 
-            # %% STEP 2. HMMs
+            # Add the data to the dataframe
+            data_all_subjects = pd.concat([data_all_subjects, pd.DataFrame(data, columns=models_features[model])], axis=0)
 
-            # Create and train the Hidden Markov Model
-            print("Creating and training the Hidden Markov Model...")
+        # %% STEP 2. HMMs
+        # Create and train the Hidden Markov Model
+        print("Creating and training the Hidden Markov Model...")
+        hmm_all_subjects, hidden_states_all_subjects = create_model(data_all_subjects, number_of_states, len(data_all_subjects), iterations)
 
-            hmm, hidden_states = create_model(data, number_of_states, iterations)
+        # %% STEP 3. SAVE RESULTS
+        print("Saving results...\n")
 
-            print("Saving results...\n")
+        # Define the file path to save the model
+        hmm_path = resultpath / "avg" / "hmm" / model
 
-            # Define the file path to save the model
-            hmm_path = resultpath / f"sub-{subject}" / "hmm" / model
+        # Create the model directory if it does not exist yet
+        hmm_path.mkdir(parents=True, exist_ok=True)
 
-            # Create the model directory if it does not exist yet
-            hmm_path.mkdir(parents=True, exist_ok=True)
+        features_string = "_".join(models_features[model])
 
-            features_string = "_".join(models_features[model])
+        # Create a dataframe with the state sequence corresponding to each timepoint
+        hidden_states_all_subjects_df = pd.DataFrame({"state": hidden_states_all_subjects})
 
-            # Create a dataframe with the state sequence corresponding to each timepoint
-            hidden_states_df = pd.DataFrame({"state": hidden_states})
+        # Add a column with the time as first column
+        hidden_states_all_subjects_df.insert(0, "timestamp", np.tile(np.arange(len(hidden_states_all_subjects_df)/len(subjects)), len(subjects)))
 
-            # Add a column with the time as first column
-            hidden_states_df.insert(0, "timestamp", np.arange(len(hidden_states_df)))
+        # Add the subject ID to the hidden states
+        hidden_states_all_subjects_df.insert(0, "subject", np.repeat(subjects, len(hidden_states_all_subjects_df)//len(subjects)))
 
-            # Save the hidden states to a tsv file
-            hidden_states_file = f"sub-{subject}_task-AVR_{model}_model_hidden_states_{features_string}.tsv"
-            hidden_states_df.to_csv(hmm_path / hidden_states_file, sep="\t", index=False)
+        # Save the hidden states to a tsv file
+        hidden_states_all_subjects_file = f"all_subjects_task-AVR_{model}_model_hidden_states_{features_string}.tsv"
+        hidden_states_all_subjects_df.to_csv(hmm_path / hidden_states_all_subjects_file, sep="\t", index=False)
 
-            # Create a dataframe with the data and the hidden states
-            data_df = pd.DataFrame(data, columns=models_features[model])
-            data_df["state"] = hidden_states
-            # Add the time as first column
-            data_df.insert(0, "timestamp", np.arange(len(data_df)))
+        # Create a dataframe with the data and the hidden states
+        data_all_subjects_df = pd.DataFrame(data_all_subjects, columns=models_features[model])
+        data_all_subjects_df["state"] = hidden_states_all_subjects
+        # Add the time as first column
+        data_all_subjects_df.insert(0, "timestamp", np.tile(np.arange(len(hidden_states_all_subjects_df)/len(subjects)), len(subjects)))
+        # Add the subject ID to the data
+        data_all_subjects_df.insert(0, "subject", np.repeat(subjects, len(hidden_states_all_subjects_df)//len(subjects)))
 
-            # Save the data with the hidden states to a tsv file
-            data_file = f"sub-{subject}_task-AVR_{model}_model_data_{features_string}.tsv"
-            data_df.to_csv(hmm_path / data_file, sep="\t", index=False)
+        # Save the data with the hidden states to a tsv file
+        data_file_all_subjects = f"all_subjects_task-AVR_{model}_model_data_{features_string}.tsv"
+        data_all_subjects_df.to_csv(hmm_path / data_file_all_subjects, sep="\t", index=False)
 
-            # Create a metadata json file with the model parameters
-            hmm_metadata = {
-                "subject": subject,
-                "model": model,
-                "number_of_states": number_of_states,
-                "iterations": iterations,
-                "number_of_mixtures": number_of_mixtures,
-                "covariance_type": covariance_type,
-                "features": models_features[model],
-                "number_of_features": len(models_features[model]),
-                "z_score": z_score,
+        # Create a metadata json file with the model parameters
+        hmm_metadata_all_subjects = {
+            "subjects": subjects,
+            "model": model,
+            "number_of_states": number_of_states,
+            "iterations": iterations,
+            "number_of_mixtures": number_of_mixtures,
+            "covariance_type": covariance_type,
+            "features": models_features[model],
+            "number_of_features": len(models_features[model]),
+            "z_score": z_score,
+        }
+
+        # Save the metadata to a json file
+        metadata_file_all_subjects = f"all_subjects_task-AVR_{model}_model_metadata_{features_string}.json"
+        with Path(hmm_path / metadata_file_all_subjects).open("w") as f:
+            json.dump(hmm_metadata_all_subjects, f)
+
+        # Create a dictionary with the state parameters
+        hmm_parameters_all_subjects = {}
+        for state in range(number_of_states):
+            # Get the percentage of time spent in the state
+            percentage = len(hidden_states_all_subjects[hidden_states_all_subjects == state]) / len(hidden_states_all_subjects)
+            hmm_state_parameters_all_subjects = {
+                "state": state,
+                "percentage": percentage,
+                "means": hmm_all_subjects.means_[state].tolist(),
+                "covars": hmm_all_subjects.covars_[state].tolist(),
+                "startprob": hmm_all_subjects.startprob_[state].tolist(),
+                "transmat": hmm_all_subjects.transmat_[state].tolist(),
             }
+            # Add the state parameters to the dictionary
+            hmm_parameters_all_subjects[f"state_{state}"] = hmm_state_parameters_all_subjects
 
-            # Save the metadata to a json file
-            metadata_file = f"sub-{subject}_task-AVR_{model}_model_metadata_{features_string}.json"
-            with Path(hmm_path / metadata_file).open("w") as f:
-                json.dump(hmm_metadata, f)
+        # Save the state parameters to a json file
+        parameters_file_all_subjects = f"all_subjects_task-AVR_{model}_model_parameters_{features_string}.json"
+        with Path(hmm_path / parameters_file_all_subjects).open("w") as f:
+            json.dump(hmm_parameters_all_subjects, f)
 
-            # Create a dictionary with the state parameters
-            hmm_parameters = {}
-            for state in range(number_of_states):
-                # Get the percentage of time spent in the state
-                percentage = len(hidden_states[hidden_states == state]) / len(hidden_states)
-                hmm_state_parameters = {
-                    "state": state,
-                    "percentage": percentage,
-                    "means": hmm.means_[state].tolist(),
-                    "covars": hmm.covars_[state].tolist(),
-                    "startprob": hmm.startprob_[state].tolist(),
-                    "transmat": hmm.transmat_[state].tolist(),
-                }
-                # Add the state parameters to the dictionary
-                hmm_parameters[f"state_{state}"] = hmm_state_parameters
+        # Create a plot for the model for each participant with a subplot for each feature
+        for subject in subjects:
+            hmm_path_subject = resultpath / f"sub-{subject}" / "hmm" / model
+            # Create the subject directory if it does not exist yet
+            hmm_path_subject.mkdir(parents=True, exist_ok=True)
 
-            # Save the state parameters to a json file
-            parameters_file = f"sub-{subject}_task-AVR_{model}_model_parameters_{features_string}.json"
-            with Path(hmm_path / parameters_file).open("w") as f:
-                json.dump(hmm_parameters, f)
-
-            # Create a plot for the model with a subplot for each feature
+            # Plot the hidden states for each feature
             fig, axs = plt.subplots(len(all_features), 1, figsize=(10, 5 * len(all_features)))
             for feature_index, feature in enumerate(models_features[model]):
                 plot_hidden_states(
-                    all_features[feature_index],
-                    hidden_states,
+                    data_all_subjects_df[data_all_subjects_df["subject"] == subject][feature],
+                    hidden_states_all_subjects_df[hidden_states_all_subjects_df["subject"] == subject]["state"],
                     axs[feature_index] if len(all_features) > 1 else axs,
                     number_of_states,
                     f"{feature}",
@@ -318,8 +331,8 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             fig.suptitle(f"{model.capitalize()} Model for subject {subject}", fontsize=16)
 
             # Save the plot
-            plot_file = f"sub_{subject}_{model}_hmm_{features_string}.png"
-            plt.savefig(hmm_path / plot_file)
+            plot_file= f"sub-{subject}_{model}_hmm_{features_string}.png"
+            plt.savefig(hmm_path_subject / plot_file)
 
             # Show the plot
             if show_plots:
