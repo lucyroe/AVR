@@ -15,7 +15,7 @@
 13	phase1 LN	std_dev valence	0.98	51	0.39	False
 14	phase1 LN	mean arousal	0.74	51	0.0	True
 15	phase1 LN	std_dev arousal	0.94	51	0.011	True
-16	phase3	mean valence	0.96	44	0.199	False
-17	phase3	std_dev valence	0.95	44	0.04	True
-18	phase3	mean arousal	0.99	44	0.93	False
-19	phase3	std_dev arousal	0.92	44	0.004	True
+16	phase3	mean valence	0.96	43	0.181	False
+17	phase3	std_dev valence	0.95	43	0.047	True
+18	phase3	mean arousal	0.99	43	0.939	False
+19	phase3	std_dev arousal	0.92	43	0.006	True

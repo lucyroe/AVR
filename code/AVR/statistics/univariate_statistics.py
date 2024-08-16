@@ -1,19 +1,25 @@
 """
 Script to read in and calculate univariate statistics of the participants of AVR phase 3.
 
-Required packages: statsmodels, scipy
+Required packages: statsmodels, scipy, pingouin
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 9 August 2024
-Last update: 12 August 2024
+Last update: 16 August 2024
 """
 
+
 def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
-    subjects=["001", "002", "003"],  # noqa: B006
+    subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
+                "011", "012", "014", "015", "016", "017", "018", "019",
+                "020", "021", "022", "024", "025", "026", "027", "028", "029",
+                "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+                "040", "041", "042", "043", "044", "045", "046", "047"],
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     debug=False,
+    show_plots=False,
 ):
     """
     Calculate univariate statistics.
@@ -32,18 +38,22 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
         1b. Load & Format Annotation Data
         1c. Load & Format Event Markers
         1d. Load & Format Physiological Data
-    2. CALCULATE UNIVARIATE STATISTICS
-        2a. Demographics
-        2b. Annotation Data
-        2c. Physiological Data
+    2. TEST ASSUMPTIONS
+        2a. rm ANOVA for Annotation Data: Normality (Shapiro-Wilk), Sphericity (Mauchly's Test)
+        2b. rm ANOVA for Physiological Data: Normality (Shapiro-Wilk), Sphericity (Mauchly's Test)
+    3. CALCULATE DESCRIPTIVE STATISTICS
+        3a. Demographics
+        3b. Annotation Data
+        3c. Physiological Data
 
     """
     # %% Import
     from pathlib import Path
 
+    import matplotlib.pyplot as plt
     import pandas as pd
+    import pingouin as pg
     from scipy import stats
-    from statsmodels.multivariate.manova import MANOVA
     from statsmodels.stats.anova import AnovaRM
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
@@ -71,6 +81,151 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     alpha = 0.05
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+    def test_assumptions(data, group_name, variable_names, alpha=0.05) -> pd.DataFrame:
+        """
+        Test the assumptions for a repeated measures ANOVA.
+
+        1. Normal distribution of data within groups (Shapiro-Wilk test)
+        2. Sphericity of data (Mauchly's Test)
+
+        Arguments:
+        ---------
+        data: dataframe
+        group_name: name of the group variable
+        variable_names: list of variables to be compared
+        alpha: significance level
+
+        Returns:
+        -------
+        table_normality: dataframe
+        fig: figure
+        table_sphericity: dataframe
+        """
+        # 1. Normal distribution of data within groups (Shapiro-Wilk test)
+        # Loop over groups
+        # Create a matrix of plots for each group and variable
+        # Determine the number of rows and columns for the subplot grid
+        num_rows = len(videos)
+        num_cols = len(variable_names)
+
+        # Create a figure and a grid of subplots
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(num_cols * 4, num_rows * 2))
+
+        # Flatten the axes array for easier indexing
+        axes = axes.flatten()
+
+        # Initialize a counter for the current axis
+        ax_counter = 0
+
+        # Create a table with the results of the Shapiro-Wilk test
+        table_normality = pd.DataFrame()
+        for group in videos:
+            data_group = data[data[group_name] == group]
+            for variable in variable_names:
+                # Perform Shapiro-Wilk test
+                shapiro_test = stats.shapiro(data_group[variable])
+
+                # Plot histogram on the current axis
+                data_group[variable].plot.hist(ax=axes[ax_counter])
+
+                # Add labels to the plot
+                if ax_counter % num_cols == 0:
+                    axes[ax_counter].set_ylabel(f"{group}")
+                elif ax_counter % num_cols == len(videos) - 2:
+                    axes[ax_counter].set_ylabel("")
+                    # Add number of participants to the side of the plot
+                    axes[ax_counter].text(
+                        1.2,
+                        0.5,
+                        f"n = {len(subjects)}",
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        transform=axes[ax_counter].transAxes,
+                    )
+                else:  # no title
+                    axes[ax_counter].set_ylabel("")
+
+                first_subplot_last_row = num_rows * num_cols - num_cols
+                if ax_counter >= first_subplot_last_row:
+                    axes[ax_counter].set_xlabel(f"{variable}")
+
+                # Make p-value bold and put it onto red ground if it is below significance level
+                if shapiro_test[1] < alpha:
+                    axes[ax_counter].text(
+                        0.5,
+                        0.5,
+                        f"p = {shapiro_test[1]:.3f}",
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        transform=axes[ax_counter].transAxes,
+                        weight="bold",
+                        backgroundcolor="red",
+                    )
+                else:
+                    axes[ax_counter].text(
+                        0.5,
+                        0.5,
+                        f"p = {shapiro_test[1]:.3f}",
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        transform=axes[ax_counter].transAxes,
+                        backgroundcolor="white",
+                    )
+
+                # Increment the axis counter
+                ax_counter += 1
+
+                # Append results to table_normality
+                table_normality = table_normality._append(
+                    {
+                        "Group": group,
+                        "Variable": f"{variable}",
+                        "Statistic": shapiro_test[0],
+                        "Samples": len(data_group),
+                        "p-value": shapiro_test[1],
+                        "Significance": shapiro_test[1] < alpha,
+                    },
+                    ignore_index=True,
+                )
+
+        # Set the title of the figure
+        fig.suptitle(
+            "Histograms of variables for each group and p-value of Shapiro-Wilk-Test to check Normality of data"
+        )
+
+        # Round p-values to three decimal places
+        table_normality["p-value"] = table_normality["p-value"].round(3)
+        # Round all other values except the p-values to two decimal places
+        table_normality[["Statistic"]] = table_normality[["Statistic"]].round(2)
+
+        # Show the plot
+        if show_plots:
+            plt.show()
+
+        plt.close()
+
+        # 2. Sphericity of data (Mauchly's Test)
+        # Perform Mauchly's Test for each variable
+        table_sphericity = pd.DataFrame()
+        for variable in variable_names:
+            spher, w, chi2, dof, pval = pg.sphericity(data, dv=variable, subject="subject", within=group_name)
+
+            # Append results to table_sphericity
+            table_sphericity = table_sphericity._append(
+                {
+                    "Variable": f"{variable}",
+                    "Sphericity": spher,
+                    "W": w,
+                    "Chi2": chi2,
+                    "df": dof,
+                    "p-value": pval,
+                    "Significance": pval < alpha,
+                },
+                ignore_index=True,
+            )
+
+        return table_normality, fig, table_sphericity
+
     def descriptives(data, variables, groups, group_name) -> pd.DataFrame:
         """
         Calculate descriptive statistics for the data.
@@ -108,7 +263,6 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
         # Concatenate the results of the descriptives
         return pd.concat(results_descriptives, axis=0)
 
-
     def perform_anova(data, variables, group_name, alpha=0.05) -> pd.DataFrame:
         """
         Perform repeated measures ANOVA to test for significant differences in variables between the groups.
@@ -142,96 +296,6 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
         results_annotation_anova["Significance"] = results_annotation_anova["p"] < alpha
 
         return results_annotation_anova
-
-    def perform_manova(data, variables, group_name, alpha=0.05) -> pd.DataFrame:
-        """
-        Perform multi-factor ANOVA (MANOVA) to test for significant differences in variables between the groups.
-
-        Arguments:
-        ---------
-        data: dataframe
-        variables: list of variables to be compared
-        group_name: name of the group variable
-        alpha: significance level
-
-        Returns:
-        -------
-        results_annotation_manova: dataframe
-        """
-        # Create a dataframe to store the results
-        results_annotation_manova = pd.DataFrame()
-
-        # Perform multi-factor ANOVA (MANOVA) for all variables together
-        list_variables = "+".join(variables)
-        manova = MANOVA.from_formula(f"{list_variables} ~ {group_name}", data=data, aggregate_func="mean")
-        results = manova.mv_test()
-
-        # Add the results to the dataframe
-        results_annotation_manova.loc["MANOVA Wilks' lambda", "Value"] = results.results[group_name]["stat"]["Value"][
-            "Wilks' lambda"
-        ]
-        results_annotation_manova.loc["MANOVA Wilks' lambda", "Num DF"] = results.results[group_name]["stat"][
-            "Num DF"
-        ]["Wilks' lambda"]
-        results_annotation_manova.loc["MANOVA Wilks' lambda", "Den DF"] = results.results[group_name]["stat"][
-            "Den DF"
-        ]["Wilks' lambda"]
-        results_annotation_manova.loc["MANOVA Wilks' lambda", "F"] = results.results[group_name]["stat"]["F Value"][
-            "Wilks' lambda"
-        ]
-        results_annotation_manova.loc["MANOVA Wilks' lambda", "p"] = results.results[group_name]["stat"]["Pr > F"][
-            "Wilks' lambda"
-        ]
-        results_annotation_manova.loc["MANOVA Pillai's trace", "Value"] = results.results[group_name]["stat"]["Value"][
-            "Pillai's trace"
-        ]
-        results_annotation_manova.loc["MANOVA Pillai's trace", "Num DF"] = results.results[group_name]["stat"][
-            "Num DF"
-        ]["Pillai's trace"]
-        results_annotation_manova.loc["MANOVA Pillai's trace", "Den DF"] = results.results[group_name]["stat"][
-            "Den DF"
-        ]["Pillai's trace"]
-        results_annotation_manova.loc["MANOVA Pillai's trace", "F"] = results.results[group_name]["stat"]["F Value"][
-            "Pillai's trace"
-        ]
-        results_annotation_manova.loc["MANOVA Pillai's trace", "p"] = results.results[group_name]["stat"]["Pr > F"][
-            "Pillai's trace"
-        ]
-        results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "Value"] = results.results[group_name]["stat"][
-            "Value"
-        ]["Hotelling-Lawley trace"]
-        results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "Num DF"] = results.results[group_name]["stat"][
-            "Num DF"
-        ]["Hotelling-Lawley trace"]
-        results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "Den DF"] = results.results[group_name]["stat"][
-            "Den DF"
-        ]["Hotelling-Lawley trace"]
-        results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "F"] = results.results[group_name]["stat"][
-            "F Value"
-        ]["Hotelling-Lawley trace"]
-        results_annotation_manova.loc["MANOVA Hotelling-Lawley trace", "p"] = results.results[group_name]["stat"][
-            "Pr > F"
-        ]["Hotelling-Lawley trace"]
-        results_annotation_manova.loc["MANOVA Roy's greatest root", "Value"] = results.results[group_name]["stat"][
-            "Value"
-        ]["Roy's greatest root"]
-        results_annotation_manova.loc["MANOVA Roy's greatest root", "Num DF"] = results.results[group_name]["stat"][
-            "Num DF"
-        ]["Roy's greatest root"]
-        results_annotation_manova.loc["MANOVA Roy's greatest root", "Den DF"] = results.results[group_name]["stat"][
-            "Den DF"
-        ]["Roy's greatest root"]
-        results_annotation_manova.loc["MANOVA Roy's greatest root", "F"] = results.results[group_name]["stat"][
-            "F Value"
-        ]["Roy's greatest root"]
-        results_annotation_manova.loc["MANOVA Roy's greatest root", "p"] = results.results[group_name]["stat"][
-            "Pr > F"
-        ]["Roy's greatest root"]
-
-        # Add column with significance
-        results_annotation_manova["Significance"] = results_annotation_manova["p"] < alpha
-
-        return results_annotation_manova
 
     def post_hoc_tests(data, variables, groups, variable_name, alpha=0.05) -> pd.DataFrame:
         """
@@ -297,22 +361,6 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
         results_table_posthoc_tests["p-value"] = results_table_posthoc_tests["p-value"].round(3)
         # Round statistics to two decimal places
         results_table_posthoc_tests[["t-statistic"]] = results_table_posthoc_tests[["t-statistic"]].round(2)
-
-        # Change formatting of all group variables
-        for group in results_table_posthoc_tests["Group1"].unique():
-            results_table_posthoc_tests["Group1"] = results_table_posthoc_tests["Group1"].replace(
-                group, group.replace("phase1", "Phase 1")
-            )
-            results_table_posthoc_tests["Group1"] = results_table_posthoc_tests["Group1"].replace(
-                group, group.replace("phase3", "Phase 3")
-            )
-        for group in results_table_posthoc_tests["Group2"].unique():
-            results_table_posthoc_tests["Group2"] = results_table_posthoc_tests["Group2"].replace(
-                group, group.replace("phase1", "Phase 1")
-            )
-            results_table_posthoc_tests["Group2"] = results_table_posthoc_tests["Group2"].replace(
-                group, group.replace("phase3", "Phase 3")
-            )
 
         return results_table_posthoc_tests
 
@@ -501,8 +549,48 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     physiological_data.to_csv(
         physiological_features_dir / "all_subjects_task-AVR_physio_features.tsv", sep="\t", index=False
     )
+    # %% STEP 2. TEST ASSUMPTIONS
+    # 2a. For Annotation Data
+    # Test the assumptions for a repeated measures ANOVA
+    table_normality_annotation, fig_normality_annotation, table_sphericity_annotation = test_assumptions(
+        annotation_data, "video", ["valence", "arousal"], alpha
+    )
 
-    # %% STEP 2. CALCULATE DESCRIPTIVE STATISTICS
+    # Save the results of the Shapiro-Wilk test as a tsv file
+    table_normality_annotation.to_csv(
+        results_dir / exp_name / averaged_name / "stats" / "annotation_normality.tsv", sep="\t", index=False
+    )
+
+    # Save the results of the Mauchly's Test as a tsv file
+    table_sphericity_annotation.to_csv(
+        results_dir / exp_name / averaged_name / "stats" / "annotation_sphericity.tsv", sep="\t", index=False
+    )
+
+    # Save the figure
+    fig_normality_annotation.savefig(results_dir / exp_name / averaged_name / "stats" / "annotation_normality.png")
+
+    # 2b. For Physiological Data
+    # Test the assumptions for a repeated measures ANOVA
+    table_normality_physiological, fig_normality_physiological, table_sphericity_physiological = test_assumptions(
+        physiological_data, "video", physiological_data.columns.unique()[2:-1], alpha
+    )
+
+    # Save the results of the Shapiro-Wilk test as a tsv file
+    table_normality_physiological.to_csv(
+        results_dir / exp_name / averaged_name / "stats" / "physiological_normality.tsv", sep="\t", index=False
+    )
+
+    # Save the results of the Mauchly's Test as a tsv file
+    table_sphericity_physiological.to_csv(
+        results_dir / exp_name / averaged_name / "stats" / "physiological_sphericity.tsv", sep="\t", index=False
+    )
+
+    # Save the figure
+    fig_normality_physiological.savefig(
+        results_dir / exp_name / averaged_name / "stats" / "physiological_normality.png"
+    )
+
+    # %% STEP 3. CALCULATE DESCRIPTIVE STATISTICS
 
     # Define results directory
     results_filepath_stats = results_dir / exp_name / averaged_name / "stats"
@@ -541,12 +629,8 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     # Perform repeated measures ANOVA to test for differences in valence & arousal ratings between the videos
     results_annotation_anova = perform_anova(annotation_data, ["valence", "arousal"], "video", alpha)
 
-    # Perform Multi-factor ANOVA (MANOVA) for both valence and arousal
-    results_annotation_manova = perform_manova(annotation_data, ["valence", "arousal"], "video", alpha)
-
     # Save results to a tsv file
     results_annotation_anova.to_csv(results_filepath_stats / "annotation_anova.tsv", sep="\t", index=True)
-    results_annotation_manova.to_csv(results_filepath_stats / "annotation_manova.tsv", sep="\t", index=True)
 
     # Post hoc tests
     results_table_posthoc_tests_annotation = post_hoc_tests(
@@ -570,14 +654,8 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
         physiological_data, physiological_data.columns.unique()[2:-1], "video", alpha
     )
 
-    # Perform Multi-factor ANOVA (MANOVA) for all physiological features
-    results_physiological_manova = perform_manova(
-        physiological_data, physiological_data.columns.unique()[2:-1], "video", alpha
-    )
-
     # Save results to a tsv file
     results_physiological_anova.to_csv(results_filepath_stats / "physiological_anova.tsv", sep="\t", index=True)
-    results_physiological_manova.to_csv(results_filepath_stats / "physiological_manova.tsv", sep="\t", index=True)
 
     # Post hoc tests
     results_table_posthoc_tests_physiological = post_hoc_tests(

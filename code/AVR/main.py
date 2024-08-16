@@ -9,10 +9,10 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 14 August 2024
+Last update: 16 August 2024
 """
 
-def main():
+def main():  # noqa: PLR0915
     """
     Run the main function of the AVR project.
 
@@ -25,23 +25,25 @@ def main():
         3. Extract features: Extract features from the physiological data.
         4. Univariate statistics: Perform univariate statistical analysis.
         5. Modelling: Perform Hidden Markov Model (HMM) analysis.
-        6. Plot results: Plot the results of the analysis.
+        6. GLM: Perform General Linear Model (GLM) of the HMM analysis.
+        7. Plot results: Plot the results of the analysis.
     """
     # %% Import
     from AVR.datacomparison.compare_variability_phase1_phase3 import compare_variability_phase1_phase3
     from AVR.datavisualization.plot_descriptives import plot_descriptives
     from AVR.datavisualization.raincloud_plot import raincloud_plot
+    from AVR.modelling.hmm import hmm
     from AVR.preprocessing.annotation.preprocessing_annotation_avr_phase3 import preprocess_annotations
     from AVR.preprocessing.physiological.feature_extraction import extract_features
-    from AVR.preprocessing.physiological.preprocessing_physiological_avr_phase3 import (
-        preprocess_physiological,
-    )
+    from AVR.preprocessing.physiological.preprocessing_physiological_avr_phase3 import preprocess_physiological
     from AVR.preprocessing.read_xdf import read_xdf
+    from AVR.statistics.glm import glm
+    from AVR.statistics.hmm_stats import hmm_stats
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Extract features"]    # Adjust as needed
-    # "Load data", "Preprocess data", "Univariate statistics", "Plot results", "Modelling"
+    steps = []    # Adjust as needed
+    # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Modelling", "GLM", "Plot results"
 
     subjects = []
                 # "001", "002", "003","004", "005", "006", "007", "009",
@@ -57,12 +59,14 @@ def main():
     # "001", "002", "003","004", "005", "006", "007", "009",
     # "011", "012", "014", "015", "016", "017", "018", "019",
     # "020", "021", "022", "024", "025", "026", "027", "028", "029",
-    # "030", "031", "032", "033", "034", "035"
+    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+    # "040", "041", "042", "043", "044", "045", "046", "047"
     # Features were already extracted for the following subjects:
-    # "001", "002", "003", "004", "005", "006", "007", "009"
-    # "011", "012", "014", "015", "016", "017", "018", "019"
+    # "001", "002", "003", "004", "005", "006", "007", "009",
+    # "011", "012", "014", "015", "016", "017", "018", "019",
     # "020", "021", "022", "024", "025", "026", "027", "028", "029",
-    # "030", "031", "032", "033", "034", "035"
+    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+    # "040", "041", "042", "043", "044", "045", "046", "047"
 
     # Only needed for comparison of phase 3 with phase 1
     subjects_phase1 = ["06", "08", "10", "12", "14", "16", "18", "19", "20",
@@ -101,6 +105,7 @@ def main():
             preprocess_physiological(subjects, data_dir, results_dir, show_plots, debug, manual_cleaning)
 
         elif step == "Extract features":
+            print("\nExtracting features...\n")
             extract_features(subjects, data_dir, results_dir, show_plots, debug)
 
         elif step == "Univariate statistics":
@@ -109,15 +114,22 @@ def main():
             print("\nPerforming statistical comparison of variability in ratings between phase 1 and phase 3...\n")
             compare_variability_phase1_phase3(subjects, subjects_phase1, data_dir, results_dir, show_plots)
 
+        elif step == "Modelling":
+            print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
+            hmm(data_dir, results_dir, subjects, debug, show_plots)
+            print("\nCalculating statistics of the hidden states...\n")
+            hmm_stats(data_dir, results_dir, subjects, debug)
+
+        elif step == "GLM":
+            print("\nFitting General Linear Model (GLM)...\n")
+            glm(data_dir, results_dir, subjects, debug)
+
         elif step == "Plot results":
             print("\nPlotting results...\n")
             print("\nCreating descriptives plots...\n")
             plot_descriptives(data_dir, results_dir, show_plots)
             print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
             raincloud_plot(data_dir, results_dir, show_plots)
-
-        elif step == "Modelling":
-            print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
 
         else:
             print(f"Step {step} not found")

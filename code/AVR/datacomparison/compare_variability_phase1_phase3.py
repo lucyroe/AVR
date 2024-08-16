@@ -1,14 +1,20 @@
 """
-Performing statistical tests (MANOVA) to compare the variability between AVR phase 1 and phase 3.
+Performing statistical tests (ANOVAs) to compare the variability between AVR phase 1 and phase 3.
+
+Required packages: statsmodels, scipy
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last updated: 7 August 2024
+Last updated: 16 August 2024
 """
 
 def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
-    subjects=["001", "002", "003"],  # noqa: B006
+    subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
+                "011", "012", "014", "015", "016", "017", "018", "019",
+                "020", "021", "022", "024", "025", "026", "027", "028", "029",
+                "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+                "040", "041", "042", "043", "044", "045", "046", "047"],
     subjects_phase1=["06", "08", "10", "12", "14", "16", "18", "19", "20",  # noqa: B006
                         "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
                         "31", "32", "33", "34", "35", "36", "37", "38", "39", "40",
@@ -19,16 +25,15 @@ def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
     show_plots=False,
 ):
     """
-    Perform statistical tests (MANOVA) to compare the variability between AVR phase 1 and phase 3.
+    Perform statistical tests (ANOVAs) to compare the variability between AVR phase 1 and phase 3.
 
     The following steps are performed:
     1. Calculate summary statistics
-    2. Test assumptions of MANOVA
+    2. Test assumptions of ANOVA
         2.1 Normal distribution of data within groups (Shapiro-Wilk test)
-        2.2 Homogeneity of variance-covariance matrices (Barlett's and Levene's tests)
-        2.3 Linearity
+        2.2. Homogeneity of variances / Homoscedasticity (Barlett's and Levene's tests)
     3. Perform statistical tests
-        3.1 Perform MANOVA
+        3.1 Perform ANOVAs
         3.2 Post-hoc tests
             3.2.1 Perform pairwise comparisons between groups
             3.2.2 Bonferroni correction for multiple comparisons
@@ -38,8 +43,9 @@ def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
 
     import matplotlib.pyplot as plt
     import pandas as pd
+    import statsmodels.api as sm
     from scipy import stats
-    from statsmodels.multivariate.manova import MANOVA
+    from statsmodels.formula.api import ols
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     phases = ["phase1", "phase3"]  # Phases for which the raincloud plot should be plotted
@@ -61,7 +67,7 @@ def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
     alpha = 0.05
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    # %% LOAD DATA, CALCULATE STATISTICS, AND SAVE AS NEW FILE
+    # %% STEP 1: LOAD DATA, CALCULATE STATISTICS, AND SAVE AS NEW FILE
     # Create empty dataframe to store data
     data_all = pd.DataFrame()
 
@@ -186,10 +192,10 @@ def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
         # Save the dataframe as a tsv file
         stats_sorted.to_csv(directory / f"stats_{phase}.tsv", sep="\t", index=False)
 
-    # %% TEST ASSUMPTIONS
-    # Test assumptions of MANOVA
+    # %% STEP 2: TEST ASSUMPTIONS
+    # Test assumptions of ANOVA
 
-    # 1. Normal distribution of data within groups (Shapiro-Wilk test)
+    # 2.1. Normal distribution of data within groups (Shapiro-Wilk test)
     # Loop over groups
     # Create a matrix of plots for each group and variable
     # Determine the number of rows and columns for the subplot grid
@@ -207,6 +213,7 @@ def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
 
     # Create a table with the results of the Shapiro-Wilk test
     table_normality = pd.DataFrame()
+
     for group in data_all["group"].unique():
         data_group = data_all[data_all["group"] == group]
         for variable in variable_names[phases[1]]:
@@ -220,7 +227,7 @@ def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
                 # Add labels to the plot
                 if ax_counter % num_cols == 0:
                     axes[ax_counter].set_ylabel(f"{group}")
-                elif ax_counter % num_cols == 3:
+                elif ax_counter % num_cols == len(data_all["group"].unique())-2:
                     axes[ax_counter].set_ylabel("")
                     # Add number of participants to the side of the plot
                     axes[ax_counter].text(
@@ -299,7 +306,7 @@ def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
 
     plt.close()
 
-    # 2. Homogeneity of variance-covariance matrices (Barlett's and Levene's tests)
+    # 2. Homogeneity of variances / Homoscedasticity (Barlett's and Levene's tests)
     # Create a table with the results of Barlett's and Levene's tests
     table_homogeinity = pd.DataFrame()
     for variable in variable_names[phases[1]]:
@@ -323,99 +330,80 @@ def compare_variability_phase1_phase3(  # noqa: C901, PLR0912, PLR0915
 
             # Append results to table_homogeinity
             table_homogeinity = table_homogeinity._append(
-                {
-                    "Variable": f"{test_statistic} {variable}",
-                    "Test": "Barlett",
-                    "Statistic": bartlett_stats,
-                    "p-value": bartlett_p,
-                    "Samples": [len(data_phase1_hp), len(data_phase1_hn), len(data_phase1_lp), len(data_phase1_ln),
-                    len(data_other_phase)]
-                },
-                ignore_index=True,
-            )
+                    {
+                        "Variable": f"{test_statistic} {variable}",
+                        "Test": "Barlett",
+                        "Statistic": bartlett_stats,
+                        "p-value": bartlett_p,
+                        "Samples": [len(data_phase1_hp), len(data_phase1_hn), len(data_phase1_lp), len(data_phase1_ln),
+                        len(data_other_phase)]
+                    },
+                    ignore_index=True,
+                )
             table_homogeinity = table_homogeinity._append(
-                {
-                    "Variable": f"{test_statistic} {variable}",
-                    "Test": "Levene",
-                    "Statistic": levene_stats,
-                    "p-value": levene_p,
-                    "Samples": [len(data_phase1_hp), len(data_phase1_hn), len(data_phase1_lp), len(data_phase1_ln),
-                    len(data_other_phase)]
-                },
-                ignore_index=True,
-            )
+                    {
+                        "Variable": f"{test_statistic} {variable}",
+                        "Test": "Levene",
+                        "Statistic": levene_stats,
+                        "p-value": levene_p,
+                        "Samples": [len(data_phase1_hp), len(data_phase1_hn), len(data_phase1_lp), len(data_phase1_ln),
+                        len(data_other_phase)]
+                    },
+                    ignore_index=True,
+                )
 
-    # Switch from scientific notation to fixed notation
-    pd.options.display.float_format = "{:.5f}".format
+        # Switch from scientific notation to fixed notation
+        pd.options.display.float_format = "{:.5f}".format
 
-    # Round p-values to three decimal places
-    table_homogeinity["p-value"] = table_homogeinity["p-value"].round(3)
-    # Round all other values except the p-values to two decimal places
-    table_homogeinity[["Statistic"]] = table_homogeinity[["Statistic"]].round(2)
+        # Round p-values to three decimal places
+        table_homogeinity["p-value"] = table_homogeinity["p-value"].round(3)
+        # Round all other values except the p-values to two decimal places
+        table_homogeinity[["Statistic"]] = table_homogeinity[["Statistic"]].round(2)
 
-    # Mark significant results
-    table_homogeinity["Significance"] = table_homogeinity["p-value"] < alpha
+        # Mark significant results
+        table_homogeinity["Significance"] = table_homogeinity["p-value"] < alpha
 
-    # Save the table as a tsv file
-    table_homogeinity.to_csv(Path(results_dir_comparison) / "homogeneity_test.tsv", sep="\t")
-
-    # 3. Linearity
-    # Create scatterplot matrix for each group with all variables
-    for group in data_all["group"].unique():
-        data_group = data_all[data_all["group"] == group]
-        # Drop columns
-        data_scatter_group = data_group.drop(columns=["group", "subject", "n_samples"])
-        figure, axis = plt.subplots(figsize=(10, 10))
-        pd.plotting.scatter_matrix(data_scatter_group, figsize=(10, 10), ax=axis, diagonal="kde")
-        figure.suptitle(f"Scatterplot matrix for {group} (n = "
-        f"{len(subjects) if group == phases[1] else len(subjects_phase1)})")
-
-        # Save the plot
-        figure.savefig(Path(results_dir_comparison) / f"scatterplot_matrix_{group}.png")
-
-        # Show the plot
-        if show_plots:
-            plt.show()
-
-        plt.close()
+        # Save the table as a tsv file
+        table_homogeinity.to_csv(Path(results_dir_comparison) / "homoscedasticity_test.tsv", sep="\t")
 
     # %% PERFORM STATISTICAL TESTS
-    # Perform MANOVA
+    # Perform ANOVAs
     # Group variables: phase 1 HP, phase 1 HN, phase 1 LP, phase 1 LN, phase 2 or 3
     # Variables: mean_valence, std_dev_valence, mean_arousal, std_dev_arousal
 
-    maov = MANOVA.from_formula(
-        "mean_valence + std_dev_valence + mean_arousal + std_dev_arousal ~ group", data=data_all
-    )
+    # Initialize a table to store the results of the ANOVA
+    results_anova = pd.DataFrame()
 
-    # Transform the results of the MANOVA into a table
-    results_manova = pd.DataFrame(
-        {
-            "Value": maov.mv_test().results["group"]["stat"]["Value"],
-            "Num_DF": maov.mv_test().results["group"]["stat"]["Num DF"],
-            "Den_DF": maov.mv_test().results["group"]["stat"]["Den DF"],
-            "F-value": maov.mv_test().results["group"]["stat"]["F Value"],
-            "p-value": maov.mv_test().results["group"]["stat"]["Pr > F"],
-            "Significance": maov.mv_test().results["group"]["stat"]["Pr > F"] < alpha,
-        }
-    )
+    # Loop over dependent variables
+    for variable in variable_names[phases[1]]:
+        for test_statistic in test_statistics:
+            name_variable = f"{test_statistic}_{variable}"
+            model = ols(f"{name_variable} ~ C(group)", data=data_all).fit()
+            anova_table = sm.stats.anova_lm(model, typ=2)
+
+            # Add the results to the dataframe
+            results_anova.loc[f"ANOVA {name_variable}", "SS"] = anova_table["sum_sq"][0]
+            results_anova.loc[f"ANOVA {name_variable}", "F"] = anova_table["F"][0]
+            results_anova.loc[f"ANOVA {name_variable}", "Num DF"] = anova_table["df"][0]
+            results_anova.loc[f"ANOVA {name_variable}", "p"] = anova_table["PR(>F)"][0]
+            results_anova.loc[f"ANOVA {name_variable}", "Significance"] = anova_table["PR(>F)"][0] < alpha
 
     # Switch from scientific notation to fixed notation
     pd.options.display.float_format = "{:.5f}".format
 
-    for test_statistic in results_manova.index:
+    for test_statistic in results_anova.index:
         # Round p-values to three decimal places
-        results_manova.loc[test_statistic, "p-value"] = round(results_manova.loc[test_statistic, "p-value"], 3)
+        results_anova.loc[test_statistic, "p"] = round(results_anova.loc[test_statistic, "p"], 3)
         # Round statistics to two decimal places
-        results_manova.loc[test_statistic, "Value"] = round(results_manova.loc[test_statistic, "Value"], 2)
-        results_manova.loc[test_statistic, "F-value"] = round(results_manova.loc[test_statistic, "F-value"], 2)
+        results_anova.loc[test_statistic, "F"] = round(results_anova.loc[test_statistic, "F"], 2)
+        results_anova.loc[test_statistic, "SS"] = round(results_anova.loc[test_statistic, "SS"], 2)
         # Add number of samples to the table
-        results_manova.loc[test_statistic, "Samples"] = [len(subjects_phase1) * 4 + len(subjects)]
+        results_anova.loc[test_statistic, "Samples"] = [len(subjects_phase1) * 4 + len(subjects)]
     # Round degrees of freedom to zero decimal places
-    results_manova[["Num_DF", "Den_DF"]] = results_manova[["Num_DF", "Den_DF"]].astype(int)
+    results_anova[["Num DF"]] = results_anova[["Num DF"]].astype(int)
 
-    # Save the results of the MANOVA as a tsv file
-    results_manova.to_csv(Path(results_dir_comparison) / "manova_results.tsv", sep="\t")
+    # Save the results of the ANOVA as a tsv file
+    results_anova.to_csv(Path(results_dir_comparison) / "anova_results.tsv", sep="\t")
 
     # Post-hoc tests
     # Perform pairwise comparisons between groups

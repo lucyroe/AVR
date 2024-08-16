@@ -6,10 +6,9 @@ Required packages: hmmlearn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 22 May 2024
-Last update: 15 August 2024
+Last update: 16 August 2024
 """
 
-# %%
 def hmm(  # noqa: C901, PLR0912, PLR0915
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",

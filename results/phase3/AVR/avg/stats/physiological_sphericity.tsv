@@ -1,0 +1,10 @@
+Variable	Sphericity	W	Chi2	df	p-value	Significance
+ibi	True	7501857.3781098025	-644.6597032402901	5	1.0	False
+hrv	True	inf	-inf	5	1.0	False
+lf_hrv	True	inf	-inf	5	1.0	False
+hf_hrv	True	inf	-inf	5	1.0	False
+posterior_alpha	True	inf	-inf	5	1.0	False
+frontal_alpha	True	inf	-inf	5	1.0	False
+frontal_theta	True	inf	-inf	5	1.0	False
+gamma	True	inf	-inf	5	1.0	False
+beta	True	inf	-inf	5	1.0	False
