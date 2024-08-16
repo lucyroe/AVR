@@ -1,7 +1,7 @@
 """
 Script to calculate a general linear model (GLM) to compare features across hidden affective states.
 
-Required packages: statsmodels, scipy
+Required packages: statsmodels, scipy, sklearn
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
@@ -9,11 +9,14 @@ Created on: 15 August 2024
 Last update: 16 August 2024
 """
 
-def glm(  # noqa: PLR0915
+
+def glm(  # noqa: PLR0915, C901
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003"],  # noqa: B006
-    debug=False):
+    debug=False,
+    show_plots=False,
+):
     """
     Fit all features from the HMMs to a general linear model (GLM) to compare features across hidden affective states.
 
@@ -33,8 +36,10 @@ def glm(  # noqa: PLR0915
     # %% Import
     from pathlib import Path
 
+    import matplotlib.pyplot as plt
     import pandas as pd
     import scipy
+    from scipy import stats
     from statsmodels.multivariate.manova import MANOVA
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
@@ -42,8 +47,7 @@ def glm(  # noqa: PLR0915
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to analyze
-    models = ["cardiac"]
-    #"neural", "integrated"]
+    models = ["cardiac", "neural", "integrated"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
@@ -57,6 +61,209 @@ def glm(  # noqa: PLR0915
     # Only analyze one subject if debug is True
     if debug:
         subjects = [subjects[0]]
+
+    # %% Functions  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
+    def test_assumptions(data, list_variables, group_name):  # noqa: C901, PLR0915
+        """
+        Test the assumptions of the MANOVA.
+
+        The assumptions are:
+        1. Normal distribution of data within groups (Shapiro-Wilk test)
+        2. Homogeneity of variance-covariance matrices (Barlett's and Levene's tests)
+        3. Linearity
+
+        Arguments:
+        ---------
+        data : pd.DataFrame
+            The data to be tested
+        list_variables : list
+            The list of variables to be tested
+        group_name : str
+            The name of the column containing the group information
+
+        Returns:
+        -------
+        table_normality : pd.DataFrame
+            Table with the results of the Shapiro-Wilk test
+        fig_normality : plt.Figure
+            Figure with histograms of the variables for each group and p-value of the Shapiro-Wilk test
+        table_homogeinity : pd.DataFrame
+            Table with the results of Barlett's and Levene's tests
+        """
+        # 1. Normal distribution of data within groups (Shapiro-Wilk test)
+        # Loop over groups
+        # Get the list of groups
+        list_groups = data[group_name].unique()
+        # Sort the groups
+        list_groups.sort()
+        # Create a matrix of plots for each group and variable
+        # Determine the number of rows and columns for the subplot grid
+        num_cols = len(list_groups)
+        num_rows = len(list_variables)
+
+        # Create a figure and a grid of subplots
+        fig_normality, axes = plt.subplots(num_rows, num_cols, figsize=(num_rows * 5, num_cols * 4))
+
+        # Flatten the axes array for easier indexing
+        axes = axes.flatten()
+
+        # Initialize a counter for the current axis
+        ax_counter = 0
+
+        # Create a table with the results of the Shapiro-Wilk test
+        table_normality = pd.DataFrame()
+        for group in list_groups:
+            data_group = data[data[group_name] == group]
+            for variable in list_variables:
+                # Perform Shapiro-Wilk test
+                shapiro_test = stats.shapiro(data_group[variable])
+
+                # Plot histogram on the current axis
+                data_group[variable].plot.hist(ax=axes[ax_counter])
+
+                # Add labels to the plot
+                if ax_counter % num_cols == 0:
+                    axes[ax_counter].set_ylabel(f"{group}")
+                elif ax_counter % num_cols == len(list_groups) - 1:
+                    axes[ax_counter].set_ylabel("")
+                    # Add number of participants to the side of the plot
+                    axes[ax_counter].text(
+                        1.2,
+                        0.5,
+                        f"n = {len(data_group)}",
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        transform=axes[ax_counter].transAxes,
+                    )
+                else:  # no title
+                    axes[ax_counter].set_ylabel("")
+
+                first_subplot_last_row = num_rows * num_cols - num_cols
+                if ax_counter >= first_subplot_last_row:
+                    axes[ax_counter].set_xlabel(f"{variable}")
+
+                # Make p-value bold and put it onto red ground if it is below significance level
+                if shapiro_test[1] < alpha:
+                    axes[ax_counter].text(
+                        0.5,
+                        0.5,
+                        f"p = {shapiro_test[1]:.3f}",
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        transform=axes[ax_counter].transAxes,
+                        weight="bold",
+                        backgroundcolor="red",
+                    )
+                else:
+                    axes[ax_counter].text(
+                        0.5,
+                        0.5,
+                        f"p = {shapiro_test[1]:.3f}",
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        transform=axes[ax_counter].transAxes,
+                        backgroundcolor="white",
+                    )
+
+                # Increment the axis counter
+                ax_counter += 1
+
+                # Append results to table_normality
+                table_normality = table_normality._append(
+                    {
+                        "State": group,
+                        "Variable": f"{variable}",
+                        "Statistic": shapiro_test[0],
+                        "Samples": len(data_group),
+                        "p-value": shapiro_test[1],
+                        "Significance": shapiro_test[1] < alpha,
+                    },
+                    ignore_index=True,
+                )
+
+        # Set the title of the figure
+        fig_normality.suptitle(
+            "Histograms of variables for each group and p-value of Shapiro-Wilk-Test to check Normality of data"
+        )
+
+        # Round p-values to three decimal places
+        table_normality["p-value"] = table_normality["p-value"].round(3)
+        # Round all other values except the p-values to two decimal places
+        table_normality[["Statistic"]] = table_normality[["Statistic"]].round(2)
+
+        # Show the plot
+        if show_plots:
+            plt.show()
+
+        plt.close()
+
+        # 2. Homogeneity of variance-covariance matrices (Barlett's and Levene's tests)
+        # Create a table with the results of Barlett's and Levene's tests
+        table_homogeinity = pd.DataFrame()
+        for variable in list_variables:
+            # subset data
+            data_state0 = data[(data[f"{group_name}"] == list_states[0])][variable]
+            data_state1 = data[(data[f"{group_name}"] == list_states[1])][variable]
+            data_state2 = data[(data[f"{group_name}"] == list_states[2])][variable]
+            data_state3 = data[(data[f"{group_name}"] == list_states[3])][variable]
+
+            # Perform Barlett's test
+            bartlett_stats, bartlett_p = stats.bartlett(data_state0, data_state1, data_state2, data_state3)
+
+            # Perform Levene's test
+            levene_stats, levene_p = stats.levene(data_state0, data_state1, data_state2, data_state3)
+
+            # Append results to table_homogeinity
+            table_homogeinity = table_homogeinity._append(
+                {
+                    "Variable": f"{variable}",
+                    "Test": "Barlett",
+                    "Statistic": bartlett_stats,
+                    "p-value": bartlett_p,
+                    "Samples": [len(data_state0), len(data_state1), len(data_state2), len(data_state3)],
+                },
+                ignore_index=True,
+            )
+            table_homogeinity = table_homogeinity._append(
+                {
+                    "Variable": f"{variable}",
+                    "Test": "Levene",
+                    "Statistic": levene_stats,
+                    "p-value": levene_p,
+                    "Samples": [len(data_state0), len(data_state1), len(data_state2), len(data_state3)],
+                },
+                ignore_index=True,
+            )
+
+        # Round p-values to three decimal places
+        table_homogeinity["p-value"] = table_homogeinity["p-value"].round(3)
+        # Round all other values except the p-values to two decimal places
+        table_homogeinity[["Statistic"]] = table_homogeinity[["Statistic"]].round(2)
+
+        # Mark significant results
+        table_homogeinity["Significance"] = table_homogeinity["p-value"] < alpha
+
+        # 3. Linearity
+        # Create list to save figures
+        figs_linearity = []
+        # Create scatterplot matrix for each group with all variables
+        for group in list_groups:
+            data_group = data[data[f"{group_name}"] == group]
+            # Drop columns
+            data_scatter_group = data_group.drop(columns=[group_name, "timestamp"])
+            fig_linearity, axis = plt.subplots(figsize=(10, 10))
+            pd.plotting.scatter_matrix(data_scatter_group, ax=axis, diagonal="kde")
+            fig_linearity.suptitle(f"Scatterplot matrix for state {group} (n = {len(data_group)})")
+
+            # Show the plot
+            if show_plots:
+                plt.show()
+
+            plt.close()
+
+            figs_linearity.append(fig_linearity)
+
+        return table_normality, fig_normality, table_homogeinity, figs_linearity
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     # %% STEP 1: LOAD DATA
@@ -73,206 +280,13 @@ def glm(  # noqa: PLR0915
         hidden_states_data = pd.read_csv(hmm_path / hidden_states_file, sep="\t")
 
         # Load the annotations
-        annotation_file = f"all_subjects_task-AVR_beh_features.tsv"
+        annotation_file = "all_subjects_task-AVR_beh_features.tsv"
         annotations = pd.read_csv(annotation_path / annotation_file, sep="\t")
 
-        # %% STEP 2: TEST ASSUMPTIONS OF MANOVA TODO
-        # 1. Normal distribution of data within groups (Shapiro-Wilk test)
-        # Loop over groups
-        # Create a matrix of plots for each group and variable
-        # Determine the number of rows and columns for the subplot grid
-        num_rows = len(data_all["group"].unique())
-        num_cols = len(variable_names[phases[1]]) * len(test_statistics)
-
-        # Create a figure and a grid of subplots
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(10, 10))
-
-        # Flatten the axes array for easier indexing
-        axes = axes.flatten()
-
-        # Initialize a counter for the current axis
-        ax_counter = 0
-
-        # Create a table with the results of the Shapiro-Wilk test
-        table_normality = pd.DataFrame()
-        for group in data_all["group"].unique():
-            data_group = data_all[data_all["group"] == group]
-            for variable in variable_names[phases[1]]:
-                for test_statistic in test_statistics:
-                    # Perform Shapiro-Wilk test
-                    shapiro_test = stats.shapiro(data_group[test_statistic + "_" + variable])
-
-                    # Plot histogram on the current axis
-                    data_group[test_statistic + "_" + variable].plot.hist(ax=axes[ax_counter])
-
-                    # Add labels to the plot
-                    if ax_counter % num_cols == 0:
-                        axes[ax_counter].set_ylabel(f"{group}")
-                    elif ax_counter % num_cols == 3:
-                        axes[ax_counter].set_ylabel("")
-                        # Add number of participants to the side of the plot
-                        axes[ax_counter].text(
-                            1.2,
-                            0.5,
-                            f"n = {len(subjects) if group == phases[1] else len(subjects_phase1)}",
-                            horizontalalignment="center",
-                            verticalalignment="center",
-                            transform=axes[ax_counter].transAxes,
-                        )
-                    else:  # no title
-                        axes[ax_counter].set_ylabel("")
-                    first_subplot_last_row = num_rows * num_cols - num_cols
-                    if ax_counter >= first_subplot_last_row:
-                        axes[ax_counter].set_xlabel(f"{variable} {test_statistic}")
-
-                    # Make p-value bold and put it onto red ground if it is below significance level
-                    if shapiro_test[1] < alpha:
-                        axes[ax_counter].text(
-                            0.5,
-                            0.5,
-                            f"p = {shapiro_test[1]:.3f}",
-                            horizontalalignment="center",
-                            verticalalignment="center",
-                            transform=axes[ax_counter].transAxes,
-                            weight="bold",
-                            backgroundcolor="red",
-                        )
-                    else:
-                        axes[ax_counter].text(
-                            0.5,
-                            0.5,
-                            f"p = {shapiro_test[1]:.3f}",
-                            horizontalalignment="center",
-                            verticalalignment="center",
-                            transform=axes[ax_counter].transAxes,
-                            backgroundcolor="white",
-                        )
-
-                    # Increment the axis counter
-                    ax_counter += 1
-
-                    # Append results to table_normality
-                    table_normality = table_normality._append(
-                        {
-                            "Group": group,
-                            "Variable": f"{test_statistic} {variable}",
-                            "Statistic": shapiro_test[0],
-                            "Samples": len(data_group),
-                            "p-value": shapiro_test[1],
-                            "Significance": shapiro_test[1] < alpha,
-                        },
-                        ignore_index=True,
-                    )
-
-        # Set the title of the figure
-        fig.suptitle("Histograms of variables for each group and p-value of Shapiro-Wilk-Test to check Normality of data")
-
-        # Switch from scientific notation to fixed notation
-        pd.options.display.float_format = "{:.5f}".format
-
-        # Round p-values to three decimal places
-        table_normality["p-value"] = table_normality["p-value"].round(3)
-        # Round all other values except the p-values to two decimal places
-        table_normality[["Statistic"]] = table_normality[["Statistic"]].round(2)
-
-        # Save the table as a tsv file
-        table_normality.to_csv(Path(results_dir_comparison) / "normality_test.tsv", sep="\t")
-
-        # Save the plot
-        fig.savefig(Path(results_dir_comparison) / "histograms_normality.png")
-
-        # Show the plot
-        if show_plots:
-            plt.show()
-
-        plt.close()
-
-        # 2. Homogeneity of variance-covariance matrices (Barlett's and Levene's tests)
-        # Create a table with the results of Barlett's and Levene's tests
-        table_homogeinity = pd.DataFrame()
-        for variable in variable_names[phases[1]]:
-            for test_statistic in test_statistics:
-                # subset data
-                data_phase1_hp = data_all[(data_all["group"] == "phase1 HP")][test_statistic + "_" + variable]
-                data_phase1_hn = data_all[(data_all["group"] == "phase1 HN")][test_statistic + "_" + variable]
-                data_phase1_lp = data_all[(data_all["group"] == "phase1 LP")][test_statistic + "_" + variable]
-                data_phase1_ln = data_all[(data_all["group"] == "phase1 LN")][test_statistic + "_" + variable]
-                data_other_phase = data_all[(data_all["group"] == phases[1])][test_statistic + "_" + variable]
-
-                # Perform Barlett's test
-                bartlett_stats, bartlett_p = stats.bartlett(
-                    data_phase1_hp, data_phase1_hn, data_phase1_lp, data_phase1_ln, data_other_phase
-                )
-
-                # Perform Levene's test
-                levene_stats, levene_p = stats.levene(
-                    data_phase1_hp, data_phase1_hn, data_phase1_lp, data_phase1_ln, data_other_phase
-                )
-
-                # Append results to table_homogeinity
-                table_homogeinity = table_homogeinity._append(
-                    {
-                        "Variable": f"{test_statistic} {variable}",
-                        "Test": "Barlett",
-                        "Statistic": bartlett_stats,
-                        "p-value": bartlett_p,
-                        "Samples": [len(data_phase1_hp), len(data_phase1_hn), len(data_phase1_lp), len(data_phase1_ln),
-                        len(data_other_phase)]
-                    },
-                    ignore_index=True,
-                )
-                table_homogeinity = table_homogeinity._append(
-                    {
-                        "Variable": f"{test_statistic} {variable}",
-                        "Test": "Levene",
-                        "Statistic": levene_stats,
-                        "p-value": levene_p,
-                        "Samples": [len(data_phase1_hp), len(data_phase1_hn), len(data_phase1_lp), len(data_phase1_ln),
-                        len(data_other_phase)]
-                    },
-                    ignore_index=True,
-                )
-
-        # Switch from scientific notation to fixed notation
-        pd.options.display.float_format = "{:.5f}".format
-
-        # Round p-values to three decimal places
-        table_homogeinity["p-value"] = table_homogeinity["p-value"].round(3)
-        # Round all other values except the p-values to two decimal places
-        table_homogeinity[["Statistic"]] = table_homogeinity[["Statistic"]].round(2)
-
-        # Mark significant results
-        table_homogeinity["Significance"] = table_homogeinity["p-value"] < alpha
-
-        # Save the table as a tsv file
-        table_homogeinity.to_csv(Path(results_dir_comparison) / "homogeneity_test.tsv", sep="\t")
-
-        # 3. Linearity
-        # Create scatterplot matrix for each group with all variables
-        for group in data_all["group"].unique():
-            data_group = data_all[data_all["group"] == group]
-            # Drop columns
-            data_scatter_group = data_group.drop(columns=["group", "subject", "n_samples"])
-            figure, axis = plt.subplots(figsize=(10, 10))
-            pd.plotting.scatter_matrix(data_scatter_group, figsize=(10, 10), ax=axis, diagonal="kde")
-            figure.suptitle(f"Scatterplot matrix for {group} (n = "
-            f"{len(subjects) if group == phases[1] else len(subjects_phase1)})")
-
-            # Save the plot
-            figure.savefig(Path(results_dir_comparison) / f"scatterplot_matrix_{group}.png")
-
-            # Show the plot
-            if show_plots:
-                plt.show()
-
-            plt.close()
-
-        # %% STEP 3: FIRST LEVEL GLM
-        print("Performing first level GLM...")
-
         # Initialize the results dataframe
-        results = pd.DataFrame(columns=["subject", "test", "value", "num_df", "den_df", "F", "p-value", "significance"])
-
+        results = pd.DataFrame(
+            columns=["subject", "test", "value", "num_df", "den_df", "F", "p-value", "significance"]
+        )
         # Loop over all subjects
         for subject_index, subject in enumerate(subjects):
             print("---------------------------------")
@@ -280,7 +294,9 @@ def glm(  # noqa: PLR0915
             print("---------------------------------\n")
 
             # Get the data for the subject
-            hidden_states_subject = hidden_states_data[hidden_states_data["subject"] == int(subject)].reset_index(drop=True)
+            hidden_states_subject = hidden_states_data[hidden_states_data["subject"] == int(subject)].reset_index(
+                drop=True
+            )
             annotations_subject = annotations[annotations["subject"] == int(subject)].reset_index(drop=True)
 
             # Delete subject and video column
@@ -295,10 +311,52 @@ def glm(  # noqa: PLR0915
                 annotations_subject = annotations_subject[:min_length]
 
             # Merge the hidden states with the annotations
-            data = pd.merge(hidden_states_subject, annotations_subject, on="timestamp")
+            data = hidden_states_subject.merge(annotations_subject, on="timestamp")
+
+            # Get list of states
+            list_states = data["state"].unique()
+            list_states.sort()
+
+            # Get the list of features
+            list_features = models_features[model]
+
+            # STEP 2: TEST ASSUMPTIONS OF MANOVA
+            print("Testing assumptions of MANOVA...")
+            table_normality, figure_normality, table_homogeinity, figures_linearity = test_assumptions(
+                data, list_features, "state"
+            )
+
+            # Save the results
+            glm_subject_results_path = resultpath / f"sub-{subject}" / "glm" / model
+
+            # Create the directory if it does not exist
+            glm_subject_results_path.mkdir(parents=True, exist_ok=True)
+
+            table_normality.to_csv(
+                glm_subject_results_path / f"sub-{subject}_task-AVR_{model}_model_glm_normality_results.tsv",
+                sep="\t",
+                index=False,
+            )
+            table_homogeinity.to_csv(
+                glm_subject_results_path / f"sub-{subject}_task-AVR_{model}_model_glm_homogeneity_results.tsv",
+                sep="\t",
+                index=False,
+            )
+
+            # Save the figures
+            figure_normality.savefig(
+                glm_subject_results_path / f"sub-{subject}_task-AVR_{model}_model_glm_normality_results.png"
+            )
+            for index, figure in enumerate(figures_linearity):
+                figure.savefig(
+                    glm_subject_results_path
+                    / f"sub-{subject}_task-AVR_{model}_model_glm_linearity_results_state_{index}.png"
+                )
+
+            # STEP 3: FIRST LEVEL GLM
+            print("Performing first level GLM...")
 
             # Create the formula for the GLM
-            list_features = models_features[model] + ["valence", "arousal"]
             # Rename features to avoid problems with the formula
             list_features = [f.replace("-", "_") for f in list_features]
             data = data.rename(columns={f: f.replace("-", "_") for f in data.columns})
@@ -308,22 +366,40 @@ def glm(  # noqa: PLR0915
 
             # Add the results to the results dataframe
             # Add the results to the dataframe
-            for index_test_statistic, test_statistic in enumerate(["Wilks' lambda", "Pillai's trace", "Hotelling-Lawley trace", "Roy's greatest root"]):
-                index_row = len(["Wilks' lambda", "Pillai's trace", "Hotelling-Lawley trace", "Roy's greatest root"])*subject_index+index_test_statistic
+            for index_test_statistic, test_statistic in enumerate(
+                ["Wilks' lambda", "Pillai's trace", "Hotelling-Lawley trace", "Roy's greatest root"]
+            ):
+                index_row = (
+                    len(["Wilks' lambda", "Pillai's trace", "Hotelling-Lawley trace", "Roy's greatest root"])
+                    * subject_index
+                    + index_test_statistic
+                )
                 results.loc[index_row, "subject"] = subject
                 results.loc[index_row, "test"] = test_statistic
-                results.loc[index_row, "value"] = manova_model.mv_test().results["state"]["stat"]["Value"][test_statistic]
-                results.loc[index_row, "num_df"] = manova_model.mv_test().results["state"]["stat"]["Num DF"][test_statistic]
-                results.loc[index_row, "den_df"] = manova_model.mv_test().results["state"]["stat"]["Den DF"][test_statistic]
-                results.loc[index_row, "F"] = manova_model.mv_test().results["state"]["stat"]["F Value"][test_statistic]
-                results.loc[index_row, "p-value"] = manova_model.mv_test().results["state"]["stat"]["Pr > F"][test_statistic]
+                results.loc[index_row, "value"] = manova_model.mv_test().results["state"]["stat"]["Value"][
+                    test_statistic
+                ]
+                results.loc[index_row, "num_df"] = manova_model.mv_test().results["state"]["stat"]["Num DF"][
+                    test_statistic
+                ]
+                results.loc[index_row, "den_df"] = manova_model.mv_test().results["state"]["stat"]["Den DF"][
+                    test_statistic
+                ]
+                results.loc[index_row, "F"] = manova_model.mv_test().results["state"]["stat"]["F Value"][
+                    test_statistic
+                ]
+                results.loc[index_row, "p-value"] = manova_model.mv_test().results["state"]["stat"]["Pr > F"][
+                    test_statistic
+                ]
                 results.loc[index_row, "significance"] = results.loc[index_row, "p-value"] < alpha
 
         # Save the results
-        glm_results_path = resultpath / "avg" / "glm"
+        glm_results_path = resultpath / "avg" / "glm" / model
         # Create the directory if it does not exist
         glm_results_path.mkdir(parents=True, exist_ok=True)
-        results.to_csv(glm_results_path / f"all_subjects_task-AVR_{model}_model_glm_results.tsv", sep="\t", index=False)
+        results.to_csv(
+            glm_results_path / f"all_subjects_task-AVR_{model}_model_glm_results.tsv", sep="\t", index=False
+        )
 
         # %% STEP 4: SECOND LEVEL GLM
         # Test the effect of the hidden states on the features across all subjects
@@ -332,9 +408,11 @@ def glm(  # noqa: PLR0915
         # Perform a one-sample t-test to test if the features are significantly different in the hidden states
         # Compare the MANOVA results to a t-test against 0 (no effect)
         results_ttest = pd.DataFrame()
-        for index_test_statistic, test_statistic in enumerate(["Wilks' lambda", "Pillai's trace", "Hotelling-Lawley trace", "Roy's greatest root"]):
+        for index_test_statistic, test_statistic in enumerate(
+            ["Wilks' lambda", "Pillai's trace", "Hotelling-Lawley trace", "Roy's greatest root"]
+        ):
             # Extract the values and convert to numeric, coercing errors to NaN
-            values = pd.to_numeric(results[results["test"] == test_statistic]["value"], errors='coerce').dropna()
+            values = pd.to_numeric(results[results["test"] == test_statistic]["value"], errors="coerce").dropna()
 
             # Perform a one-sample t-test
             tstats = scipy.stats.ttest_1samp(values, 0, alternative="two-sided")
@@ -342,10 +420,15 @@ def glm(  # noqa: PLR0915
             results_ttest.loc[index_test_statistic, "t-value"] = tstats.statistic
             results_ttest.loc[index_test_statistic, "df"] = tstats.df
             results_ttest.loc[index_test_statistic, "p-value"] = tstats.pvalue
-            results_ttest.loc[index_test_statistic, "significance"] = results_ttest.loc[index_test_statistic, "p-value"] < alpha
+            results_ttest.loc[index_test_statistic, "significance"] = (
+                results_ttest.loc[index_test_statistic, "p-value"] < alpha
+            )
 
         # Save the results
-        results_ttest.to_csv(glm_results_path / f"avg_task-AVR_{model}_model_glm_results_ttest.tsv", sep="\t", index=False)
+        results_ttest.to_csv(
+            glm_results_path / f"avg_task-AVR_{model}_model_glm_results_ttest.tsv", sep="\t", index=False
+        )
+
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 if __name__ == "__main__":

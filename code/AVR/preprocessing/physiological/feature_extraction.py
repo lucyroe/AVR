@@ -6,7 +6,7 @@ Required packages:  mne, neurokit2, fcwt, scipy, fooof
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 23 July 2024
-Last update: 13 August 2024
+Last update: 16 August 2024
 """
 
 
@@ -713,7 +713,7 @@ def extract_features(  # noqa: PLR0915, C901, PLR0912
 
         # Read in file with excluded participants
         with (data_dir / exp_name / derivative_name / preprocessed_name / "excluded_participants.tsv").open("r") as f:
-            excluded_participants = f.read().splitlines()
+            excluded_participants = f.read()
 
         # Skip excluded participants
         if subject in excluded_participants:

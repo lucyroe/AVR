@@ -1,0 +1,17 @@
+State	Variable	Statistic	Samples	p-value	Significance
+0	ibi	0.98	274	0.0	True
+0	hf-hrv	0.85	274	0.0	True
+0	valence	0.87	274	0.0	True
+0	arousal	0.8	274	0.0	True
+1	ibi	0.99	342	0.006	True
+1	hf-hrv	0.95	342	0.0	True
+1	valence	0.87	342	0.0	True
+1	arousal	0.82	342	0.0	True
+2	ibi	1.0	435	0.186	False
+2	hf-hrv	0.97	435	0.0	True
+2	valence	0.85	435	0.0	True
+2	arousal	0.74	435	0.0	True
+3	ibi	0.97	341	0.0	True
+3	hf-hrv	0.97	341	0.0	True
+3	valence	0.84	341	0.0	True
+3	arousal	0.78	341	0.0	True

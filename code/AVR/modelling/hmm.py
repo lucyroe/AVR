@@ -9,6 +9,7 @@ Created on: 22 May 2024
 Last update: 16 August 2024
 """
 
+
 def hmm(  # noqa: C901, PLR0912, PLR0915
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
@@ -225,12 +226,16 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             data = np.column_stack(tuple(all_features))
 
             # Add the data to the dataframe
-            data_all_subjects = pd.concat([data_all_subjects, pd.DataFrame(data, columns=models_features[model])], axis=0)
+            data_all_subjects = pd.concat(
+                [data_all_subjects, pd.DataFrame(data, columns=models_features[model])], axis=0
+            )
 
         # %% STEP 2. HMMs
         # Create and train the Hidden Markov Model
         print("Creating and training the Hidden Markov Model...")
-        hmm_all_subjects, hidden_states_all_subjects = create_model(data_all_subjects, number_of_states, len(data_all_subjects), iterations)
+        hmm_all_subjects, hidden_states_all_subjects = create_model(
+            data_all_subjects, number_of_states, len(data_all_subjects), iterations
+        )
 
         # %% STEP 3. SAVE RESULTS
         print("Saving results...\n")
@@ -247,10 +252,14 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         hidden_states_all_subjects_df = pd.DataFrame({"state": hidden_states_all_subjects})
 
         # Add a column with the time as first column
-        hidden_states_all_subjects_df.insert(0, "timestamp", np.tile(np.arange(len(hidden_states_all_subjects_df)/len(subjects)), len(subjects)))
+        hidden_states_all_subjects_df.insert(
+            0, "timestamp", np.tile(np.arange(len(hidden_states_all_subjects_df) / len(subjects)), len(subjects))
+        )
 
         # Add the subject ID to the hidden states
-        hidden_states_all_subjects_df.insert(0, "subject", np.repeat(subjects, len(hidden_states_all_subjects_df)//len(subjects)))
+        hidden_states_all_subjects_df.insert(
+            0, "subject", np.repeat(subjects, len(hidden_states_all_subjects_df) // len(subjects))
+        )
 
         # Save the hidden states to a tsv file
         hidden_states_all_subjects_file = f"all_subjects_task-AVR_{model}_model_hidden_states_{features_string}.tsv"
@@ -260,9 +269,13 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         data_all_subjects_df = pd.DataFrame(data_all_subjects, columns=models_features[model])
         data_all_subjects_df["state"] = hidden_states_all_subjects
         # Add the time as first column
-        data_all_subjects_df.insert(0, "timestamp", np.tile(np.arange(len(hidden_states_all_subjects_df)/len(subjects)), len(subjects)))
+        data_all_subjects_df.insert(
+            0, "timestamp", np.tile(np.arange(len(hidden_states_all_subjects_df) / len(subjects)), len(subjects))
+        )
         # Add the subject ID to the data
-        data_all_subjects_df.insert(0, "subject", np.repeat(subjects, len(hidden_states_all_subjects_df)//len(subjects)))
+        data_all_subjects_df.insert(
+            0, "subject", np.repeat(subjects, len(hidden_states_all_subjects_df) // len(subjects))
+        )
 
         # Save the data with the hidden states to a tsv file
         data_file_all_subjects = f"all_subjects_task-AVR_{model}_model_data_{features_string}.tsv"
@@ -290,7 +303,9 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         hmm_parameters_all_subjects = {}
         for state in range(number_of_states):
             # Get the percentage of time spent in the state
-            percentage = len(hidden_states_all_subjects[hidden_states_all_subjects == state]) / len(hidden_states_all_subjects)
+            percentage = len(hidden_states_all_subjects[hidden_states_all_subjects == state]) / len(
+                hidden_states_all_subjects
+            )
             hmm_state_parameters_all_subjects = {
                 "state": state,
                 "percentage": percentage,
@@ -330,7 +345,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             fig.suptitle(f"{model.capitalize()} Model for subject {subject}", fontsize=16)
 
             # Save the plot
-            plot_file= f"sub-{subject}_{model}_hmm_{features_string}.png"
+            plot_file = f"sub-{subject}_{model}_hmm_{features_string}.png"
             plt.savefig(hmm_path_subject / plot_file)
 
             # Show the plot

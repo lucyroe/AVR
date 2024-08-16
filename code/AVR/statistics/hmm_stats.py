@@ -1,5 +1,5 @@
 """
-Script to calculate summary stats and test for differences between the hidden states of the different HMMs.
+Script to calculate summary stats of the hidden states of the different HMMs.
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
@@ -7,11 +7,13 @@ Created on: 14 August 2024
 Last update: 16 August 2024
 """
 
+
 def hmm_stats(  # noqa: C901, PLR0915
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003"],  # noqa: B006
-    debug=False):
+    debug=False,
+):
     """
     Calculate summary statistics for the HMMs.
 
@@ -66,7 +68,7 @@ def hmm_stats(  # noqa: C901, PLR0915
         hidden_states_data = pd.read_csv(hmm_path / hidden_states_file, sep="\t")
 
         # Load the annotations
-        annotation_file = f"all_subjects_task-AVR_beh_features.tsv"
+        annotation_file = "all_subjects_task-AVR_beh_features.tsv"
         annotations = pd.read_csv(annotation_path / annotation_file, sep="\t")
 
         # Initialize the summary stats for all subjects
@@ -79,7 +81,9 @@ def hmm_stats(  # noqa: C901, PLR0915
             print("---------------------------------\n")
 
             # Get the data for the subject
-            hidden_states_subject = hidden_states_data[hidden_states_data["subject"] == int(subject)].reset_index(drop=True)
+            hidden_states_subject = hidden_states_data[hidden_states_data["subject"] == int(subject)].reset_index(
+                drop=True
+            )
             annotations_subject = annotations[annotations["subject"] == int(subject)].reset_index(drop=True)
 
             # Delete subject and video column
@@ -94,7 +98,7 @@ def hmm_stats(  # noqa: C901, PLR0915
                 annotations_subject = annotations_subject[:min_length]
 
             # Merge the hidden states with the annotations
-            data = pd.merge(hidden_states_subject, annotations_subject, on="timestamp")
+            data = hidden_states_subject.merge(annotations_subject, on="timestamp")
 
             # Get a list of all features
             features = [col for col in data.columns if col not in ["timestamp", "state"]]
@@ -131,7 +135,7 @@ def hmm_stats(  # noqa: C901, PLR0915
             for state in range(number_of_states):
                 # Get the data for the state
                 data_state = hidden_states_subject[hidden_states_subject["state"] == state]
-                data_state.reset_index(drop=True, inplace=True)
+                data_state.reset_index(drop=True)
 
                 # Fractional Occupancy
                 fractional_occupancy = len(data_state) / len(hidden_states_subject)
@@ -145,13 +149,13 @@ def hmm_stats(  # noqa: C901, PLR0915
                 for index, timepoint in enumerate(data_state["timestamp"]):
                     # Check if the timepoint is the first one
                     if index == 0:
-                        continue
-                    elif timepoint == data_state["timestamp"][index-1] + 1:
+                        lifetime = 0
+                    elif timepoint == data_state["timestamp"][index - 1] + 1:
                         lifetime += 1
                     else:
                         lifetimes.append(lifetime)
                         lifetime = 0
-                        intervaltime = timepoint - data_state["timestamp"][index-1]
+                        intervaltime = timepoint - data_state["timestamp"][index - 1]
                         intervaltimes.append(intervaltime)
 
                 # Calculate the mean lifetime
@@ -168,7 +172,9 @@ def hmm_stats(  # noqa: C901, PLR0915
             global_stats_all_subjects = pd.concat([global_stats_all_subjects, global_stats], axis=0)
 
         # Add the state to the summary stats as second column
-        summary_stats_all_subjects.insert(1, "state", np.tile(np.arange(number_of_states), len(subjects)*len(features)))
+        summary_stats_all_subjects.insert(
+            1, "state", np.tile(np.arange(number_of_states), len(subjects) * len(features))
+        )
 
         # Reset the index of the summary stats for all subjects
         summary_stats_all_subjects = summary_stats_all_subjects.reset_index(drop=True)
@@ -178,7 +184,9 @@ def hmm_stats(  # noqa: C901, PLR0915
         # Create the directory if it does not exist
         resultpath_model.mkdir(parents=True, exist_ok=True)
 
-        summary_stats_all_subjects.to_csv(resultpath_model / f"all_subjects_task-AVR_{model}_model_states_stats.tsv", sep="\t", index=False)
+        summary_stats_all_subjects.to_csv(
+            resultpath_model / f"all_subjects_task-AVR_{model}_model_states_stats.tsv", sep="\t", index=False
+        )
 
         # Add the state to the global stats as second column
         global_stats_all_subjects.insert(1, "state", np.tile(np.arange(number_of_states), len(subjects)))
@@ -187,7 +195,9 @@ def hmm_stats(  # noqa: C901, PLR0915
         global_stats_all_subjects = global_stats_all_subjects.reset_index(drop=True)
 
         # Save the global stats for all subjects to a file
-        global_stats_all_subjects.to_csv(resultpath_model / f"all_subjects_task-AVR_{model}_model_states_global_stats.tsv", sep="\t", index=False)
+        global_stats_all_subjects.to_csv(
+            resultpath_model / f"all_subjects_task-AVR_{model}_model_states_global_stats.tsv", sep="\t", index=False
+        )
 
         # %% STEP 3. CALCULATE AVERAGED STATS
         # Calculate the statistics for each hidden state averaged across all subjects
@@ -198,15 +208,27 @@ def hmm_stats(  # noqa: C901, PLR0915
 
             summary_stats = pd.DataFrame()
             # Calculate the mean and standard deviation for each feature
-            summary_stats["mean"] = summary_stats_all_subjects[summary_stats_all_subjects["state"]
-                    == state].groupby("feature")["mean"].mean()
-            summary_stats["std"] = summary_stats_all_subjects[summary_stats_all_subjects["state"]
-                    == state].groupby("feature")["std"].mean()
+            summary_stats["mean"] = (
+                summary_stats_all_subjects[summary_stats_all_subjects["state"] == state]
+                .groupby("feature")["mean"]
+                .mean()
+            )
+            summary_stats["std"] = (
+                summary_stats_all_subjects[summary_stats_all_subjects["state"] == state]
+                .groupby("feature")["std"]
+                .mean()
+            )
             # Calculate the minimum and maximum for each feature
-            summary_stats["min"] = summary_stats_all_subjects[summary_stats_all_subjects["state"]
-                    == state].groupby("feature")["min"].mean()
-            summary_stats["max"] = summary_stats_all_subjects[summary_stats_all_subjects["state"]
-                    == state].groupby("feature")["max"].mean()
+            summary_stats["min"] = (
+                summary_stats_all_subjects[summary_stats_all_subjects["state"] == state]
+                .groupby("feature")["min"]
+                .mean()
+            )
+            summary_stats["max"] = (
+                summary_stats_all_subjects[summary_stats_all_subjects["state"] == state]
+                .groupby("feature")["max"]
+                .mean()
+            )
             summary_stats.insert(0, "state", state)
 
             # Append the summary stats for the state to the summary stats for all states
@@ -215,11 +237,17 @@ def hmm_stats(  # noqa: C901, PLR0915
             # Calculate the global statistics for each state
             global_stats = pd.DataFrame()
             # Calculate the mean fractional occupancy
-            global_stats.loc[state, "fractional_occupancy"] = global_stats_all_subjects[global_stats_all_subjects["state"] == state]["fractional_occupancy"].mean()
+            global_stats.loc[state, "fractional_occupancy"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["fractional_occupancy"].mean()
             # Calculate the mean lifetime
-            global_stats.loc[state, "mean_lifetime"] = global_stats_all_subjects[global_stats_all_subjects["state"] == state]["mean_lifetime"].mean()
+            global_stats.loc[state, "mean_lifetime"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["mean_lifetime"].mean()
             # Calculate the mean intervaltime
-            global_stats.loc[state, "mean_intervaltime"] = global_stats_all_subjects[global_stats_all_subjects["state"] == state]["mean_intervaltime"].mean()
+            global_stats.loc[state, "mean_intervaltime"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["mean_intervaltime"].mean()
             global_stats.insert(0, "state", state)
 
             # Append the global stats for the state to the global stats for all states
@@ -232,13 +260,18 @@ def hmm_stats(  # noqa: C901, PLR0915
         summary_stats_averaged = summary_stats_averaged.reset_index(drop=True)
 
         # Save the summary stats for all states to a file
-        summary_stats_averaged.to_csv(resultpath_model / f"avg_task-AVR_{model}_model_states_stats.tsv", sep="\t", index=False)
+        summary_stats_averaged.to_csv(
+            resultpath_model / f"avg_task-AVR_{model}_model_states_stats.tsv", sep="\t", index=False
+        )
 
         # Reset the index of the global stats for all states
         global_stats_averaged = global_stats_averaged.reset_index(drop=True)
 
         # Save the global stats for all states to a file
-        global_stats_averaged.to_csv(resultpath_model / f"avg_task-AVR_{model}_model_states_global_stats.tsv", sep="\t", index=False)
+        global_stats_averaged.to_csv(
+            resultpath_model / f"avg_task-AVR_{model}_model_states_global_stats.tsv", sep="\t", index=False
+        )
+
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 if __name__ == "__main__":

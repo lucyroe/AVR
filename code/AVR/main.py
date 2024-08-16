@@ -35,6 +35,7 @@ def main():  # noqa: PLR0915
     from AVR.modelling.hmm import hmm
     from AVR.preprocessing.annotation.preprocessing_annotation_avr_phase3 import preprocess_annotations
     from AVR.preprocessing.physiological.feature_extraction import extract_features
+    from AVR.preprocessing.physiological.preprocessing_metadata import preprocessing_metadata
     from AVR.preprocessing.physiological.preprocessing_physiological_avr_phase3 import preprocess_physiological
     from AVR.preprocessing.read_xdf import read_xdf
     from AVR.statistics.glm import glm
@@ -42,31 +43,34 @@ def main():  # noqa: PLR0915
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = []    # Adjust as needed
+    steps = ["Extract features"]   # Adjust as needed
     # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Modelling", "GLM", "Plot results"
 
-    subjects = []
-                # "001", "002", "003","004", "005", "006", "007", "009",
-                # "011", "012", "014", "015", "016", "017", "018", "019",
-                # "020", "021", "022", "024", "025", "026", "027", "028", "029",
-                # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
-                # "040", "041", "042", "043", "044", "045", "046", "047"
+    subjects = ["001", "003", "004", "005", "006", "007",
+                "012", "014", "015", "016", "018", "019",
+                "020", "021", "022", "024", "025", "026", "027", "028",
+                "030", "031", "032", "034", "037", "038",
+                "040", "041", "042", "043", "045", "046"]
 
     # subjects "008", "010", "013" were excluded due to missing data
     # subject "023" was excluded because of bad quality of ECG data
+    # subjects "002", "009", "011", "017", "029", "033", "035", "036", "039", "044", "047"
+    # were excluded due to bad quality of EEG data
 
     # Preprocessing of the following subjects was already done:
     # "001", "002", "003","004", "005", "006", "007", "009",
     # "011", "012", "014", "015", "016", "017", "018", "019",
-    # "020", "021", "022", "024", "025", "026", "027", "028", "029",
+    # "020", "021", "022", "023", "024", "025", "026", "027", "028", "029",
     # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
     # "040", "041", "042", "043", "044", "045", "046", "047"
     # Features were already extracted for the following subjects:
-    # "001", "002", "003", "004", "005", "006", "007", "009",
-    # "011", "012", "014", "015", "016", "017", "018", "019",
-    # "020", "021", "022", "024", "025", "026", "027", "028", "029",
-    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
-    # "040", "041", "042", "043", "044", "045", "046", "047"
+
+    # For comparison of phase 3 with phase 1
+    subjects_annotations = ["001", "002", "003","004", "005", "006", "007", "009",
+                            "011", "012", "014", "015", "016", "017", "018", "019",
+                            "020", "021", "022", "023", "024", "025", "026", "027", "028", "029",
+                            "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+                            "040", "041", "042", "043", "044", "045", "046", "047"]
 
     # Only needed for comparison of phase 3 with phase 1
     subjects_phase1 = ["06", "08", "10", "12", "14", "16", "18", "19", "20",
@@ -100,9 +104,11 @@ def main():  # noqa: PLR0915
 
         elif step == "Preprocess data":
             print("\nPreprocessing annotations...\n")
-            preprocess_annotations(subjects, data_dir, results_dir, show_plots, debug)
+            preprocess_annotations(subjects_annotations, data_dir, results_dir, show_plots, debug)
             print("\nPreprocessing physiological data...\n")
-            preprocess_physiological(subjects, data_dir, results_dir, show_plots, debug, manual_cleaning)
+            preprocess_physiological(subjects_annotations, data_dir, results_dir, show_plots, debug, manual_cleaning)
+            print("\nCalculating averaged preprocessing metadata...\n")
+            preprocessing_metadata(subjects_annotations, data_dir, debug)
 
         elif step == "Extract features":
             print("\nExtracting features...\n")
@@ -112,7 +118,7 @@ def main():  # noqa: PLR0915
             print("\nPerforming univariate statistical analysis...\n")
             univariate_statistics(subjects, data_dir, results_dir, show_plots, debug)
             print("\nPerforming statistical comparison of variability in ratings between phase 1 and phase 3...\n")
-            compare_variability_phase1_phase3(subjects, subjects_phase1, data_dir, results_dir, show_plots)
+            compare_variability_phase1_phase3(subjects_annotations, subjects_phase1, data_dir, results_dir, show_plots)
 
         elif step == "Modelling":
             print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
@@ -122,7 +128,7 @@ def main():  # noqa: PLR0915
 
         elif step == "GLM":
             print("\nFitting General Linear Model (GLM)...\n")
-            glm(data_dir, results_dir, subjects, debug)
+            glm(data_dir, results_dir, subjects, debug, show_plots)
 
         elif step == "Plot results":
             print("\nPlotting results...\n")

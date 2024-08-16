@@ -6,7 +6,7 @@ Required packages: mne, neurokit, systole, seaborn, autoreject
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 12 August 2024
+Last update: 16 August 2024
 """
 #%%
 def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
@@ -1151,7 +1151,7 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             # Check for bad epochs
             remaining_bad_epochs = []
             for i, epoch in enumerate(epochs):
-                if np.max(epoch.data) > artifact_threshold:
+                if np.abs(np.max(epoch.data)) > (artifact_threshold*1e-6):
                     remaining_bad_epochs.append(i)
 
             # Calculate the percentage of bad epochs
