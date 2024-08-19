@@ -278,7 +278,9 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             print("Detecting bad channels and epochs...")
             print("This may take a while...")
             print("Start time: ", start_time)
-            ar = AutoReject(random_state=42, picks=picks, n_jobs=3, verbose="progressbar")
+            #ar = AutoReject(random_state=42, picks=picks, n_jobs=8, verbose="progressbar")
+            ar = AutoReject(n_interpolate=[1], consensus=[0.6], random_state=42, picks=picks, n_jobs=8, verbose="progressbar")
+            #ar.fit(epochs[:30])
             ar.fit(epochs)
             reject_log = ar.get_reject_log(epochs)
 
@@ -330,6 +332,9 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                     f"WARNING! More than {bad_epochs_threshold}% of epochs or channels are bad."
                     "Excluding the participant is recommended."
                 )
+
+            if show_plots:
+                reject_log.plot_epochs(epochs)
 
             answer = input("Do you want to exclude this participant? (Y/n): ")
             if answer == "Y":
@@ -1052,6 +1057,10 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 plt.show()
             plt.close()
 
+            # Plot all ICA components
+            if show_plots:
+                ica_all.plot_sources(epochs, title="ICA components", block=True, precompute=True, show_scrollbars=False)
+
             # Manual rejection of components
             answer = input("Do you want to remove any of the automatically identified components? (Y/n): ")
             if answer == "Y":
@@ -1122,6 +1131,10 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             print("Rejecting components in the filtered data (0.1 Hz) that are not brain related...")
             eeg_clean = ica.apply(filtered_data.copy())
 
+            # Plot cleaned data
+            if show_plots:
+                eeg_clean.plot(scalings={"eeg": 75e-6}, n_channels=32, title="Cleaned EEG data", block=True, show_scrollbars=False)
+
             # Get the explained variance of the ICA components
             explained_variance_ratio = ica.get_explained_variance_ratio(epochs_ica, components=ica.exclude)["eeg"]
             print(f"Explained variance ratio of excluded ICA components: {explained_variance_ratio}")
@@ -1140,7 +1153,7 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
 
             if show_plots:
                 plt.show()
-
+                
             plt.close()
 
             # Final Check: Segment cleaned data into epochs again and check in how many epochs
@@ -1155,19 +1168,19 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             # Pick only EEG channels
             epochs.pick_types(eeg=True, eog=False, ecg=False)
 
-            # Check for bad epochs
+            # Check for remaining bad epochs
             remaining_bad_epochs = []
             for i, epoch in enumerate(epochs):
-                if np.max(epoch.data) > artifact_threshold:
+                if np.abs(np.max(epoch.data)) > (artifact_threshold*1e-6):
                     remaining_bad_epochs.append(i)
 
-            # Calculate the percentage of bad epochs
+            # Calculate the percentage of remaining bad epochs
             percentage_bad_epochs = len(remaining_bad_epochs) / len(epochs) * 100
 
             # Print the number of remaining bad epochs
             print(f"Number of remaining bad epochs: {len(remaining_bad_epochs)} ({percentage_bad_epochs:.2f}%).")
 
-            # Check if the percentage of bad epochs is above the threshold
+            # Check if the percentage of remaining bad epochs is above the threshold
             if percentage_bad_epochs > bad_epochs_threshold:
                 print("The percentage of bad epochs is above the threshold. Participant should be excluded.")
 

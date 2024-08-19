@@ -43,7 +43,7 @@ def main():
     steps = ["Preprocess data"]    # Adjust as needed
     # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Plot results", "Modelling"
 
-    subjects = ["044"]
+    subjects = ['011', '017', '029', '033', '035', '036', '039', '044', '047']
                 #"026", "027", "028", "029", "030",
                 #"031", "032", "033", "034", "035", "036", "037", "038", "039", "040",
                 #"041", "042", "043", "044", "045", "046", "047"]
@@ -67,7 +67,7 @@ def main():
     results_dir = "E:/AffectiveVR/Phase_3/Results/"
 
     # Define if plots should be shown
-    show_plots = False
+    show_plots = True
 
     # Define whether manual cleaning of the data is required (cleaning of R-peaks for ECG data)
     manual_cleaning = True
