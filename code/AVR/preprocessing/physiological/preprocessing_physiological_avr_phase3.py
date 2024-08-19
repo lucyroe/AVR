@@ -9,7 +9,7 @@ Created on: 6 July 2024
 Last update: 19 August 2024
 """
 
-def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
+def preprocess_physiological(subjects=[],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
             data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
             results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
             show_plots=True,
@@ -28,8 +28,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 Participant metadata in json files
                 Excluded participants (with too many bad channels) in a list
                 Plots of preprocessing steps
-                Data of all participants concatenated in tsv files (ECG & PPG) and fif files (EEG, after ICA)
-                Averaged data over all participants in tsv files (ECG & PPG)
 
     Functions:
         plot_peaks(): Plot ECG or PPG signal with peaks.
@@ -49,10 +47,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
         2b. Format data
         2c. Preprocess ECG and PPG data & save to tsv files
         2d. Preprocess EEG data & save to fif files
-    3. AVERAGE OVER ALL PARTICIPANTS
-        3a. Concatenate all ECG & PPG data
-        3b. Average over all participants (ECG & PPG) & save to tsv files
-
     """
     # %% Import
     import gzip
@@ -79,7 +73,7 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
         subjects = [subjects[0]]
 
     # Defne preprocessing steps to perform
-    steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG", "Averaging"]  # Adjust as needed
+    steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG"]  # Adjust as needed
 
     # Define whether scaling of the ECG and PPG data should be done
     scaling = True
@@ -438,8 +432,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
 
     # %% STEP 1. LOAD DATA
-    # Initialize list to store data of all participants
-    list_data_all = {"ECG": [], "PPG": [], "EEG": []}
 
     # Initialize list to store excluded participants
     excluded_participants = []
@@ -854,9 +846,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 index=False,
             )
 
-            # Add ECG data to list_data_all
-            list_data_all["ECG"].append(ecg_data_df)
-
             # Append PPG-peaks, IBI, and HR so that they have the same length as the PPG data
             ppg_peaks_indices_with_nans = list(ppg_peaks_indices) + [np.nan] * (
                 len(signals_ppg["PPG_Clean"]) - len(ppg_peaks_indices)
@@ -885,9 +874,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 sep="\t",
                 index=False,
             )
-
-            # Add PPG data to list_data_all
-            list_data_all["PPG"].append(ppg_data_df)
 
             print("Preprocessed ECG and PPG data saved to tsv files.\n")
 
@@ -1188,9 +1174,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                 overwrite=True,
             )
 
-            # Add EEG data to list_data_all
-            list_data_all["EEG"].append(eeg_clean)
-
             # Save the ICA object with the bad components
             ica.save(
                 subject_preprocessed_folder / f"sub-{subject}_task-{task}_eeg_{attributes_eeg}_ica.fif", overwrite=True
@@ -1254,287 +1237,6 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
         data_dir / exp_name / derivative_name / preprocessed_name / "events_experiment.tsv", sep="\t",
         index=False
         )
-
-    # %% STEP 3. AVERAGE OVER ALL PARTICIPANTS
-    if "Averaging" in steps:
-        print("********** Averaging over all participants **********\n")
-        # ---------------------- 3a. Interpolate data ----------------------
-        print("Interpolating data to match the length of the first subject's data...")
-
-        # Create new empty lists to store the interpolated data
-        list_data_all_interpolated = {"ECG": [], "PPG": []}
-
-        # Interpolate ECG data
-        for i, ecg_data in enumerate(list_data_all["ECG"]):
-            # Interpolate ECG data to match the length of the first subject's data
-            if i != 0:
-                interpolated_ecg = nk.signal_interpolate(
-                    np.linspace(0, len(ecg_data["ECG"]) - 1, num=len(ecg_data["ECG"]), endpoint=False),
-                    ecg_data["ECG"].to_numpy(),
-                    np.linspace(
-                        0,
-                        len(list_data_all["ECG"][0]["ECG"]) - 1,
-                        num=len(list_data_all["ECG"][0]["ECG"]),
-                        endpoint=False,
-                    ),
-                    method="linear",
-                )
-                interpolated_rpeaks = nk.signal_interpolate(
-                    np.linspace(0, len(ecg_data["R-peaks"]) - 1, num=len(ecg_data["R-peaks"]), endpoint=False),
-                    ecg_data["R-peaks"].to_numpy(),
-                    np.linspace(
-                        0,
-                        len(list_data_all["ECG"][0]["R-peaks"]) - 1,
-                        num=len(list_data_all["ECG"][0]["R-peaks"]),
-                        endpoint=False,
-                    ),
-                    method="linear",
-                )
-                interpolated_ibi = nk.signal_interpolate(
-                    np.linspace(0, len(ecg_data["IBI"]) - 1, num=len(ecg_data["IBI"]), endpoint=False),
-                    ecg_data["IBI"].to_numpy(),
-                    np.linspace(
-                        0,
-                        len(list_data_all["ECG"][0]["IBI"]) - 1,
-                        num=len(list_data_all["ECG"][0]["IBI"]),
-                        endpoint=False,
-                    ),
-                    method="linear",
-                )
-                interpoldated_hr = nk.signal_interpolate(
-                    np.linspace(0, len(ecg_data["HR"]) - 1, num=len(ecg_data["HR"]), endpoint=False),
-                    ecg_data["HR"].to_numpy(),
-                    np.linspace(
-                        0,
-                        len(list_data_all["ECG"][0]["HR"]) - 1,
-                        num=len(list_data_all["ECG"][0]["HR"]),
-                        endpoint=False,
-                    ),
-                    method="linear",
-                )
-
-                # Get the timestamps of the first subject
-                timestamps_first_subject = list_data_all["ECG"][0]["timestamp"]
-
-                # Create new array with subject number that has the same length as the interpolated data
-                subject_array = [ecg_data["subject"].unique()[0]] * len(interpolated_ecg)
-
-                # Initialize new empty dataframe
-                ecg_data_interpolated = pd.DataFrame()
-
-                # Add the interpolated data to the new dataframe
-                ecg_data_interpolated["subject"] = subject_array
-                ecg_data_interpolated["timestamp"] = timestamps_first_subject
-                ecg_data_interpolated["ECG"] = interpolated_ecg
-                ecg_data_interpolated["R-peaks"] = interpolated_rpeaks
-                ecg_data_interpolated["IBI"] = interpolated_ibi
-                ecg_data_interpolated["HR"] = interpoldated_hr
-
-                # Append the interpolated data to the list
-                list_data_all_interpolated["ECG"].append(ecg_data_interpolated)
-
-            else:
-                list_data_all_interpolated["ECG"].append(ecg_data)
-
-        # Interpolate PPG data
-        for i, ppg_data in enumerate(list_data_all["PPG"]):
-            # Interpolate PPG data to match the length of the first subject's data
-            if i != 0:
-                interpolated_ppg = nk.signal_interpolate(
-                    np.linspace(0, len(ppg_data["PPG"]) - 1, num=len(ppg_data["PPG"]), endpoint=False),
-                    ppg_data["PPG"].to_numpy(),
-                    np.linspace(
-                        0,
-                        len(list_data_all["PPG"][0]["PPG"]) - 1,
-                        num=len(list_data_all["PPG"][0]["PPG"]),
-                        endpoint=False,
-                    ),
-                    method="linear",
-                )
-                interpolated_ppg_peaks = nk.signal_interpolate(
-                    np.linspace(0, len(ppg_data["PPG-peaks"]) - 1, num=len(ppg_data["PPG-peaks"]), endpoint=False),
-                    ppg_data["PPG-peaks"].to_numpy(),
-                    np.linspace(
-                        0,
-                        len(list_data_all["PPG"][0]["PPG-peaks"]) - 1,
-                        num=len(list_data_all["PPG"][0]["PPG-peaks"]),
-                        endpoint=False,
-                    ),
-                    method="linear",
-                )
-                interpolated_ppg_ibi = nk.signal_interpolate(
-                    np.linspace(0, len(ppg_data["IBI"]) - 1, num=len(ppg_data["IBI"]), endpoint=False),
-                    ppg_data["IBI"].to_numpy(),
-                    np.linspace(
-                        0,
-                        len(list_data_all["PPG"][0]["IBI"]) - 1,
-                        num=len(list_data_all["PPG"][0]["IBI"]),
-                        endpoint=False,
-                    ),
-                    method="linear",
-                )
-                interpolated_ppg_hr = nk.signal_interpolate(
-                    np.linspace(0, len(ppg_data["HR"]) - 1, num=len(ppg_data["HR"]), endpoint=False),
-                    ppg_data["HR"].to_numpy(),
-                    np.linspace(
-                        0,
-                        len(list_data_all["PPG"][0]["HR"]) - 1,
-                        num=len(list_data_all["PPG"][0]["HR"]),
-                        endpoint=False,
-                    ),
-                    method="linear",
-                )
-
-                # Get the timestamps of the first subject
-                timestamps_first_subject = list_data_all["PPG"][0]["timestamp"]
-
-                # Create new array with subject number that has the same length as the interpolated data
-                subject_array = [ppg_data["subject"].unique()[0]] * len(interpolated_ppg)
-
-                # Initialize new empty dataframe
-                ppg_data_interpolated = pd.DataFrame()
-
-                # Add the interpolated data to the new dataframe
-                ppg_data_interpolated["subject"] = subject_array
-                ppg_data_interpolated["timestamp"] = timestamps_first_subject
-                ppg_data_interpolated["PPG"] = interpolated_ppg
-                ppg_data_interpolated["PPG-peaks"] = interpolated_ppg_peaks
-                ppg_data_interpolated["IBI"] = interpolated_ppg_ibi
-                ppg_data_interpolated["HR"] = interpolated_ppg_hr
-
-                # Append the interpolated data to the list
-                list_data_all_interpolated["PPG"].append(ppg_data_interpolated)
-
-            else:
-                list_data_all_interpolated["PPG"].append(ppg_data)
-
-        # ---------------------- 3b. Concatenate all data ----------------------
-        print("Concatenating all data...")
-        # Concatenate all ECG data
-        all_ecg_data = pd.concat(list_data_all_interpolated["ECG"], ignore_index=True)
-
-        # Concatenate all PPG data
-        all_ppg_data = pd.concat(list_data_all_interpolated["PPG"], ignore_index=True)
-
-        # Save concatenated data to tsv files
-        print("Saving concatenated data to tsv files...")
-
-        all_ecg_data.to_csv(
-            data_dir
-            / exp_name
-            / derivative_name
-            / preprocessed_name
-            / averaged_name
-            / datatype_name
-            / f"all_subjects_task-{task}_physio_preprocessed_ecg.tsv",
-            sep="\t",
-            index=False,
-        )
-        all_ppg_data.to_csv(
-            data_dir
-            / exp_name
-            / derivative_name
-            / preprocessed_name
-            / averaged_name
-            / datatype_name
-            / f"all_subjects_task-{task}_physio_preprocessed_ppg.tsv",
-            sep="\t",
-            index=False,
-        )
-
-        # ---------------------- 3b. Average over all participants ----------------------
-        print("Averaging over all participants' ECG and PPG data...")
-
-        # Drop subject column
-        all_ecg_data = all_ecg_data.drop(columns=["subject"])
-        all_ppg_data = all_ppg_data.drop(columns=["subject"])
-
-        # Drop peak columns
-        all_ecg_data = all_ecg_data.drop(columns=["R-peaks"])
-        all_ppg_data = all_ppg_data.drop(columns=["PPG-peaks"])
-
-        # Calculate averaged data
-        ecg_data_mean = all_ecg_data.groupby("timestamp").mean()
-        ppg_data_mean = all_ppg_data.groupby("timestamp").mean()
-
-        # Reset index
-        ecg_data_mean.reset_index(inplace=True)  # noqa: PD002
-        ppg_data_mean.reset_index(inplace=True)  # noqa: PD002
-
-        # Save averaged data to tsv files
-        print("Saving averaged data to tsv files...")
-
-        ecg_data_mean.to_csv(
-            data_dir
-            / exp_name
-            / derivative_name
-            / preprocessed_name
-            / averaged_name
-            / datatype_name
-            / f"avg_task-{task}_physio_preprocessed_ecg.tsv",
-            sep="\t",
-            index=False,
-        )
-
-        ppg_data_mean.to_csv(
-            data_dir
-            / exp_name
-            / derivative_name
-            / preprocessed_name
-            / averaged_name
-            / datatype_name
-            / f"avg_task-{task}_physio_preprocessed_ppg.tsv",
-            sep="\t",
-            index=False,
-        )
-
-        # Plot averaged data
-        fig, axs = plt.subplots(2, 2, figsize=(15, 8))
-        axs[0, 0].plot(
-            ecg_data_mean["timestamp"][:: sampling_rates["ecg"]], ecg_data_mean["IBI"].dropna(), color=colors["ECG"][0]
-        )
-        axs[0, 0].set_ylabel("IBI from ECG")
-        axs[0, 1].plot(
-            ecg_data_mean["timestamp"][:: sampling_rates["ecg"]], ecg_data_mean["HR"].dropna(), color=colors["ECG"][1]
-        )
-        axs[0, 1].set_ylabel("HR from ECG")
-        axs[1, 0].plot(
-            ppg_data_mean["timestamp"][:: sampling_rates["ppg"]], ppg_data_mean["IBI"].dropna(), color=colors["PPG"][0]
-        )
-        axs[1, 0].set_ylabel("IBI from PPG")
-        axs[1, 1].plot(
-            ppg_data_mean["timestamp"][:: sampling_rates["ppg"]], ppg_data_mean["HR"].dropna(), color=colors["PPG"][1]
-        )
-        axs[1, 1].set_ylabel("HR from PPG")
-        fig.suptitle(
-            f"Mean IBI and HR from ECG and PPG data for AVR phase 3 (n={len(subjects)}), "
-            "(no manual cleaning)"
-            if not manual_cleaning
-            else f"Mean IBI and HR from ECG and PPG data for AVR phase 3 (n={len(subjects)}), "
-            "(after manual cleaning)",
-            fontsize=16,
-        )
-        # Set x-axis labels to minutes instead of seconds for all axes
-        for ax in axs.flat:
-            ax.set_xlabel("Time (min)")
-            x_ticks = ax.get_xticks()
-            ax.set_xticks(x_ticks)
-            ax.set_xticklabels([f"{round(x/60)}" for x in x_ticks])
-            # Add vertical lines for event markers
-            # Exclude first and last event markers
-            # And only use every second event marker to avoid overlap
-            for _, row in events_experiment.iloc[0:-1:2].iterrows():
-                ax.axvline(row["onset"], color="gray", linestyle="--", alpha=0.5)
-
-        # Save plot to results directory
-        plt.savefig(
-            Path(results_dir) / exp_name / averaged_name / datatype_name / f"avg_task-{task}_physio_IBI-HR.png"
-        )
-
-        if show_plots:
-            plt.show()
-
-        plt.close()
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
 if __name__ == "__main__":

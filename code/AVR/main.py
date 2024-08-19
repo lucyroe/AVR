@@ -26,12 +26,14 @@ def main():  # noqa: PLR0915
         4. Univariate statistics: Perform univariate statistical analysis.
         5. Modelling: Perform Hidden Markov Model (HMM) analysis.
         6. GLM: Perform General Linear Model (GLM) of the HMM analysis.
-        7. Plot results: Plot the results of the analysis.
+        7. Model Comparison: Compare the different HMM models.
+        8. Plot results: Plot the results of the analysis.
     """
     # %% Import
     from AVR.datacomparison.compare_variability_phase1_phase3 import compare_variability_phase1_phase3
     from AVR.datavisualization.plot_descriptives import plot_descriptives
     from AVR.datavisualization.raincloud_plot import raincloud_plot
+    from AVR.modelling.compare_models import compare_models
     from AVR.modelling.hmm import hmm
     from AVR.preprocessing.annotation.preprocessing_annotation_avr_phase3 import preprocess_annotations
     from AVR.preprocessing.physiological.feature_extraction import extract_features
@@ -43,10 +45,12 @@ def main():  # noqa: PLR0915
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Extract features"]   # Adjust as needed
-    # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Modelling", "GLM", "Plot results"
+    steps = []   # Adjust as needed
+    # "Load data", "Preprocess data", "Extract features", "Univariate statistics",
+    # "Modelling", "GLM", "Model comparison", "Plot results"
 
-    subjects = ["015", "016", "018", "019",
+    subjects = ["001", "002", "003","004", "005", "006", "007", "009",
+                "012", "014", "015", "016", "018", "019",
                 "020", "021", "022", "024", "025", "026", "027", "028",
                 "030", "031", "032", "034", "037", "038",
                 "040", "041", "042", "043", "045", "046"]
@@ -64,7 +68,16 @@ def main():  # noqa: PLR0915
     # "040", "041", "042", "043", "044", "045", "046", "047"
     # Features were already extracted for the following subjects:
     # "001", "002", "003","004", "005", "006", "007", "009",
-    # "012", "014"
+    # "012", "014", "015", "016", "018", "019",
+    # "020", "021", "022", "024", "025", "026", "027", "028",
+    # "030", "031", "032", "034", "037", "038",
+    # "040", "041", "042", "043", "045", "046"
+    # Univariate statistics were already performed for the following subjects:
+    # "001", "002", "003","004", "005", "006", "007", "009",
+    # "012", "014", "015", "016", "018", "019",
+    # "020", "021", "022", "024", "025", "026", "027", "028",
+    # "030", "031", "032", "034", "037", "038",
+    # "040", "041", "042", "043", "045", "046"
 
     # For comparison of phase 3 with phase 1
     subjects_annotations = ["001", "002", "003","004", "005", "006", "007", "009",
@@ -129,7 +142,11 @@ def main():  # noqa: PLR0915
 
         elif step == "GLM":
             print("\nFitting General Linear Model (GLM)...\n")
-            glm(data_dir, results_dir, subjects, debug, show_plots)
+            glm(results_dir, subjects, debug, show_plots)
+
+        elif step == "Model comparison":
+            print("\nComparing the different HMM models...\n")
+            compare_models(data_dir, results_dir, subjects, debug, show_plots)
 
         elif step == "Plot results":
             print("\nPlotting results...\n")

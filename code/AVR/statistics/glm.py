@@ -6,12 +6,11 @@ Required packages: statsmodels, scipy, sklearn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 15 August 2024
-Last update: 16 August 2024
+Last update: 19 August 2024
 """
 
 
 def glm(  # noqa: PLR0915, C901
-    data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003"],  # noqa: B006
     debug=False,
@@ -43,7 +42,6 @@ def glm(  # noqa: PLR0915, C901
     from statsmodels.multivariate.manova import MANOVA
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    annotation_path = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "features" / "avg" / "beh"
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to analyze
@@ -279,10 +277,6 @@ def glm(  # noqa: PLR0915, C901
         hidden_states_file = f"all_subjects_task-AVR_{model}_model_data_{features_string}.tsv"
         hidden_states_data = pd.read_csv(hmm_path / hidden_states_file, sep="\t")
 
-        # Load the annotations
-        annotation_file = "all_subjects_task-AVR_beh_features.tsv"
-        annotations = pd.read_csv(annotation_path / annotation_file, sep="\t")
-
         # Initialize the results dataframe
         results = pd.DataFrame(
             columns=["subject", "test", "value", "num_df", "den_df", "F", "p-value", "significance"]
@@ -297,21 +291,9 @@ def glm(  # noqa: PLR0915, C901
             hidden_states_subject = hidden_states_data[hidden_states_data["subject"] == int(subject)].reset_index(
                 drop=True
             )
-            annotations_subject = annotations[annotations["subject"] == int(subject)].reset_index(drop=True)
 
-            # Delete subject and video column
-            annotations_subject = annotations_subject.drop(columns=["subject", "video"])
-            hidden_states_subject = hidden_states_subject.drop(columns=["subject"])
-
-            # Check if the timestamps have the same length
-            if len(hidden_states_subject) != len(annotations_subject):
-                # Cut the longer one to the length of the shorter one
-                min_length = min(len(hidden_states_subject), len(annotations_subject))
-                hidden_states_subject = hidden_states_subject[:min_length]
-                annotations_subject = annotations_subject[:min_length]
-
-            # Merge the hidden states with the annotations
-            data = hidden_states_subject.merge(annotations_subject, on="timestamp")
+            # Delete subject column
+            data = hidden_states_subject.drop(columns=["subject"])
 
             # Get list of states
             list_states = data["state"].unique()

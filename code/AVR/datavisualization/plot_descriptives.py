@@ -4,7 +4,7 @@ Plotting descriptive statistics for the AVR data.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 12 August 2024
-Last updated: 13 August 2024
+Last updated: 19 August 2024
 """
 
 
@@ -33,7 +33,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
 
     # Path where the data is stored
     data_dir = Path(data_dir) / "phase3" / "AVR" / "derivatives"
-    annotation_dir = Path(data_dir) / "preproc" / "avg" / "beh"
+    annotation_dir = Path(data_dir) / "features" / "avg" / "beh"
     physiological_dir = Path(data_dir) / "features" / "avg" / "eeg"
     events_dir = Path(data_dir) / "preproc"
 
@@ -46,8 +46,8 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
         "physiological": [
             "ibi",
             "hrv",
-            "lf-hrv",
-            "hf-hrv",
+            "lf_hrv",
+            "hf_hrv",
             "posterior_alpha",
             "frontal_alpha",
             "frontal_theta",
@@ -65,8 +65,8 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
         "physiological": {
             "ibi": "#CC79A7",
             "hrv": "#ff9789",
-            "lf-hrv": "#f3849b",
-            "hf-hrv": "#ffb375",
+            "lf_hrv": "#f3849b",
+            "hf_hrv": "#ffb375",
             # shades of pink-orange
             "posterior_alpha": "#009E73",
             "frontal_alpha": "#66b974",
@@ -264,12 +264,22 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     # Create one dataframe for all datastreams
     data = pd.DataFrame()
     # Load the annotation data
-    annotations = pd.read_csv(annotation_dir / "avg_task-AVR_beh_preprocessed.tsv", sep="\t")
+    annotations = pd.read_csv(annotation_dir / "all_subjects_task-AVR_beh_features.tsv", sep="\t")
+    # Drop unnecessary columns
+    annotations = annotations.drop(columns=["subject", "video"])
+    # Average over all subjects
+    annotations = annotations.groupby("timestamp").mean()
+
     for variable in datastreams["annotation"]:
         data[variable] = annotations[variable]
 
     # Load the physiological data
-    physiological = pd.read_csv(physiological_dir / "avg_task-AVR_physio_features.tsv", sep="\t")
+    physiological = pd.read_csv(physiological_dir / "all_subjects_task-AVR_physio_features.tsv", sep="\t")
+    # Drop unnecessary columns
+    physiological = physiological.drop(columns=["subject", "video"])
+    # Average over all subjects
+    physiological = physiological.groupby("timestamp").mean()
+
     for variable in datastreams["physiological"]:
         # Check if the variable has the same length as the annotations
         for annotation_variable in datastreams["annotation"]:
@@ -367,7 +377,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     # Read in results of the post-hoc-tests
     posthoc_results = pd.read_csv(results_dir_descriptives / "stats" / "annotation_posthoc_results.tsv", sep="\t")
     # Get the significant differences
-    significant_differences_dataframe = posthoc_results[posthoc_results["Significance"] is True]
+    significant_differences_dataframe = posthoc_results[posthoc_results["Significance"] == True]  # noqa: E712
 
     # Plot raincloud plots to visualize the differences in annotation ratings between the different videos
     # Create a figure with subplots for valence and arousal

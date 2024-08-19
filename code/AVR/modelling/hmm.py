@@ -1,7 +1,7 @@
 """
 Script to perform a Hidden Markov Model (HMM) analysis on Affective VR cardiac and neural data.
 
-Required packages: hmmlearn
+Required packages: hmmlearn, pickle
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
@@ -38,6 +38,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
     # %% Import
     import json
     from pathlib import Path
+    import pickle
 
     import matplotlib.pyplot as plt
     import numpy as np
@@ -321,6 +322,11 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         parameters_file_all_subjects = f"all_subjects_task-AVR_{model}_model_parameters_{features_string}.json"
         with Path(hmm_path / parameters_file_all_subjects).open("w") as f:
             json.dump(hmm_parameters_all_subjects, f)
+
+        # Save the model for future use
+        hmm_model_file = f"all_subjects_task-AVR_{model}_model_{features_string}.pkl"
+        with hmm_path / hmm_model_file.open("wb") as f:
+            pickle.dump(hmm_all_subjects, f)
 
         # Create a plot for the model for each participant with a subplot for each feature
         for subject in subjects:

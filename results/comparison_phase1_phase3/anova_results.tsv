@@ -1,0 +1,5 @@
+	SS	F	Num DF	p	Significance	Samples
+ANOVA mean_valence	59.91	85.42	4	0.0	True	248.0
+ANOVA std_dev_valence	4.67	41.3	4	0.0	True	248.0
+ANOVA mean_arousal	56.33	73.87	4	0.0	True	248.0
+ANOVA std_dev_arousal	4.79	50.05	4	0.0	True	248.0
