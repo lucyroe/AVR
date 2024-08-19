@@ -6,9 +6,9 @@ Required packages: mne, neurokit, systole, seaborn, autoreject
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 6 July 2024
-Last update: 16 August 2024
+Last update: 19 August 2024
 """
-#%%
+
 def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR0912, PLR0913
             data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
             results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
@@ -79,8 +79,7 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
         subjects = [subjects[0]]
 
     # Defne preprocessing steps to perform
-    steps = ["Cutting", "Formatting", "Preprocessing EEG", "Averaging"]  # Adjust as needed
-    # "Preprocessing ECG + PPG",
+    steps = ["Cutting", "Formatting", "Preprocessing ECG + PPG", "Preprocessing EEG", "Averaging"]  # Adjust as needed
 
     # Define whether scaling of the ECG and PPG data should be done
     scaling = True
@@ -915,7 +914,7 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             cleaned_ecg_file = [file.name for file in cleaned_ecg_dir.iterdir() if file.is_file() and
                     "_ecg_preprocessed" in file.name]
             if len(cleaned_ecg_file) != 1:
-                print("ERROR! No or multiple cleaned ECG files found."
+                print("ERROR! No or multiple cleaned ECG files found. "
                 "Make sure to run the preprocessing for ECG data first.")
                 # Exit the program if no or multiple cleaned ECG files are found
                 sys.exit()

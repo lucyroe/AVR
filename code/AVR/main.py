@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 16 August 2024
+Last update: 19 August 2024
 """
 
 def main():  # noqa: PLR0915
@@ -46,15 +46,14 @@ def main():  # noqa: PLR0915
     steps = ["Extract features"]   # Adjust as needed
     # "Load data", "Preprocess data", "Extract features", "Univariate statistics", "Modelling", "GLM", "Plot results"
 
-    subjects = ["001", "003", "004", "005", "006", "007",
-                "012", "014", "015", "016", "018", "019",
+    subjects = ["015", "016", "018", "019",
                 "020", "021", "022", "024", "025", "026", "027", "028",
                 "030", "031", "032", "034", "037", "038",
                 "040", "041", "042", "043", "045", "046"]
 
     # subjects "008", "010", "013" were excluded due to missing data
     # subject "023" was excluded because of bad quality of ECG data
-    # subjects "002", "009", "011", "017", "029", "033", "035", "036", "039", "044", "047"
+    # subjects "011", "017", "029", "033", "035", "036", "039", "044", "047"
     # were excluded due to bad quality of EEG data
 
     # Preprocessing of the following subjects was already done:
@@ -64,6 +63,8 @@ def main():  # noqa: PLR0915
     # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
     # "040", "041", "042", "043", "044", "045", "046", "047"
     # Features were already extracted for the following subjects:
+    # "001", "002", "003","004", "005", "006", "007", "009",
+    # "012", "014"
 
     # For comparison of phase 3 with phase 1
     subjects_annotations = ["001", "002", "003","004", "005", "006", "007", "009",
@@ -108,7 +109,7 @@ def main():  # noqa: PLR0915
             print("\nPreprocessing physiological data...\n")
             preprocess_physiological(subjects_annotations, data_dir, results_dir, show_plots, debug, manual_cleaning)
             print("\nCalculating averaged preprocessing metadata...\n")
-            preprocessing_metadata(subjects_annotations, data_dir, debug)
+            preprocessing_metadata(subjects, data_dir, debug)
 
         elif step == "Extract features":
             print("\nExtracting features...\n")
