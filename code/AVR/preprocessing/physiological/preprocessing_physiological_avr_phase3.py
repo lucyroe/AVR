@@ -1112,6 +1112,11 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
                     "(separated by commas): "
                     )
                 manual_rejection_other = [int(i) for i in manual_rejection_other.split(",")]
+                #remove components in manual_rejection_other from list_remaining_components
+                list_remaining_components = set(list_remaining_components)
+                for sublist in manual_rejection_other:
+                    list_remaining_components -= {sublist}
+                list_remaining_components = list(list_remaining_components)
                 print(f"Remaining components {manual_rejection_other} added to the list of rejected components.")
             else:
                 manual_rejection_other = []
@@ -1258,7 +1263,8 @@ def preprocess_physiological(subjects=["001"],  # noqa: PLR0915, B006, C901, PLR
             participant_metadata["eog_components"] = [int(index) for index in eog_indices]
             participant_metadata["ecg_components"] = [int(index) for index in ecg_indices]
             participant_metadata["emg_components"] = [int(index) for index in emg_indices]
-            participant_metadata["other_components"] = [int(index) for index in list_remaining_components]
+            participant_metadata["other_rejected_components"] = [int(index) for index in manual_rejection_other]
+            participant_metadata["remaining_components"] = [int(index) for index in list_remaining_components]
             participant_metadata["explained_variance_ratio"] = float(explained_variance_ratio)
 
             # Include the end time of the preprocessing
