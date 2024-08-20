@@ -6,10 +6,10 @@ Required packages: statsmodels, scipy, sklearn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 15 August 2024
-Last update: 19 August 2024
+Last update: 20 August 2024
 """
 
-
+# %%
 def glm(  # noqa: PLR0915, C901
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003"],  # noqa: B006
@@ -36,6 +36,7 @@ def glm(  # noqa: PLR0915, C901
     from pathlib import Path
 
     import matplotlib.pyplot as plt
+    import numpy as np
     import pandas as pd
     import scipy
     from scipy import stats
@@ -61,7 +62,7 @@ def glm(  # noqa: PLR0915, C901
         subjects = [subjects[0]]
 
     # %% Functions  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-    def test_assumptions(data, list_variables, group_name):  # noqa: C901, PLR0915
+    def test_assumptions(data, list_variables, group_name):  # noqa: C901, PLR0915, PLR0912
         """
         Test the assumptions of the MANOVA.
 
@@ -199,39 +200,46 @@ def glm(  # noqa: PLR0915, C901
         # Create a table with the results of Barlett's and Levene's tests
         table_homogeinity = pd.DataFrame()
         for variable in list_variables:
-            # subset data
-            data_state0 = data[(data[f"{group_name}"] == list_states[0])][variable]
-            data_state1 = data[(data[f"{group_name}"] == list_states[1])][variable]
-            data_state2 = data[(data[f"{group_name}"] == list_states[2])][variable]
-            data_state3 = data[(data[f"{group_name}"] == list_states[3])][variable]
+            # Initialize empty array to store data for each group
+            data_groups = []
+
+            for group in list_groups:
+                # subset data
+                data_group = data[(data[f"{group_name}"] == group)][variable]
+                data_group.reset_index(drop=True)
+                # Transform data to 1D array
+                data_group = np.array(data_group)
+
+                # Append data to data_groups
+                data_groups.append(data_group)
 
             # Perform Barlett's test
-            bartlett_stats, bartlett_p = stats.bartlett(data_state0, data_state1, data_state2, data_state3)
+            bartlett_stats, bartlett_p = stats.bartlett(*data_groups)
 
             # Perform Levene's test
-            levene_stats, levene_p = stats.levene(data_state0, data_state1, data_state2, data_state3)
+            levene_stats, levene_p = stats.levene(*data_groups)
 
             # Append results to table_homogeinity
             table_homogeinity = table_homogeinity._append(
-                {
-                    "Variable": f"{variable}",
-                    "Test": "Barlett",
-                    "Statistic": bartlett_stats,
-                    "p-value": bartlett_p,
-                    "Samples": [len(data_state0), len(data_state1), len(data_state2), len(data_state3)],
-                },
-                ignore_index=True,
-            )
+                    {
+                        "Variable": f"{variable}",
+                        "Test": "Barlett",
+                        "Statistic": bartlett_stats,
+                        "p-value": bartlett_p,
+                        "Samples": [len(data_group) for data_group in data_groups],
+                    },
+                    ignore_index=True,
+                )
             table_homogeinity = table_homogeinity._append(
-                {
-                    "Variable": f"{variable}",
-                    "Test": "Levene",
-                    "Statistic": levene_stats,
-                    "p-value": levene_p,
-                    "Samples": [len(data_state0), len(data_state1), len(data_state2), len(data_state3)],
-                },
-                ignore_index=True,
-            )
+                    {
+                        "Variable": f"{variable}",
+                        "Test": "Levene",
+                        "Statistic": levene_stats,
+                        "p-value": levene_p,
+                        "Samples": [len(data_state) for data_state in data_groups],
+                    },
+                    ignore_index=True,
+                )
 
         # Round p-values to three decimal places
         table_homogeinity["p-value"] = table_homogeinity["p-value"].round(3)
@@ -284,7 +292,7 @@ def glm(  # noqa: PLR0915, C901
         # Loop over all subjects
         for subject_index, subject in enumerate(subjects):
             print("---------------------------------")
-            print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subject)) + "...")
+            print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subjects)) + "...")
             print("---------------------------------\n")
 
             # Get the data for the subject
@@ -301,6 +309,7 @@ def glm(  # noqa: PLR0915, C901
 
             # Get the list of features
             list_features = models_features[model]
+            list_features.sort()
 
             # STEP 2: TEST ASSUMPTIONS OF MANOVA
             print("Testing assumptions of MANOVA...")

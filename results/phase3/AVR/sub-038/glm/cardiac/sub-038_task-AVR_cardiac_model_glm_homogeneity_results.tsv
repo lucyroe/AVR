@@ -1,0 +1,5 @@
+Variable	Test	Statistic	p-value	Samples	Significance
+hf-hrv	Barlett	1270.24	0.0	[421, 214, 340, 417]	True
+hf-hrv	Levene	124.44	0.0	[421, 214, 340, 417]	True
+ibi	Barlett	61.65	0.0	[421, 214, 340, 417]	True
+ibi	Levene	17.08	0.0	[421, 214, 340, 417]	True

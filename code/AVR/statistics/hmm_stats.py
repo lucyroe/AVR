@@ -6,8 +6,7 @@ Contact: lucy.roellecke[at]tuta.com
 Created on: 14 August 2024
 Last update: 20 August 2024
 """
-# %%
-def hmm_stats(  # noqa: C901, PLR0915
+def hmm_stats(  # noqa: C901, PLR0915, PLR0912
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
@@ -267,17 +266,65 @@ def hmm_stats(  # noqa: C901, PLR0915
             # Calculate the global statistics for each state
             global_stats = pd.DataFrame()
             # Calculate the mean fractional occupancy
-            global_stats.loc[state, "fractional_occupancy"] = global_stats_all_subjects[
+            global_stats.loc[state, "mean_fractional_occupancy"] = global_stats_all_subjects[
                 global_stats_all_subjects["state"] == state
             ]["fractional_occupancy"].mean()
+
+            # Calculate the std of the fractional occupancy
+            global_stats.loc[state, "std_fractional_occupancy"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["fractional_occupancy"].std()
+
+            # Calculate the min of the fractional occupancy
+            global_stats.loc[state, "min_fractional_occupancy"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["fractional_occupancy"].min()
+
+            # Calculate the max of the fractional occupancy
+            global_stats.loc[state, "max_fractional_occupancy"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["fractional_occupancy"].max()
+
             # Calculate the mean lifetime
             global_stats.loc[state, "mean_lifetime"] = global_stats_all_subjects[
                 global_stats_all_subjects["state"] == state
             ]["mean_lifetime"].mean()
+
+            # Calculate the std of the lifetime
+            global_stats.loc[state, "std_lifetime"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["mean_lifetime"].std()
+
+            # Calculate the min of the lifetime
+            global_stats.loc[state, "min_lifetime"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["mean_lifetime"].min()
+
+            # Calculate the max of the lifetime
+            global_stats.loc[state, "max_lifetime"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["mean_lifetime"].max()
+
             # Calculate the mean intervaltime
             global_stats.loc[state, "mean_intervaltime"] = global_stats_all_subjects[
                 global_stats_all_subjects["state"] == state
             ]["mean_intervaltime"].mean()
+
+            # Calculate the std of the intervaltime
+            global_stats.loc[state, "std_intervaltime"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["mean_intervaltime"].std()
+
+            # Calculate the min of the intervaltime
+            global_stats.loc[state, "min_intervaltime"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["mean_intervaltime"].min()
+
+            # Calculate the max of the intervaltime
+            global_stats.loc[state, "max_intervaltime"] = global_stats_all_subjects[
+                global_stats_all_subjects["state"] == state
+            ]["mean_intervaltime"].max()
+
             global_stats.insert(0, "state", state)
 
             # Append the global stats for the state to the global stats for all states

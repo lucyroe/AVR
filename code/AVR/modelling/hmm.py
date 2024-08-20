@@ -121,7 +121,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         data, hidden_states, axis, num_states, title, legend
     ):
         """
-        Plot the data with the hidden states marked in color vertically.
+        Plot the data with the hidden states.
 
         Args:
         ----
