@@ -1,19 +1,22 @@
 """
 Script to perform a Hidden Markov Model (HMM) analysis on Affective VR cardiac and neural data.
 
-Required packages: hmmlearn, pickle
+Required packages: hmmlearn, pickle, seaborn
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 22 May 2024
-Last update: 16 August 2024
+Last update: 20 August 2024
 """
-
 
 def hmm(  # noqa: C901, PLR0912, PLR0915
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
-    subjects=["001", "002", "003"],  # noqa: B006
+    subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
+                "012", "014", "015", "016", "018", "019",
+                "020", "021", "022", "024", "025", "026", "027", "028",
+                "030", "031", "032", "034", "037", "038",
+                "040", "041", "042", "043", "045", "046"],
     debug=False,
     show_plots=False,
 ):
@@ -37,13 +40,16 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
     """
     # %% Import
     import json
-    from pathlib import Path
     import pickle
+    from pathlib import Path
 
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
+    import seaborn as sns
     from hmmlearn.hmm import GMMHMM
+    from matplotlib.collections import LineCollection
+    from matplotlib.lines import Line2D
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     datapath = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "features"
@@ -73,9 +79,8 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
     # Covariance type for the GMMHMM
     covariance_type = "diag"
 
-    color_features = "black"
     # Colors of the hidden states
-    colors_states = ["#009E73", "#CC79A7", "#0072B2", "#D55E00"]  # green, pink, dark blue, dark orange
+    colors_states = ["#D55E00", "#0072B2", "#009E73", "#CC79A7"]  #  dark orange, dark blue, green, pink
 
     # Only analyze one subject if debug is True
     if debug:
@@ -113,7 +118,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         return model, hidden_states
 
     def plot_hidden_states(  # noqa: PLR0913
-        data, hidden_states, axis, num_states, title, ylabel, legend
+        data, hidden_states, axis, num_states, title, legend
     ):
         """
         Plot the data with the hidden states marked in color vertically.
@@ -125,29 +130,64 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             axis (matplotlib.axis): The axis to plot on.
             num_states (int): The number of states.
             title (str): The title of the plot.
-            ylabel (str): The label of the y-axis.
             legend (list): The legend of the plot.
         """
-        axis.plot(data, color=color_features, linewidth=1)
-        axis.set_title(title)
+        # Define the intervals with the hidden states to be of different colors
+        segments = []
+        colors = []
+        color_labels = []
 
-        # Calculate min and max for proper scaling
-        data_min = min(data)
-        data_max = max(data)
+        all_states = np.unique(hidden_states)
+        all_states.sort()
 
-        # Loop over all states
-        for i in range(num_states):
-            # Fill the area between the min and max of the data where the hidden state is i
-            axis.fill_between(
-                np.arange(len(data)),
-                data_min,
-                data_max,
-                where=hidden_states == i,
-                color=colors_states[i],
-                alpha=0.5,
-                label=legend[i],
-            )
-        # TODO: problem of 1s windows between changes -> fill_between does not work properly
+        times = np.arange(len(data))
+
+        for i in range(len(data) - 1):
+            xi = times[i:i+2]
+            yi = data[i:i+2]
+
+            if hidden_states[xi[1]] == all_states[0]:
+                colors.append(colors_states[0])
+                color_labels.append(legend[0])
+            elif hidden_states[xi[1]] == all_states[1]:
+                colors.append(colors_states[1])
+                color_labels.append(legend[1])
+            elif hidden_states[xi[1]] == all_states[2]:
+                colors.append(colors_states[2])
+                color_labels.append(legend[2])
+            elif hidden_states[xi[1]] == all_states[3]:
+                colors.append(colors_states[3])
+                color_labels.append(legend[3])
+
+            segments.append(np.column_stack([xi, yi]))
+
+        # Create a LineCollection from the segments and colors
+        lc = LineCollection(segments, colors=colors, linewidth=2)
+
+        # Add the LineCollection to the axis
+        axis.add_collection(lc)
+
+        # Set the title of the plot
+        if title in ("ibi", "hf-hrv"):
+            title = title.upper()
+            ylabel = "Value (z-scored)"
+        else:
+            title = title.replace("_", " ").title()
+            ylabel = "Power (z-scored)"
+
+        axis.set_title(title, fontsize=14, fontweight="bold")
+
+        # Adjust the limits of the plot
+        axis.set_xlim(-1, len(data) + 100)
+        axis.set_ylim(data.min()-1, data.max()+1)
+
+        # Create custom legend handles
+        legend_handles = [
+            Line2D([0], [0], color=colors_states[i], lw=2, label=legend[i]) for i in range(num_states)
+                    ]
+
+        # Add the legend to the plot
+        axis.legend(handles=legend_handles, loc="upper right")
 
         # Transform the x-axis to min
         xticks = axis.get_xticks()
@@ -155,7 +195,6 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         axis.set_xticklabels([f"{int(x/60)}" for x in xticks])
         axis.set_xlabel("Time (min)")
         axis.set_ylabel(ylabel)
-        axis.legend(loc="upper right")
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
 
@@ -172,7 +211,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         # Loop over all subjects
         for subject_index, subject in enumerate(subjects):
             print("---------------------------------")
-            print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subject)) + "...")
+            print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subjects)) + "...")
             print("---------------------------------\n")
             # Get the right datapath
             subject_datapath = datapath / f"sub-{subject}" / "eeg"
@@ -325,7 +364,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
 
         # Save the model for future use
         hmm_model_file = f"all_subjects_task-AVR_{model}_model_{features_string}.pkl"
-        with hmm_path / hmm_model_file.open("wb") as f:
+        with Path(hmm_path / hmm_model_file).open("wb") as f:
             pickle.dump(hmm_all_subjects, f)
 
         # Create a plot for the model for each participant with a subplot for each feature
@@ -335,20 +374,28 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             hmm_path_subject.mkdir(parents=True, exist_ok=True)
 
             # Plot the hidden states for each feature
+            sns.set(style="ticks")
             fig, axs = plt.subplots(len(all_features), 1, figsize=(10, 5 * len(all_features)))
             for feature_index, feature in enumerate(models_features[model]):
                 plot_hidden_states(
                     data_all_subjects_df[data_all_subjects_df["subject"] == subject][feature],
-                    hidden_states_all_subjects_df[hidden_states_all_subjects_df["subject"] == subject]["state"],
+                    (hidden_states_all_subjects_df[hidden_states_all_subjects_df["subject"] == subject]
+                        ["state"]).reset_index(drop=True),
                     axs[feature_index] if len(all_features) > 1 else axs,
                     number_of_states,
                     f"{feature}",
-                    feature,
                     legend=[f"State {i}" for i in range(number_of_states)],
                 )
 
             # Set the title of the plot
-            fig.suptitle(f"{model.capitalize()} Model for subject {subject}", fontsize=16)
+            fig.suptitle(f"{model.capitalize()} Model for Subject {subject}", fontsize=16)
+
+            # Remove the x-labels from all but the last subplot
+            for ax in axs[:-1]:
+                ax.set_xlabel("")
+
+            # Remove the space between the subplots and the title
+            plt.subplots_adjust(top=0.9)
 
             # Save the plot
             plot_file = f"sub-{subject}_{model}_hmm_{features_string}.png"

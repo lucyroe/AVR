@@ -4,14 +4,17 @@ Script to calculate summary stats of the hidden states of the different HMMs.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 14 August 2024
-Last update: 16 August 2024
+Last update: 20 August 2024
 """
-
-
+# %%
 def hmm_stats(  # noqa: C901, PLR0915
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
-    subjects=["001", "002", "003"],  # noqa: B006
+    subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
+                "012", "014", "015", "016", "018", "019",
+                "020", "021", "022", "024", "025", "026", "027", "028",
+                "030", "031", "032", "034", "037", "038",
+                "040", "041", "042", "043", "045", "046"],
     debug=False,
 ):
     """
@@ -77,7 +80,7 @@ def hmm_stats(  # noqa: C901, PLR0915
         # Loop over all subjects
         for subject_index, subject in enumerate(subjects):
             print("---------------------------------")
-            print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subject)) + "...")
+            print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subjects)) + "...")
             print("---------------------------------\n")
 
             # Get the data for the subject
@@ -103,6 +106,9 @@ def hmm_stats(  # noqa: C901, PLR0915
             # Get a list of all features
             features = [col for col in data.columns if col not in ["timestamp", "state"]]
 
+            # Sort the features alphabetically
+            features = sorted(features)
+
             # STEP 2. CALCULATE STATS
             # Loop over all features
             summary_stats_all = pd.DataFrame()
@@ -116,6 +122,19 @@ def hmm_stats(  # noqa: C901, PLR0915
                 # Calculate the minimum and maximum for each hidden state
                 summary_stats["min"] = data.groupby("state")[feature].min()
                 summary_stats["max"] = data.groupby("state")[feature].max()
+
+                # Sort the summary stats by the hidden states
+                summary_stats = summary_stats.sort_index()
+
+                # Check if the summary stats are calculated for all states
+                if len(summary_stats) != number_of_states:
+                    # Add a row with NaNs for the missing states
+                    for state in range(number_of_states):
+                        if state not in summary_stats.index:
+                            summary_stats.loc[state, :] = [np.nan] * len(summary_stats.columns)
+
+                        # Sort the summary stats by the hidden states
+                        summary_stats = summary_stats.sort_index()
 
                 summary_stats.insert(0, "feature", feature)
 
@@ -134,11 +153,19 @@ def hmm_stats(  # noqa: C901, PLR0915
             # Loop over all hidden states
             for state in range(number_of_states):
                 # Get the data for the state
-                data_state = hidden_states_subject[hidden_states_subject["state"] == state]
+                data_state = data[data["state"] == state]
                 data_state.reset_index(drop=True)
 
+                # Check if the state is empty (state is not visited)
+                if len(data_state) == 0:
+                    # Add NaNs to the respective columns
+                    global_stats.loc[state, "fractional_occupancy"] = np.nan
+                    global_stats.loc[state, "mean_lifetime"] = np.nan
+                    global_stats.loc[state, "mean_intervaltime"] = np.nan
+                    continue
+
                 # Fractional Occupancy
-                fractional_occupancy = len(data_state) / len(hidden_states_subject)
+                fractional_occupancy = len(data_state) / len(data)
                 global_stats.loc[state, "fractional_occupancy"] = fractional_occupancy
 
                 # Lifetime & Intervaltime
@@ -150,12 +177,12 @@ def hmm_stats(  # noqa: C901, PLR0915
                     # Check if the timepoint is the first one
                     if index == 0:
                         lifetime = 0
-                    elif timepoint == data_state["timestamp"][index - 1] + 1:
+                    elif timepoint == data_state["timestamp"].reset_index(drop=True)[index - 1] + 1:
                         lifetime += 1
                     else:
                         lifetimes.append(lifetime)
                         lifetime = 0
-                        intervaltime = timepoint - data_state["timestamp"][index - 1]
+                        intervaltime = timepoint - data_state["timestamp"].reset_index(drop=True)[index - 1]
                         intervaltimes.append(intervaltime)
 
                 # Calculate the mean lifetime
@@ -230,6 +257,9 @@ def hmm_stats(  # noqa: C901, PLR0915
                 .mean()
             )
             summary_stats.insert(0, "state", state)
+
+            # Sort the summary stats by the features
+            summary_stats = summary_stats.sort_index()
 
             # Append the summary stats for the state to the summary stats for all states
             summary_stats_averaged = pd.concat([summary_stats_averaged, summary_stats], axis=0)
