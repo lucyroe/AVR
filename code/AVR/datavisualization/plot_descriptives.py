@@ -235,7 +235,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
                 label_index_second = x_tick_labels.index(second_group)
                 specific_xtick_position_second_group = xtick_positions[label_index_second]
 
-                # Get maximum value of the two groups
+                # Get maximum value of the whole data
                 max_value = max(data_list[label_index_first].max(), data_list[label_index_second].max())
 
                 # The color of line and asterisk should be black

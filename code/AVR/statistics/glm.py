@@ -6,13 +6,17 @@ Required packages: statsmodels, scipy, sklearn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 15 August 2024
-Last update: 20 August 2024
+Last update: 22 August 2024
 """
 
-# %%
 def glm(  # noqa: PLR0915, C901
+    data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
-    subjects=["001", "002", "003"],  # noqa: B006
+    subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
+        "012", "014", "015", "016", "018", "019",
+        "020", "021", "022", "024", "025", "026", "027", "028", "029",
+        "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+        "040", "041", "042", "043", "045", "046"],
     debug=False,
     show_plots=False,
 ):
@@ -31,6 +35,7 @@ def glm(  # noqa: PLR0915, C901
         2.3 Linearity
     3. Perform first level GLM (MANOVA)
     4. Perform second level GLM (one-sample t-test)
+    5. Perform post-hoc tests to see between which states the features differ
     """
     # %% Import
     from pathlib import Path
@@ -43,15 +48,17 @@ def glm(  # noqa: PLR0915, C901
     from statsmodels.multivariate.manova import MANOVA
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
+    datapath = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "features" / "avg" / "beh"
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to analyze
-    models = ["cardiac", "neural", "integrated"]
+    models = ["cardiac", "neural", "integrated", "subjective"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
+        "subjective": ["valence", "arousal"],
     }
 
     # Set the significance level
@@ -271,6 +278,74 @@ def glm(  # noqa: PLR0915, C901
 
         return table_normality, fig_normality, table_homogeinity, figs_linearity
 
+    def post_hoc_tests(data, variables, groups, variable_name, alpha=0.05) -> pd.DataFrame:
+        """
+        Perform post-hoc tests to compare variables between the videos.
+
+        Arguments:
+        ---------
+        data: dataframe
+        variables: list of variables to be compared
+        groups: list of groups to be compared
+        variable_name: name of the variable
+        alpha: significance level
+
+        Returns:
+        -------
+        results_table_posthoc_tests: dataframe
+        """
+        # Perform pairwise comparisons between groups
+        # Bonferroni correction for multiple comparisons
+        # Perform t-tests for each variable and statistic
+        # Create table with group-comparisons and t-test results
+        results_table_posthoc_tests = pd.DataFrame()
+        for variable in variables:
+            for group1 in groups:
+                for group2 in groups:
+                    if group1 != group2:
+                        data_group1 = data[data[f"{variable_name}"] == group1][variable]
+                        data_group2 = data[data[f"{variable_name}"] == group2][variable]
+                        # Interpolate the data if the lengths of the two datasets do not match
+                        if len(data_group1) != len(data_group2):
+                            required_length = max(len(data_group1), len(data_group2))
+                            data_group1 = data_group1.reset_index(drop=True)
+                            data_group2 = data_group2.reset_index(drop=True)
+                            data_group1 = data_group1.reindex(range(required_length)).interpolate()
+                            data_group2 = data_group2.reindex(range(required_length)).interpolate()
+                        # Perform t-test
+                        ttest_stats, ttest_p = stats.ttest_rel(data_group1, data_group2)
+                        # Append results to results_table
+                        results_table_posthoc_tests = results_table_posthoc_tests._append(
+                            {
+                                "Variable": f"{variable}",
+                                "Group1": group1,
+                                "Sample1": len(data_group1),
+                                "Group2": group2,
+                                "Sample2": len(data_group2),
+                                "t-statistic": ttest_stats,
+                                "p-value": ttest_p,
+                            },
+                            ignore_index=True,
+                        )
+
+        # Bonferroni correction for multiple comparisons
+        # Number of comparisons
+        n_comparisons = len(groups) * (len(groups) - 1) * len(variables)
+
+        # Corrected alpha level
+        alpha_corrected = alpha / n_comparisons
+
+        # Mark significant results
+        results_table_posthoc_tests["Significance"] = results_table_posthoc_tests["p-value"] < alpha_corrected
+
+        # Round p-values to three decimal places
+        results_table_posthoc_tests["p-value"] = results_table_posthoc_tests["p-value"].round(3)
+        # Round statistics to two decimal places
+        results_table_posthoc_tests[["t-statistic"]] = results_table_posthoc_tests[["t-statistic"]].round(2)
+
+        return results_table_posthoc_tests
+
+
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     # %% STEP 1: LOAD DATA
     # Loop over all models
@@ -282,13 +357,49 @@ def glm(  # noqa: PLR0915, C901
         # Load the features with hidden states
         hmm_path = resultpath / "avg" / "hmm" / model
         features_string = "_".join(models_features[model])
+        features_string_integrated = "_".join(models_features["integrated"])
         hidden_states_file = f"all_subjects_task-AVR_{model}_model_data_{features_string}.tsv"
         hidden_states_data = pd.read_csv(hmm_path / hidden_states_file, sep="\t")
+
+        all_data_file = f"all_subjects_task-AVR_integrated_model_data_{features_string_integrated}.tsv"
+        all_data = pd.read_csv(resultpath / "avg" / "hmm" / "integrated" / all_data_file, sep="\t")
+
+        features_annotations = "_".join(models_features["subjective"])
+        annotation_file = f"all_subjects_task-AVR_subjective_model_data_{features_annotations}.tsv"
+        annotations = pd.read_csv(resultpath / "avg" / "hmm" / "subjective" / annotation_file, sep="\t")
+
+        # Check if the length per subject is the same
+        if len(annotations) != len(all_data):
+            # Shorten the annotations dataframe to the length of the all_data dataframe
+            new_annotations = []
+            for subject in annotations["subject"].unique():
+                # Get the length of the data for the subject
+                length_data = len(all_data[all_data["subject"] == subject])
+                # Get the length of the annotations for the subject
+                length_annotations = len(annotations[annotations["subject"] == subject])
+                # Check if the lengths are different
+                if length_data != length_annotations:
+                    # Shorten the annotations dataframe to the length of the all_data dataframe
+                    annotations_subject = annotations[annotations["subject"] == subject][:length_data]
+                    new_annotations.append(annotations_subject)
+
+            annotations_short = pd.concat(new_annotations)
+
+        # Add valence and arousal to the data
+        all_data["valence"] = annotations_short["valence"]
+        all_data["arousal"] = annotations_short["arousal"]
+
+        # Drop the state column
+        all_data = all_data.drop(columns=["state"])
+
+        # Add the state column of the respective model
+        all_data["state"] = hidden_states_data["state"]
 
         # Initialize the results dataframe
         results = pd.DataFrame(
             columns=["subject", "test", "value", "num_df", "den_df", "F", "p-value", "significance"]
         )
+
         # Loop over all subjects
         for subject_index, subject in enumerate(subjects):
             print("---------------------------------")
@@ -308,7 +419,7 @@ def glm(  # noqa: PLR0915, C901
             list_states.sort()
 
             # Get the list of features
-            list_features = models_features[model]
+            list_features = models_features[model].copy()
             list_features.sort()
 
             # STEP 2: TEST ASSUMPTIONS OF MANOVA
@@ -418,6 +529,28 @@ def glm(  # noqa: PLR0915, C901
         # Save the results
         results_ttest.to_csv(
             glm_results_path / f"avg_task-AVR_{model}_model_glm_results_ttest.tsv", sep="\t", index=False
+        )
+
+        # %% STEP 5: POST-HOC TESTS
+        # Perform post-hoc tests to see between which states the features differ
+        print("Performing post-hoc tests...")
+
+        # Get the list of features to perform the post-hoc tests
+        list_features = all_data.columns.tolist()
+        list_features.remove("state")
+        list_features.remove("subject")
+        list_features.remove("timestamp")
+
+        # Drop the timestamp column
+        feature_data = all_data.drop(columns=["timestamp"])
+        feature_data = feature_data.reset_index(drop=True)
+
+        # Perform post-hoc tests to see between which states the features differ
+        results_table_posthoc_tests = post_hoc_tests(feature_data, list_features, list_states, "state", alpha)
+
+        # Save the results
+        results_table_posthoc_tests.to_csv(
+            glm_results_path / f"avg_task-AVR_{model}_model_glm_results_posthoc_tests.tsv", sep="\t", index=False
         )
 
 

@@ -6,17 +6,17 @@ Required packages: hmmlearn, pickle, seaborn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 22 May 2024
-Last update: 20 August 2024
+Last update: 22 August 2024
 """
 
 def hmm(  # noqa: C901, PLR0912, PLR0915
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
-                "012", "014", "015", "016", "018", "019",
-                "020", "021", "022", "024", "025", "026", "027", "028",
-                "030", "031", "032", "034", "037", "038",
-                "040", "041", "042", "043", "045", "046"],
+        "012", "014", "015", "016", "018", "019",
+        "020", "021", "022", "024", "025", "026", "027", "028", "029",
+        "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+        "040", "041", "042", "043", "045", "046"],
     debug=False,
     show_plots=False,
 ):
@@ -26,7 +26,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
     Inputs: Extracted ECG and EEG features.
 
     Outputs:
-    - Three Hidden Markov Models (HMMs): Cardiac Model, Neural Model, Integrated Model.
+    - Four Hidden Markov Models (HMMs): Cardiac Model, Neural Model, Integrated Model, Subjective Model.
     - Plot of the data with the hidden states marked in color vertically.
 
     Functions:
@@ -56,12 +56,13 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to create
-    models = ["cardiac", "neural", "integrated"]
+    models = ["cardiac", "neural", "integrated", "subjective"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
+        "subjective": ["valence", "arousal"],
     }
 
     # Define whether features should be z-scored to have mean 0 and standard deviation 1
@@ -171,6 +172,9 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         if title in ("ibi", "hf-hrv"):
             title = title.upper()
             ylabel = "Value (z-scored)"
+        elif title in ("valence", "arousal"):
+            title = title.capitalize()
+            ylabel = "Value (z-scored)"
         else:
             title = title.replace("_", " ").title()
             ylabel = "Power (z-scored)"
@@ -214,7 +218,8 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             print(f"Processing subject {subject_index+1} (ID {subject}) of " + str(len(subjects)) + "...")
             print("---------------------------------\n")
             # Get the right datapath
-            subject_datapath = datapath / f"sub-{subject}" / "eeg"
+            subject_datapath = (datapath / "avg" / "beh" if model == "subjective"
+                        else datapath / f"sub-{subject}" / "eeg")
 
             # Create empty list to store the data of all features
             all_features = []
@@ -248,6 +253,13 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
                         feature_datafile = f"sub-{subject}_task-AVR_eeg_features_whole-brain_power.tsv"
                         feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature]
 
+                elif model == "subjective":
+                    feature_datafile = "all_subjects_task-AVR_beh_features.tsv"
+                    feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")
+                    # Get only the data of the current subject
+                    feature_data = feature_data[feature_data["subject"] == int(subject)]
+                    feature_data = feature_data[feature]
+
                 # Z-score the data if necessary
                 if z_score:
                     feature_data = (feature_data - feature_data.mean()) / feature_data.std()
@@ -269,6 +281,9 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
             data_all_subjects = pd.concat(
                 [data_all_subjects, pd.DataFrame(data, columns=models_features[model])], axis=0
             )
+
+        # Find NaN values and interpolate them
+        data_all_subjects = data_all_subjects.interpolate()
 
         # %% STEP 2. HMMs
         # Create and train the Hidden Markov Model

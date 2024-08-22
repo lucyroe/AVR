@@ -1,0 +1,5 @@
+Variable	Test	Statistic	p-value	Samples	Significance
+arousal	Barlett	558.5	0.0	[562, 330, 259, 242]	True
+arousal	Levene	58.01	0.0	[562, 330, 259, 242]	True
+valence	Barlett	766.46	0.0	[562, 330, 259, 242]	True
+valence	Levene	76.11	0.0	[562, 330, 259, 242]	True

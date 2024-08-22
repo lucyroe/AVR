@@ -1,0 +1,5 @@
+test	t-value	df	p-value	significance
+Wilks' lambda		0.0		False
+Pillai's trace		0.0		False
+Hotelling-Lawley trace		0.0		False
+Roy's greatest root		0.0		False

@@ -1,11 +1,11 @@
 Variable	Test	Statistic	p-value	Samples	Significance
-beta	Barlett	2351.49	0.0	[645, 63, 159, 523]	True
-beta	Levene	48.92	0.0	[645, 63, 159, 523]	True
-frontal_alpha	Barlett	623.91	0.0	[645, 63, 159, 523]	True
-frontal_alpha	Levene	55.94	0.0	[645, 63, 159, 523]	True
-frontal_theta	Barlett	175.98	0.0	[645, 63, 159, 523]	True
-frontal_theta	Levene	26.22	0.0	[645, 63, 159, 523]	True
-gamma	Barlett	5342.03	0.0	[645, 63, 159, 523]	True
-gamma	Levene	55.5	0.0	[645, 63, 159, 523]	True
-posterior_alpha	Barlett	1245.92	0.0	[645, 63, 159, 523]	True
-posterior_alpha	Levene	96.73	0.0	[645, 63, 159, 523]	True
+beta	Barlett	2354.58	0.0	[171, 508, 64, 647]	True
+beta	Levene	48.11	0.0	[171, 508, 64, 647]	True
+frontal_alpha	Barlett	628.23	0.0	[171, 508, 64, 647]	True
+frontal_alpha	Levene	55.42	0.0	[171, 508, 64, 647]	True
+frontal_theta	Barlett	172.86	0.0	[171, 508, 64, 647]	True
+frontal_theta	Levene	25.5	0.0	[171, 508, 64, 647]	True
+gamma	Barlett	5382.39	0.0	[171, 508, 64, 647]	True
+gamma	Levene	54.63	0.0	[171, 508, 64, 647]	True
+posterior_alpha	Barlett	1247.58	0.0	[171, 508, 64, 647]	True
+posterior_alpha	Levene	96.91	0.0	[171, 508, 64, 647]	True

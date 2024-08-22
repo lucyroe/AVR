@@ -1,5 +1,5 @@
 Variable	Sphericity	W	Chi2	df	p-value	Significance
-ibi	True	5818389.350629534	-494.12227419049947	5	1.0	False
+ibi	True	7206684.086085023	-579.8629660330197	5	1.0	False
 hrv	True	inf	-inf	5	1.0	False
 lf_hrv	True	inf	-inf	5	1.0	False
 hf_hrv	True	inf	-inf	5	1.0	False

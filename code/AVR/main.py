@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 20 August 2024
+Last update: 22 August 2024
 """
 
 def main():  # noqa: PLR0915
@@ -46,19 +46,19 @@ def main():  # noqa: PLR0915
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Plot results"]   # Adjust as needed
+    steps = ["GLM"]   # Adjust as needed
     # "Load data", "Preprocess data", "Extract features", "Univariate statistics",
     # "Modelling", "GLM", "Model comparison", "Plot results"
 
     subjects = ["001", "002", "003","004", "005", "006", "007", "009",
-                "012", "014", "015", "016", "018", "019",
-                "020", "021", "022", "024", "025", "026", "027", "028",
-                "030", "031", "032", "034", "037", "038",
-                "040", "041", "042", "043", "045", "046"]
+        "012", "014", "015", "016", "018", "019",
+        "020", "021", "022", "024", "025", "026", "027", "028", "029",
+        "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+        "040", "041", "042", "043", "045", "046"]
 
     # subjects "008", "010", "013" were excluded due to missing data
     # subject "023" was excluded because of bad quality of ECG data
-    # subjects "011", "017", "029", "033", "035", "036", "039", "044", "047"
+    # subjects "011", "017", "044", "047"
     # were excluded due to bad quality of EEG data
 
     # Preprocessing of the following subjects was already done:
@@ -70,15 +70,22 @@ def main():  # noqa: PLR0915
     # Features were already extracted for the following subjects:
     # "001", "002", "003","004", "005", "006", "007", "009",
     # "012", "014", "015", "016", "018", "019",
-    # "020", "021", "022", "024", "025", "026", "027", "028",
-    # "030", "031", "032", "034", "037", "038",
+    # "020", "021", "022", "024", "025", "026", "027", "028", "029",
+    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
     # "040", "041", "042", "043", "045", "046"
     # Univariate statistics were already performed for the following subjects:
     # "001", "002", "003","004", "005", "006", "007", "009",
     # "012", "014", "015", "016", "018", "019",
-    # "020", "021", "022", "024", "025", "026", "027", "028",
-    # "030", "031", "032", "034", "037", "038",
+    # "020", "021", "022", "024", "025", "026", "027", "028", "029",
+    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
     # "040", "041", "042", "043", "045", "046"
+    # Modelling was already performed for the following subjects:
+    # "001", "002", "003","004", "005", "006", "007", "009",
+    # "012", "014", "015", "016", "018", "019",
+    # "020", "021", "022", "024", "025", "026", "027", "028", "029",
+    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+    # "040", "041", "042", "043", "045", "046"
+    # GLM was already performed for the following subjects:
 
     # For comparison of phase 3 with phase 1
     subjects_annotations = ["001", "002", "003","004", "005", "006", "007", "009",
@@ -136,14 +143,14 @@ def main():  # noqa: PLR0915
             compare_variability_phase1_phase3(subjects_annotations, subjects_phase1, data_dir, results_dir, show_plots)
 
         elif step == "Modelling":
-            print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
-            hmm(data_dir, results_dir, subjects, debug, show_plots)
+            #print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
+            #hmm(data_dir, results_dir, subjects, debug, show_plots)
             print("\nCalculating statistics of the hidden states...\n")
-            hmm_stats(data_dir, results_dir, subjects, debug)
+            hmm_stats(results_dir, subjects, debug)
 
         elif step == "GLM":
             print("\nFitting General Linear Model (GLM)...\n")
-            glm(results_dir, subjects, debug, show_plots)
+            glm(data_dir, results_dir, subjects, debug, show_plots)
 
         elif step == "Model comparison":
             print("\nComparing the different HMM models...\n")

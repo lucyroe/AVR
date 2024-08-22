@@ -4,7 +4,7 @@ Plotting hidden states from HMM analysis of the AVR data.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 20 August 2024
-Last updated: 20 August 2024
+Last updated: 22 August 2024
 """
 
 # %%
@@ -41,7 +41,8 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
     events_dir = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "preproc"
 
     # Which HMMs to plot
-    models = ["cardiac", "neural", "integrated"]
+    models = ["cardiac"]
+    #"neural", "integrated"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
@@ -203,25 +204,28 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         return fig
 
-    def create_violinplot(data, variable, ylabel):
+    def create_violinplot(data, axis, variable, ylabel):
         """
         Create violin plots for global statistics of the hidden states.
 
         Args:
         ----
             data (pd.DataFrame): The data to plot.
+            axis (matplotlib.axis): The axis to plot on.
             variable (str): The variable to plot.
             ylabel (str): The ylabel of the plot.
         """
-        fig, axis = plt.subplots(figsize=(10, 5))
-
         sns.violinplot(data=data, x="state", y=variable, palette=colors_states, ax=axis, inner=None)
 
-        for index, violin in enumerate(plt.gca().collections[::1]):
+        # Customizing the violin plots (color and transparency)
+        for index, violin in enumerate(axis.collections[::1]):
             face_color = colors_states[index]
             violin.set_facecolor(plt.matplotlib.colors.to_rgba(face_color, alpha=0.3))
             violin.set_edgecolor(face_color)
             violin.set_linewidth(2)
+        
+        # Overlay the individual data points with stripplot
+        sns.stripplot(data=data, x="state", y=variable, palette=colors_states, ax=axis, size=4, jitter=False)
 
         # Add labels
         axis.set_ylabel(ylabel, fontsize=12)
@@ -235,14 +239,195 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         title = " ".join(variable.split("_")).title() if variable == "fractional_occupancy" else variable.split("_")[1].capitalize()
         axis.set_title(title, fontsize=14, fontweight="bold")
 
-        return fig
+    def create_affect_grid(data, data_mean, axis):
+        """
+        Create a plot of the mean valence and arousal ratings for each state on the Affect Grid.
+
+        Args:
+        ----
+            data (pd.DataFrame): The data to plot.
+            data_mean (pd.DataFrame): The mean data to plot.
+            axis (matplotlib.axis): The axis to plot on.
+        """
+        # Create the plot
+        sns.scatterplot(data=data, x="valence", y="arousal", hue="state", palette=colors_states, ax=axis, s=50, alpha=0.4)
+
+        # Add the mean ratings
+        sns.scatterplot(data=data_mean, x="valence", y="arousal", hue="state", palette=colors_states, ax=axis, s=150, alpha=1)
+
+        # Add the standard deviation of the ratings as lines to the points
+        for i in range(4):
+            axis.errorbar(
+                data_mean[data_mean["state"] == i]["valence"],
+                data_mean[data_mean["state"] == i]["arousal"],
+                xerr=data_mean[data_mean["state"] == i]["std_valence"],
+                yerr=data_mean[data_mean["state"] == i]["std_arousal"],
+                fmt="none",
+                ecolor=colors_states[i],
+                capsize=5,
+                capthick=2,
+                elinewidth=2)
+        
+        # Change the axes to be centered
+        axis.spines["left"].set_position("center")
+        axis.spines["bottom"].set_position("center")
+
+        # Hide the top and right spines
+        axis.spines["top"].set_visible(False)
+        axis.spines["right"].set_visible(False)
+
+        # Add labels to the axes outside of the plot
+        axis.set_xlabel("Valence", fontsize=12)
+        axis.set_ylabel("Arousal", fontsize=12, rotation=360)
+
+        # Move the x-axis label to the right middle
+        axis.xaxis.set_label_coords(0.96, 0.53)
+    
+        # Move the y-axis label to the top middle
+        axis.yaxis.set_label_coords(0.55, 0.98)
+
+        # Set the limits of the plot
+        axis.set_xlim(-1.2, 1.2)
+        axis.set_ylim(-1.2, 1.2)
+
+        # Hide only the middle tick label on the x-axis and y-axis
+        xticks = axis.xaxis.get_major_ticks()
+        xticks[3].label1.set_visible(False)
+        yticks = axis.yaxis.get_major_ticks()
+        yticks[3].label1.set_visible(False)
+
+        # Set custom legend labels
+        legend_handles = [
+            Line2D([0], [0], marker="o", color="w", markerfacecolor=colors_states[i], markersize=10, label=f"State {i+1}") for i in range(4)
+        ]
+
+        axis.legend(handles=legend_handles, loc="upper right")
+
+        # Add grid lines
+        plt.grid(True)
+
+    def create_raincloud_plots(data, axis, variable, significant_differences):
+        """
+        Create raincloud plots for the ECG features with significant differences marked.
+
+        Raincloud plots are made up of three different parts:
+        - Boxplots.
+        - Violin Plots.
+        - Scatter Plots.
+
+        Args:
+        ----
+            data (pd.DataFrame): The data to plot.
+            axis (matplotlib.axis): The axis to plot on.
+            variable (str): The variable to plot.
+            significant_differences (list): The significant differences to mark.
+        """
+        # Divide data for each part of the plot
+        data_list = []
+        list_states = data["state"].unique()
+        list_states.sort()
+        for state in list_states:
+            data_state = data[data["state"] == state][f"{variable}"]
+            data_state = data_state.reset_index(drop=True)
+            data_list.append(data_state)
+
+        # Exclude nan values from the data
+        data_list = [data[~np.isnan(data)] for data in data_list]
+
+        # Boxplots
+        # Boxplot data
+        boxplot_data = axis.boxplot(
+            data_list, widths=0.15, patch_artist=True, showfliers=False, medianprops=dict(color="black"))
+
+        # Change to the desired color and add transparency
+        for patch, color in zip(boxplot_data["boxes"], colors_states, strict=False):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.5)
+
+        # Violin Plots
+        # Violin plot data
+        violin_data = axis.violinplot(
+            data_list, points=int(len(data)/len(list_states)), showmeans=False, showmedians=False, showextrema=False
+        )
+
+
+        for idx, body in enumerate(violin_data["bodies"]):
+            # Get the center of the plot
+            center = np.mean(body.get_paths()[0].vertices[:, 0])
+            # Modify it so we only see the upper half of the violin plot
+            body.get_paths()[0].vertices[:, 0] = np.clip(body.get_paths()[0].vertices[:, 0], center, np.inf)
+            # Change to the desired color
+            body.set_color(colors_states[list_states[idx]])
+
+        # Scatter Plots
+        for idx, features in enumerate(data_list):
+            # Add jitter effect so the features do not overlap on the y-axis
+            x = np.full(len(features), idx + 0.8)
+            idxs = np.arange(len(x))
+            out = x.astype(float)
+            # Create a default_rng instance
+            rng = np.random.default_rng()
+            out.flat[idxs] += rng.uniform(low=-0.05, high=0.05, size=len(idxs))
+            x = out
+            axis.scatter(x, features, s=3, c=colors_states[list_states[idx]])
+
+        # Set labels
+        axis.set_xticklabels([f"State {state+1}" for state in list_states])
+        axis.set_ylabel("Value (z-scored)")
+
+        # Set title
+        axis.set_title(f"{variable.upper()}", fontsize=14, fontweight="bold", pad=20)
+
+        if mark_significant_differences:
+            # Mark significant differences with an asterisk and a line above the two groups
+            counter = 0
+            # Get distance between lines
+            distance = 0.5
+
+            for difference in significant_differences:
+                first_group = f"State {difference[0]+1}"
+                second_group = f"State {difference[1]+1}"
+                # Get x-tick labels and positions
+                x_tick_labels = [tick.get_text() for tick in axis.get_xticklabels()]
+                xtick_positions = axis.get_xticks()
+
+                # Get position of the label for the first group
+                label_index_first = x_tick_labels.index(first_group)
+                specific_xtick_position_first_group = xtick_positions[label_index_first]
+                # Get position of the label for the second group
+                label_index_second = x_tick_labels.index(second_group)
+                specific_xtick_position_second_group = xtick_positions[label_index_second]
+
+                # Get maximum value
+                max_value = np.max(np.concatenate(data_list))
+
+                # The color of line and asterisk should be black
+                color = "black"
+
+                # Plot a line between the two groups
+                axis.plot(
+                    [specific_xtick_position_first_group, specific_xtick_position_second_group],
+                    [max_value + distance + counter, max_value + distance + counter],
+                    color=color,
+                )
+
+                # Add an asterisk in the middle of the line
+                axis.text(
+                    (specific_xtick_position_first_group + specific_xtick_position_second_group) / 2,
+                    max_value + distance + counter,
+                    "*",
+                    fontsize=12,
+                    color=color,
+                )
+
+                counter += 0.3
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     # %% STEP 1. LOAD DATA
     # Loop over all models
     for model in models:
         print("+++++++++++++++++++++++++++++++++")
-        print(f"Initiating {model} model...")
+        print(f"Plotting hidden states for {model} model...")
         print("+++++++++++++++++++++++++++++++++\n")
 
         hmm_path = resultpath / "avg" / "hmm" / model
@@ -256,6 +441,9 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         hmm_global_stats_all = pd.read_csv(hmm_path / f"all_subjects_task-AVR_{model}_model_states_global_stats.tsv", sep="\t")
         hmm_feature_stats_avg = pd.read_csv(hmm_path / f"avg_task-AVR_{model}_model_states_stats.tsv", sep="\t")
         hmm_global_stats_avg = pd.read_csv(hmm_path / f"avg_task-AVR_{model}_model_states_global_stats.tsv", sep="\t")
+
+        # Read in the results of the post-hoc-tests
+        posthoc_results = pd.read_csv(glm_path / f"avg_task-AVR_{model}_model_glm_results_posthoc_tests.tsv", sep="\t")
 
         events = pd.read_csv(events_dir / "events_experiment.tsv", sep="\t")
     
@@ -314,24 +502,117 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         # %% STEP 3. CREATE ONE SET OF PLOTS FOR EACH HMM
         # 3a. Violin plots for all four states for fractional occupancy, life times, interval times
-        for variable in ["fractional_occupancy", "mean_lifetime", "mean_intervaltime"]:
-            sns.set(style="ticks")
+        sns.set(style="ticks")
+        figure, axes = plt.subplots(3, 1, figsize=(10, 15))
 
-            fig = create_violinplot(hmm_global_stats_all, variable, ("Proportion" if variable == "fractional_occupancy" else "Time (s)"))
+        for index, variable in enumerate(["fractional_occupancy", "mean_lifetime", "mean_intervaltime"]):
+            create_violinplot(hmm_global_stats_all, axes[index], variable, ("Proportion" if variable == "fractional_occupancy" else "Time (s)"))
 
-            # Save the plot
-            plot_file = f"global_stats_{model}_model_{variable}.svg"
-            fig.savefig(hmm_path / plot_file)
+        # Save the plot
+        plot_file = f"global_stats_{model}_model.svg"
+        plt.savefig(hmm_path / plot_file)
 
-            # Show the plot
-            if show_plots:
-                plt.show()
-            
-            plt.close()
+        # Show the plot
+        if show_plots:
+            plt.show()
+        
+        plt.close()
 
         # 3b. Mean valence and arousal ratings for each state on the Affect Grid
+        arousal_all_subjects = hmm_feature_stats_all[hmm_feature_stats_all["feature"] == "arousal"]
+        arousal_all_subjects = arousal_all_subjects.drop(columns=["feature", "subject", "std", "min", "max"])
+        arousal_all_subjects = arousal_all_subjects.rename(columns={"mean": "arousal"})
+        arousal_all_subjects = arousal_all_subjects.reset_index(drop=True)
+
+        valence_all_subjects = hmm_feature_stats_all[hmm_feature_stats_all["feature"] == "valence"]
+        valence_all_subjects = valence_all_subjects.drop(columns=["feature", "subject", "std", "min", "max", "state"])
+        valence_all_subjects = valence_all_subjects.rename(columns={"mean": "valence"})
+        valence_all_subjects = valence_all_subjects.reset_index(drop=True)
+
+        # Combine the data
+        ratings_dataframe_all_subjects = pd.concat([valence_all_subjects, arousal_all_subjects], axis=1)
+
+        # Get the mean ratings for each state
+        arousal_mean = hmm_feature_stats_avg[hmm_feature_stats_avg["feature"] == "arousal"]
+        arousal_mean = arousal_mean.drop(columns=["feature", "min", "max"])
+        arousal_mean = arousal_mean.rename(columns={"mean": "arousal", "std": "std_arousal"})
+        arousal_mean = arousal_mean.reset_index(drop=True)
+
+        valence_mean = hmm_feature_stats_avg[hmm_feature_stats_avg["feature"] == "valence"]
+        valence_mean = valence_mean.drop(columns=["feature", "min", "max", "state"])
+        valence_mean = valence_mean.rename(columns={"mean": "valence", "std": "std_valence"})
+        valence_mean = valence_mean.reset_index(drop=True)
+
+        # Combine the data
+        ratings_dataframe_avg = pd.concat([valence_mean, arousal_mean], axis=1)
+
+        sns.set(style="ticks")
+
+        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        create_affect_grid(ratings_dataframe_all_subjects, ratings_dataframe_avg, ax)
+
+        # Save the plot
+        plot_file = f"affect_grid_{model}_model.svg"
+        plt.savefig(hmm_path / plot_file)
+
+        # Show the plot
+        if show_plots:
+            plt.show()
+
+        plt.close()
 
         # 3c. Raincloud plots for each state for all ECG features with significant differences marked
+        cardiac_features = models_features["cardiac"]
+
+        # Get the significant differences
+        significant_differences_dataframe = posthoc_results[posthoc_results["Significance"] == True]  # noqa: E712
+
+        # Plot raincloud plots
+        sns.set(style="ticks")
+
+        fig, axes = plt.subplots(len(cardiac_features), 1, figsize=(10, 15))
+
+        for index, feature in enumerate(cardiac_features):
+            # Get the data for the current feature
+            features_data = hmm_feature_stats_all[hmm_feature_stats_all["feature"] == feature]
+            features_data = features_data.drop(columns=["feature", "subject", "std", "min", "max"])
+            features_data = features_data.rename(columns={"mean": feature})
+            features_data = features_data.reset_index(drop=True)
+
+            # Get tjhe significant differences for the current feature
+            significant_differences_current = significant_differences_dataframe[
+                significant_differences_dataframe["Variable"] == feature
+            ]
+
+            # Put the significant differences in a list (pairs of groups)
+            significant_differences = [
+                [group1, group2]
+                for group1, group2 in zip(
+                    significant_differences_current["Group1"],
+                    significant_differences_current["Group2"],
+                    strict=True,
+                )
+            ]
+
+            # Delete duplicates (no matter in which order the groups are)
+            significant_differences = [sorted(difference) for difference in significant_differences]
+            significant_differences = list({tuple(difference) for difference in significant_differences})
+
+            # Sort so that the groups are in alphabetical order
+            significant_differences = sorted(significant_differences)
+
+            create_raincloud_plots(features_data, axes[index], feature, significant_differences)
+
+        # Save the plot
+        plot_file = f"raincloud_plots_cardiac_features_{model}_model.svg"
+        plt.savefig(hmm_path / plot_file)
+
+        # Show the plot
+        if show_plots:
+            plt.show()
+
+        plt.close()
+
 
         # 3d. Topoplots for each state for all EEG features
 
