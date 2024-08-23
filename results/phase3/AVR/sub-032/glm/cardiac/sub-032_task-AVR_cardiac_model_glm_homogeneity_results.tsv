@@ -1,5 +1,5 @@
 Variable	Test	Statistic	p-value	Samples	Significance
-hf-hrv	Barlett	456.18	0.0	[395, 305, 358, 334]	True
-hf-hrv	Levene	76.29	0.0	[395, 305, 358, 334]	True
-ibi	Barlett	60.33	0.0	[395, 305, 358, 334]	True
-ibi	Levene	16.55	0.0	[395, 305, 358, 334]	True
+hf-hrv	Barlett	50.01	0.0	[310, 342, 409, 331]	True
+hf-hrv	Levene	21.0	0.0	[310, 342, 409, 331]	True
+ibi	Barlett	37.06	0.0	[310, 342, 409, 331]	True
+ibi	Levene	10.27	0.0	[310, 342, 409, 331]	True

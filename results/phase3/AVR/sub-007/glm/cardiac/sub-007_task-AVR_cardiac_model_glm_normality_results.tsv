@@ -1,9 +1,9 @@
 State	Variable	Statistic	Samples	p-value	Significance
-0	hf-hrv	0.99	515	0.0	True
-0	ibi	0.99	515	0.001	True
-1	hf-hrv	0.67	238	0.0	True
-1	ibi	0.97	238	0.0	True
-2	hf-hrv	0.97	374	0.0	True
-2	ibi	0.98	374	0.0	True
-3	hf-hrv	0.89	265	0.0	True
-3	ibi	0.98	265	0.001	True
+0	hf-hrv	0.8	310	0.0	True
+0	ibi	0.97	310	0.0	True
+1	hf-hrv	0.95	342	0.0	True
+1	ibi	1.0	342	0.411	False
+2	hf-hrv	0.98	409	0.0	True
+2	ibi	0.97	409	0.0	True
+3	hf-hrv	0.91	331	0.0	True
+3	ibi	1.0	331	0.991	False

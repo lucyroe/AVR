@@ -1,9 +1,9 @@
 State	Variable	Statistic	Samples	p-value	Significance
-0	arousal	0.81	453	0.0	True
-0	valence	0.33	453	0.0	True
-1	arousal	0.76	478	0.0	True
-1	valence	0.67	478	0.0	True
-2	arousal	0.78	135	0.0	True
-2	valence	0.76	135	0.0	True
-3	arousal	0.84	327	0.0	True
-3	valence	0.41	327	0.0	True
+0	arousal	0.93	463	0.0	True
+0	valence	0.42	463	0.0	True
+1	arousal	0.53	370	0.0	True
+1	valence	0.46	370	0.0	True
+2	arousal	0.87	264	0.0	True
+2	valence	0.67	264	0.0	True
+3	arousal	0.89	296	0.0	True
+3	valence	0.8	296	0.0	True

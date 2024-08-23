@@ -6,10 +6,10 @@ Required packages: hmmlearn, pickle, seaborn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 22 May 2024
-Last update: 22 August 2024
+Last update: 23 August 2024
 """
-
-def hmm(  # noqa: C901, PLR0912, PLR0915
+# %%
+def hmm(  # noqa: C901, PLR0912, PLR0915, PLR0913
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
@@ -17,6 +17,10 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         "020", "021", "022", "024", "025", "026", "027", "028", "029",
         "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
         "040", "041", "042", "043", "045", "046"],
+    state_quadrant_mapping = {"cardiac": {0: "LN", 1: "HP", 2: "LP", 3: "HN"},  # noqa: B006
+                                "neural": {0: "HN", 1: "LP", 2: "LN", 3: "HP"},
+                                "integrated": {0: "LN", 1: "HP", 2: "HN", 3: "LP"},
+                                "subjective": {0: "LP", 1: "HN", 2: "LN", 3: "HP"}},
     debug=False,
     show_plots=False,
 ):
@@ -303,6 +307,52 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
 
         features_string = "_".join(models_features[model])
 
+        # Save the model for future use
+        hmm_model_file = f"all_subjects_task-AVR_{model}_model_{features_string}.pkl"
+        with Path(hmm_path / hmm_model_file).open("wb") as f:
+            pickle.dump(hmm_all_subjects, f)
+
+        # Create a dictionary with the state parameters
+        hmm_parameters_all_subjects = {}
+        for state in range(number_of_states):
+            # Get the percentage of time spent in the state
+            percentage = len(hidden_states_all_subjects[hidden_states_all_subjects == state]) / len(
+                hidden_states_all_subjects
+            )
+            hmm_state_parameters_all_subjects = {
+                "percentage": percentage,
+                "means": hmm_all_subjects.means_[state].tolist(),
+                "covars": hmm_all_subjects.covars_[state].tolist(),
+                "startprob": hmm_all_subjects.startprob_[state].tolist(),
+                "transmat": hmm_all_subjects.transmat_[state].tolist(),
+            }
+            # Add the state parameters to the dictionary
+            hmm_parameters_all_subjects[f"state_{state}"] = hmm_state_parameters_all_subjects
+
+        # Rename the keys of the state parameters
+        # Loop over keys
+        for key in list(hmm_parameters_all_subjects.keys()):
+            # Get the new key
+            new_key = state_quadrant_mapping[model][int(key.split("_")[1])]
+            new_key = {"LP": 0, "HN": 1, "LN": 2, "HP": 3}[new_key]
+            # Replace the key
+            hmm_parameters_all_subjects[new_key] = hmm_parameters_all_subjects.pop(key)
+
+        # Save the state parameters to a json file
+        parameters_file_all_subjects = f"all_subjects_task-AVR_{model}_model_parameters_{features_string}.json"
+        with Path(hmm_path / parameters_file_all_subjects).open("w") as f:
+            json.dump(hmm_parameters_all_subjects, f)
+
+        # Transform array into a dataframe
+        hidden_states_all_subjects = pd.Series(hidden_states_all_subjects)
+
+        # Replace all states with the corresponding quadrant
+        for state in range(number_of_states):
+            hidden_states_all_subjects[hidden_states_all_subjects == state] = state_quadrant_mapping[model][state]
+
+        # Replace all states quadrants with the corresponding state of the subjective model (so that the colors match)
+        hidden_states_all_subjects = hidden_states_all_subjects.replace({"LP": 0, "HN": 1, "LN": 2, "HP": 3})
+
         # Create a dataframe with the state sequence corresponding to each timepoint
         hidden_states_all_subjects_df = pd.DataFrame({"state": hidden_states_all_subjects})
 
@@ -353,34 +403,6 @@ def hmm(  # noqa: C901, PLR0912, PLR0915
         metadata_file_all_subjects = f"all_subjects_task-AVR_{model}_model_metadata_{features_string}.json"
         with Path(hmm_path / metadata_file_all_subjects).open("w") as f:
             json.dump(hmm_metadata_all_subjects, f)
-
-        # Create a dictionary with the state parameters
-        hmm_parameters_all_subjects = {}
-        for state in range(number_of_states):
-            # Get the percentage of time spent in the state
-            percentage = len(hidden_states_all_subjects[hidden_states_all_subjects == state]) / len(
-                hidden_states_all_subjects
-            )
-            hmm_state_parameters_all_subjects = {
-                "state": state,
-                "percentage": percentage,
-                "means": hmm_all_subjects.means_[state].tolist(),
-                "covars": hmm_all_subjects.covars_[state].tolist(),
-                "startprob": hmm_all_subjects.startprob_[state].tolist(),
-                "transmat": hmm_all_subjects.transmat_[state].tolist(),
-            }
-            # Add the state parameters to the dictionary
-            hmm_parameters_all_subjects[f"state_{state}"] = hmm_state_parameters_all_subjects
-
-        # Save the state parameters to a json file
-        parameters_file_all_subjects = f"all_subjects_task-AVR_{model}_model_parameters_{features_string}.json"
-        with Path(hmm_path / parameters_file_all_subjects).open("w") as f:
-            json.dump(hmm_parameters_all_subjects, f)
-
-        # Save the model for future use
-        hmm_model_file = f"all_subjects_task-AVR_{model}_model_{features_string}.pkl"
-        with Path(hmm_path / hmm_model_file).open("wb") as f:
-            pickle.dump(hmm_all_subjects, f)
 
         # Create a plot for the model for each participant with a subplot for each feature
         for subject in subjects:

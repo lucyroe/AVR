@@ -46,7 +46,7 @@ def main():  # noqa: PLR0915
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["GLM"]   # Adjust as needed
+    steps = ["Model comparison"]   # Adjust as needed
     # "Load data", "Preprocess data", "Extract features", "Univariate statistics",
     # "Modelling", "GLM", "Model comparison", "Plot results"
 
@@ -86,6 +86,11 @@ def main():  # noqa: PLR0915
     # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
     # "040", "041", "042", "043", "045", "046"
     # GLM was already performed for the following subjects:
+    # "001", "002", "003","004", "005", "006", "007", "009",
+    # "012", "014", "015", "016", "018", "019",
+    # "020", "021", "022", "024", "025", "026", "027", "028", "029",
+    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+    # "040", "041", "042", "043", "045", "046"
 
     # For comparison of phase 3 with phase 1
     subjects_annotations = ["001", "002", "003","004", "005", "006", "007", "009",
@@ -105,6 +110,14 @@ def main():  # noqa: PLR0915
     # change with the directory of data storage
     data_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/"
     results_dir = "/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/"
+
+    # Define which hidden states for each model correspond to which quadrant of the Affect Grid
+    # (after visual inspection)
+    state_quadrant_mapping = {"cardiac": {0: "LN", 1: "HP", 2: "LP", 3: "HN"},
+                                "neural": {0: "HN", 1: "LP", 2: "LN", 3: "HP"},
+                                "integrated": {0: "LN", 1: "HP", 2: "HN", 3: "LP"},
+                                "subjective": {0: "LP", 1: "HN", 2: "LN", 3: "HP"}}
+
 
     # Define if plots should be shown
     show_plots = False
@@ -144,7 +157,7 @@ def main():  # noqa: PLR0915
 
         elif step == "Modelling":
             print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
-            hmm(data_dir, results_dir, subjects, debug, show_plots)
+            hmm(data_dir, results_dir, subjects, state_quadrant_mapping, debug, show_plots)
             print("\nCalculating statistics of the hidden states...\n")
             hmm_stats(results_dir, subjects, debug)
 
@@ -154,16 +167,16 @@ def main():  # noqa: PLR0915
 
         elif step == "Model comparison":
             print("\nComparing the different HMM models...\n")
-            compare_models(data_dir, results_dir, subjects, debug, show_plots)
+            compare_models(results_dir, subjects, debug)
 
         elif step == "Plot results":
             print("\nPlotting results...\n")
-            #print("\nCreating descriptives plots...\n")
-            #plot_descriptives(data_dir, results_dir, show_plots)
-            #print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
-            #raincloud_plot(data_dir, results_dir, show_plots)
+            print("\nCreating descriptives plots...\n")
+            plot_descriptives(data_dir, results_dir, show_plots)
+            print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
+            raincloud_plot(data_dir, results_dir, show_plots)
             print("\nCreating hidden states plots...\n")
-            plot_hidden_states(data_dir, results_dir, show_plots)
+            plot_hidden_states(data_dir, results_dir, subjects, show_plots)
 
         else:
             print(f"Step {step} not found")

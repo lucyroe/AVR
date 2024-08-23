@@ -13,7 +13,7 @@ Last updated: 23 August 2024
 def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
-    subjects=["001", "002", "003","004", "005", "006", "007", "009",
+    subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
         "012", "014", "015", "016", "018", "019",
         "020", "021", "022", "024", "025", "026", "027", "028", "029",
         "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
@@ -33,42 +33,42 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
             3d. Topoplots for each state for all EEG features.
     """
     # %% Import
+    import sys
     from pathlib import Path
 
     import matplotlib.pyplot as plt
+    import mne
     import numpy as np
     import pandas as pd
     import seaborn as sns
+    from matplotlib import gridspec
     from matplotlib.collections import LineCollection
+    from matplotlib.colors import LinearSegmentedColormap
     from matplotlib.lines import Line2D
-
-    import mne
-    import sys
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
 
     # Path where the data is stored
     resultpath = Path(results_dir) / "phase3" / "AVR"
-    events_dir = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "preproc"
     data_path = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "features"
 
     # Which HMMs to plot
-    models = ["cardiac"]
-    #"neural", "integrated"]
+    models = ["cardiac", "neural", "integrated", "subjective"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
+        "subjective": ["valence", "arousal"],
     }
 
     # Which subject to use as example subject for HMM for methods
     example_subject = "031"
-    time_window = [14.5, 16.5]    # Time window for the example plot in minutes
+    time_window = [14.5, 16.5]  # Time window for the example plot in minutes
 
     # Which frequencies to plot topoplots for
     frequencies = ["alpha", "theta", "beta", "gamma"]
 
-    # Whether to z-standardize the data to average over all subjects
+    # Whether to z-standardize the power values before averaging over all subjects
     z_standardize = True
 
     # Colors of the hidden states
@@ -76,18 +76,28 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
     # Create custom colormaps for each state for the topoplot
     color_poles_states = [
-        [26.48, 41.48, 100, 45],  # dark orange, light orange
-        [201.57, 190, 100, 35],  # dark blue, light blue
-        [163.67, 140, 100, 31],  # green, light green
-        [326.75, 350, 45, 64],  # pink, light pink
+        ["#D55E00", "#FFB700"],  # dark orange, light orange
+        ["#0072B2", "#1E90FF"],  # dark blue, light blue
+        ["#009E73", "#32CD32"],  # green, light green
+        ["#CC79A7", "#FF6F61"],  # pink, light pink
     ]
-    cmap_states = [sns.light_palette(color, as_cmap=True) for color in colors_states]
 
+    cmap_states = [
+        LinearSegmentedColormap.from_list(
+            name=f"custom_{color_poles}",
+            colors=[
+                sns.dark_palette(color_poles[0], as_cmap=False)[-1],  # Darker shade
+                "white",  # Middle value
+                sns.light_palette(color_poles[1], as_cmap=False)[-1],
+            ],  # Lighter shade
+        )
+        for color_poles in color_poles_states
+    ]
 
     mark_significant_differences = False  # if True, significant differences will be marked in the boxplots
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    def example_plot(  # noqa: PLR0913
+    def example_plot(
         data, hidden_states, axis, title, legend
     ):
         """
@@ -112,8 +122,8 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         times = np.arange(len(data))
 
         for i in range(len(data) - 1):
-            xi = times[i:i+2]
-            yi = data[i:i+2]
+            xi = times[i : i + 2]
+            yi = data[i : i + 2]
 
             if hidden_states[xi[1]] == all_states[0]:
                 colors.append(colors_states[0])
@@ -148,19 +158,18 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         # Adjust the limits of the plot
         axis.set_xlim(-1, len(data) + 1)
-        axis.set_ylim(data.min()-1, data.max()+1)
+        axis.set_ylim(data.min() - 1, data.max() + 1)
 
         # Create custom legend handles
         legend_handles = [
             Line2D([0], [0], color=colors_states[i], lw=2, label=legend[i]) for i in range(len(all_states))
-                    ]
+        ]
 
         # Add the legend to the plot
         axis.legend(handles=legend_handles, loc="upper right")
 
         axis.set_xlabel("Time (s)")
         axis.set_ylabel(ylabel, labelpad=20)
-    
 
     def catplot_states(hidden_states):
         """
@@ -170,7 +179,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         ----
             hidden_states (np.array): The hidden states to plot.
             axis (matplotlib.axis): The axis to plot on.
-        
+
         Returns:
         -------
             fig (matplotlib.figure): The figure with the
@@ -185,10 +194,10 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         # Create a subplot for each state
         fig, axis = plt.subplots(len(list_states), 1, figsize=(10, len(list_states)))
-        
+
         sns.set(style="white")
 
-        for state in list_states:
+        for index, state in enumerate(list_states):
             # Transform the data to 1s and 0s
             hidden_states_binary = hidden_states.copy()
             for row in hidden_states_binary.iterrows():
@@ -198,19 +207,21 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
                     hidden_states_binary.loc[row[0], "state"] = 0
 
             # Create the plot
-            axis[state].plot(hidden_states_binary["time"], hidden_states_binary["state"], color=colors_states[state])
+            axis[index].plot(hidden_states_binary["time"], hidden_states_binary["state"], color=colors_states[state])
             # Fill the area under the curve
-            axis[state].fill_between(hidden_states_binary["time"], hidden_states_binary["state"], color=colors_states[state], alpha=0.3)
+            axis[index].fill_between(
+                hidden_states_binary["time"], hidden_states_binary["state"], color=colors_states[state], alpha=0.3
+            )
             # Rotate the ylabel
-            axis[state].set_ylabel(f"State {state+1}", rotation=360, labelpad=30)
+            axis[index].set_ylabel(f"State {state+1}", rotation=360, labelpad=30)
             # Remove the x-label for all except the last subplot
-            axis[state].set_xlabel("") if state != max(list_states) else axis[state].set_xlabel("Time (s)")
+            axis[index].set_xlabel("") if state != max(list_states) else axis[index].set_xlabel("Time (s)")
 
             # Remove the y-ticks
-            axis[state].set_yticks([])
+            axis[index].set_yticks([])
 
             # Adjust the limits of the plot
-            axis[state].set_xlim(-1, len(hidden_states) + 1)
+            axis[index].set_xlim(-1, len(hidden_states) + 1)
 
         return fig
 
@@ -233,7 +244,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
             violin.set_facecolor(plt.matplotlib.colors.to_rgba(face_color, alpha=0.3))
             violin.set_edgecolor(face_color)
             violin.set_linewidth(2)
-        
+
         # Overlay the individual data points with stripplot
         sns.stripplot(data=data, x="state", y=variable, palette=colors_states, ax=axis, size=4, jitter=False)
 
@@ -246,7 +257,11 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         # Change the x-ticks
         axis.set_xticklabels([f"State {i+1}" for i in range(4)], fontsize=12)
         # Add title
-        title = " ".join(variable.split("_")).title() if variable == "fractional_occupancy" else variable.split("_")[1].capitalize()
+        title = (
+            " ".join(variable.split("_")).title()
+            if variable == "fractional_occupancy"
+            else variable.split("_")[1].capitalize()
+        )
         axis.set_title(title, fontsize=14, fontweight="bold")
 
     def create_affect_grid(data, data_mean, axis):
@@ -260,10 +275,14 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
             axis (matplotlib.axis): The axis to plot on.
         """
         # Create the plot
-        sns.scatterplot(data=data, x="valence", y="arousal", hue="state", palette=colors_states, ax=axis, s=50, alpha=0.4)
+        sns.scatterplot(
+            data=data, x="valence", y="arousal", hue="state", palette=colors_states, ax=axis, s=50, alpha=0.4
+        )
 
         # Add the mean ratings
-        sns.scatterplot(data=data_mean, x="valence", y="arousal", hue="state", palette=colors_states, ax=axis, s=150, alpha=1)
+        sns.scatterplot(
+            data=data_mean, x="valence", y="arousal", hue="state", palette=colors_states, ax=axis, s=150, alpha=1
+        )
 
         # Add the standard deviation of the ratings as lines to the points
         for i in range(4):
@@ -276,7 +295,8 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
                 ecolor=colors_states[i],
                 capsize=5,
                 capthick=2,
-                elinewidth=2)
+                elinewidth=2,
+            )
 
         # Change the axes to be centered
         axis.spines["left"].set_position("center")
@@ -292,13 +312,9 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         # Move the x-axis label to the right middle
         axis.xaxis.set_label_coords(0.96, 0.53)
-    
+
         # Move the y-axis label to the top middle
         axis.yaxis.set_label_coords(0.55, 0.98)
-
-        # Set the limits of the plot
-        axis.set_xlim(-1.2, 1.2)
-        axis.set_ylim(-1.2, 1.2)
 
         # Hide only the middle tick label on the x-axis and y-axis
         xticks = axis.xaxis.get_major_ticks()
@@ -308,8 +324,15 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         # Set custom legend labels
         legend_handles = [
-            Line2D([0], [0], marker="o", color="w", markerfacecolor=colors_states[i], markersize=10, label=f"State {i+1}") for i in range(4)
+            Line2D(
+                [0], [0], marker="o", color="w", markerfacecolor=colors_states[i], markersize=10, label=f"State {i+1}"
+            )
+            for i in range(4)
         ]
+
+        # Set limits of the plot
+        axis.set_xlim(-2, 2)
+        axis.set_ylim(-2, 2)
 
         axis.legend(handles=legend_handles, loc="upper right")
 
@@ -347,7 +370,8 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         # Boxplots
         # Boxplot data
         boxplot_data = axis.boxplot(
-            data_list, widths=0.15, patch_artist=True, showfliers=False, medianprops=dict(color="black"))
+            data_list, widths=0.15, patch_artist=True, showfliers=False, medianprops=dict(color="black")
+        )
 
         # Change to the desired color and add transparency
         for patch, color in zip(boxplot_data["boxes"], colors_states, strict=False):
@@ -357,9 +381,8 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         # Violin Plots
         # Violin plot data
         violin_data = axis.violinplot(
-            data_list, points=int(len(data)/len(list_states)), showmeans=False, showmedians=False, showextrema=False
+            data_list, points=int(len(data) / len(list_states)), showmeans=False, showmedians=False, showextrema=False
         )
-
 
         for idx, body in enumerate(violin_data["bodies"]):
             # Get the center of the plot
@@ -445,22 +468,26 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
             state (int): The state to plot.
         """
         # Create the topoplot
-        mne.viz.plot_topomap(
+        fig, _ = mne.viz.plot_topomap(
             data.to_numpy()[0],
             info,
             show=False,
             axes=axis,
+            contours=0,
+            size=10,
             cmap=cmap_states[state],
         )
 
         # Add the title to the plot
-        axis.set_title(f"{frequency.capitalize()}", fontsize=14, fontweight="bold")
+        axis.set_title(f"{frequency.capitalize()}", fontsize=16)
 
         # Remove the x-label
         axis.set_xlabel("")
 
         # Remove the y-label
         axis.set_ylabel("")
+
+        return fig
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     # %% STEP 1. LOAD DATA
@@ -477,23 +504,25 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         # Load the data
         hmm_data = pd.read_csv(hmm_path / f"all_subjects_task-AVR_{model}_model_data_{features_string}.tsv", sep="\t")
-        hmm_feature_stats_all = pd.read_csv(hmm_path / f"all_subjects_task-AVR_{model}_model_states_stats.tsv", sep="\t")
-        hmm_global_stats_all = pd.read_csv(hmm_path / f"all_subjects_task-AVR_{model}_model_states_global_stats.tsv", sep="\t")
+        hmm_feature_stats_all = pd.read_csv(
+            hmm_path / f"all_subjects_task-AVR_{model}_model_states_stats.tsv", sep="\t"
+        )
+        hmm_global_stats_all = pd.read_csv(
+            hmm_path / f"all_subjects_task-AVR_{model}_model_states_global_stats.tsv", sep="\t"
+        )
         hmm_feature_stats_avg = pd.read_csv(hmm_path / f"avg_task-AVR_{model}_model_states_stats.tsv", sep="\t")
-        hmm_global_stats_avg = pd.read_csv(hmm_path / f"avg_task-AVR_{model}_model_states_global_stats.tsv", sep="\t")
 
         # Read in the results of the post-hoc-tests
         posthoc_results = pd.read_csv(glm_path / f"avg_task-AVR_{model}_model_glm_results_posthoc_tests.tsv", sep="\t")
 
-        events = pd.read_csv(events_dir / "events_experiment.tsv", sep="\t")
-    
         # %% STEP 2. PLOT EXAMPLE OF HMM ALGORITHM FOR METHODS
         # Get data for example subject
         example_subject_data = hmm_data[hmm_data["subject"] == int(example_subject)]
 
         # Get the time window for the example plot
         example_data = example_subject_data[
-            (example_subject_data["timestamp"] >= time_window[0] * 60) & (example_subject_data["timestamp"] <= time_window[1] * 60)
+            (example_subject_data["timestamp"] >= time_window[0] * 60)
+            & (example_subject_data["timestamp"] <= time_window[1] * 60)
         ]
 
         example_data = example_data.reset_index(drop=True)
@@ -546,7 +575,12 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         figure, axes = plt.subplots(3, 1, figsize=(10, 15))
 
         for index, variable in enumerate(["fractional_occupancy", "mean_lifetime", "mean_intervaltime"]):
-            create_violinplot(hmm_global_stats_all, axes[index], variable, ("Proportion" if variable == "fractional_occupancy" else "Time (s)"))
+            create_violinplot(
+                hmm_global_stats_all,
+                axes[index],
+                variable,
+                ("Proportion" if variable == "fractional_occupancy" else "Time (s)"),
+            )
 
         # Save the plot
         plot_file = f"global_stats_{model}_model.svg"
@@ -555,7 +589,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         # Show the plot
         if show_plots:
             plt.show()
-        
+
         plt.close()
 
         # 3b. Mean valence and arousal ratings for each state on the Affect Grid
@@ -666,7 +700,12 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
                 # Loop over all participants
                 for subject in subjects:
                     # Get correct file
-                    data_file = data_path / f"sub-{subject}" / "eeg" / f"sub-{subject}_task-AVR_eeg_features_all_channels_{frequency}_power.tsv"
+                    data_file = (
+                        data_path
+                        / f"sub-{subject}"
+                        / "eeg"
+                        / f"sub-{subject}_task-AVR_eeg_features_all_channels_{frequency}_power.tsv"
+                    )
 
                     # Load the data
                     data = pd.read_csv(data_file, sep="\t")
@@ -677,7 +716,10 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
                     # Get the hidden states file
                     features_string_hidden_states = "_".join(models_features[model])
-                    hidden_states_file = hmm_path / f"all_subjects_task-AVR_{model}_model_hidden_states_{features_string_hidden_states}.tsv"
+                    hidden_states_file = (
+                        hmm_path
+                        / f"all_subjects_task-AVR_{model}_model_hidden_states_{features_string_hidden_states}.tsv"
+                    )
 
                     # Load the hidden states
                     hidden_states = pd.read_csv(hidden_states_file, sep="\t")
@@ -753,34 +795,40 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         info.set_montage(montage)
 
-        # %%
         # Then, create one plot with four subplots for each states, with each four subplots for each frequency
         # (4x4 grid)
-        fig, axes = plt.subplots(4, 4, figsize=(20, 20))
+        fig = plt.figure(figsize=(20, 20))
+        gs = gridspec.GridSpec(4, 5, width_ratios=[1, 1, 1, 1, 0.3])  # Extra column for colorbars
 
         # Loop over all states
         for state in range(4):
             # Loop over all frequencies
-            for frequency in frequencies:
+            for freq_idx, frequency in enumerate(frequencies):
                 # Get the corresponding data
                 data_topoplot = data_freq[(data_freq["state"] == state) & (data_freq["frequency"] == frequency)]
 
                 # Drop the state and frequency columns
                 data_topoplot = data_topoplot.drop(columns=["state", "frequency"])
 
-                # Create the plot
-                create_topoplot(data_topoplot, info, axes[state, frequencies.index(frequency)], frequency, state)
-        
-        # Set the titles of the subplots (rows)
-        for ax, state in zip(axes[:, 0], range(4)):
-            ax.set_ylabel(f"State {state+1}", fontsize=14, fontweight="bold", rotation=360, labelpad=20)
+                # Create subplot in the grid
+                ax = plt.subplot(gs[state, freq_idx])
 
-        # Add a colorbar to each row
-        for ax in axes[:, -1]:
-            cbar = plt.colorbar(ax.get_images()[0], ax=ax, orientation="vertical")
-            cbar.set_label("Power (z-scored)", fontsize=12)
-        
-        # TODO: find a way to make all plots the same size
+                # Create the plot
+                cax = create_topoplot(data_topoplot, info, ax, frequency, state)
+
+                # Set the title of the subplot
+                if freq_idx == 0:
+                    ax.set_ylabel(f"State {state+1}", fontsize=24, fontweight="bold", rotation=360, labelpad=60)
+
+            # Add a colorbar to the extra column
+            axis = plt.subplot(gs[state, -1])  # Extra column for colorbars
+            cbar = plt.colorbar(cax, ax=axis, orientation="vertical")
+            cbar.set_label("Power (z-scored)", fontsize=14)
+            axis.axis("off")  # Hide the axes of the colorbar subplot
+
+        # Save the plot
+        plot_file = f"topoplots_{model}_model.svg"
+        plt.savefig(hmm_path / plot_file)
 
         # Show the plot
         if show_plots:
@@ -793,5 +841,3 @@ if __name__ == "__main__":
     plot_hidden_states()
 
 # o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o END
-
-
