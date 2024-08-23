@@ -1,5 +1,5 @@
 test	t-value	df	p-value	significance
-Wilks' lambda		0.0		False
-Pillai's trace		0.0		False
-Hotelling-Lawley trace		0.0		False
-Roy's greatest root		0.0		False
+Wilks' lambda	50.17567648929891	38.0	2.431135523531663e-36	True
+Pillai's trace	10.818012317142365	38.0	3.6712353621184586e-13	True
+Hotelling-Lawley trace	7.5229654988697705	38.0	4.876490131561316e-09	True
+Roy's greatest root	7.5229654988697705	38.0	4.876490131561316e-09	True

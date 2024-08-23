@@ -6,11 +6,10 @@ Required packages: statsmodels, scipy, sklearn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 15 August 2024
-Last update: 22 August 2024
+Last update: 23 August 2024
 """
-
+# %%
 def glm(  # noqa: PLR0915, C901
-    data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
         "012", "014", "015", "016", "018", "019",
@@ -44,11 +43,12 @@ def glm(  # noqa: PLR0915, C901
     import numpy as np
     import pandas as pd
     import scipy
+    from numpy.linalg import LinAlgError
     from scipy import stats
     from statsmodels.multivariate.manova import MANOVA
 
+
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    datapath = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "features" / "avg" / "beh"
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to analyze
@@ -264,17 +264,23 @@ def glm(  # noqa: PLR0915, C901
             data_group = data[data[f"{group_name}"] == group]
             # Drop columns
             data_scatter_group = data_group.drop(columns=[group_name, "timestamp"])
-            fig_linearity, axis = plt.subplots(figsize=(10, 10))
-            pd.plotting.scatter_matrix(data_scatter_group, ax=axis, diagonal="kde")
-            fig_linearity.suptitle(f"Scatterplot matrix for state {group} (n = {len(data_group)})")
 
-            # Show the plot
-            if show_plots:
-                plt.show()
+            try:
+                fig_linearity, axis = plt.subplots(figsize=(10, 10))
+                pd.plotting.scatter_matrix(data_scatter_group, ax=axis, diagonal="kde")
+                fig_linearity.suptitle(f"Scatterplot matrix for state {group} (n = {len(data_group)})")
 
-            plt.close()
+                # Show the plot
+                if show_plots:
+                    plt.show()
 
-            figs_linearity.append(fig_linearity)
+                plt.close()
+
+                figs_linearity.append(fig_linearity)
+
+            except LinAlgError:
+                print(f"LinAlgError: Cannot create scatterplot matrix for participant {subject}")
+                return table_normality, fig_normality, table_homogeinity, None
 
         return table_normality, fig_normality, table_homogeinity, figs_linearity
 
@@ -445,15 +451,16 @@ def glm(  # noqa: PLR0915, C901
                 index=False,
             )
 
-            # Save the figures
-            figure_normality.savefig(
-                glm_subject_results_path / f"sub-{subject}_task-AVR_{model}_model_glm_normality_results.png"
-            )
-            for index, figure in enumerate(figures_linearity):
-                figure.savefig(
-                    glm_subject_results_path
-                    / f"sub-{subject}_task-AVR_{model}_model_glm_linearity_results_state_{index}.png"
+            if figures_linearity is not None:
+                # Save the figures
+                figure_normality.savefig(
+                    glm_subject_results_path / f"sub-{subject}_task-AVR_{model}_model_glm_normality_results.png"
                 )
+                for index, figure in enumerate(figures_linearity):
+                    figure.savefig(
+                        glm_subject_results_path
+                        / f"sub-{subject}_task-AVR_{model}_model_glm_linearity_results_state_{index}.png"
+                    )
 
             # STEP 3: FIRST LEVEL GLM
             print("Performing first level GLM...")

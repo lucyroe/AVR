@@ -4,7 +4,7 @@ Script to calculate summary stats of the hidden states of the different HMMs.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 14 August 2024
-Last update: 22 August 2024
+Last update: 23 August 2024
 """
 
 
@@ -109,7 +109,7 @@ def hmm_stats(  # noqa: C901, PLR0915, PLR0912
             hidden_states_subject = hidden_states_subject.drop(columns=["subject", "timestamp"])
 
             # Check if the timestamps have the same length
-            if len(data_subject) != len(annotations_subject) != len(hidden_states_subject):
+            if len(data_subject) != len(annotations_subject) or len(data_subject) != len(hidden_states_subject):
                 # Cut the longer one to the length of the shorter one
                 min_length = min(len(data_subject), len(annotations_subject), len(hidden_states_subject))
                 data_subject = data_subject[:min_length]
@@ -167,10 +167,12 @@ def hmm_stats(  # noqa: C901, PLR0915, PLR0912
             print("Calculating global stats...")
             global_stats = pd.DataFrame()
             # Loop over all hidden states
+            # %%
             for state in range(number_of_states):
                 # Get the data for the state
                 data_state = data[data["state"] == state]
                 data_state = data_state.reset_index(drop=True)
+                data_state = data_state.dropna()
 
                 # Check if the state is empty (state is not visited)
                 if len(data_state) == 0:
@@ -214,6 +216,7 @@ def hmm_stats(  # noqa: C901, PLR0915, PLR0912
                 mean_intervaltime = 0 if len(intervaltimes) == 0 else np.mean(intervaltimes)
                 global_stats.loc[state, "mean_intervaltime"] = mean_intervaltime
 
+            # %%
             # Add the subject ID to the global stats as first column
             global_stats.insert(0, "subject", subject)
 

@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 22 August 2024
+Last update: 23 August 2024
 """
 
 def main():  # noqa: PLR0915
@@ -143,14 +143,14 @@ def main():  # noqa: PLR0915
             compare_variability_phase1_phase3(subjects_annotations, subjects_phase1, data_dir, results_dir, show_plots)
 
         elif step == "Modelling":
-            #print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
-            #hmm(data_dir, results_dir, subjects, debug, show_plots)
+            print("\nPerforming Hidden Markov Model (HMM) analysis...\n")
+            hmm(data_dir, results_dir, subjects, debug, show_plots)
             print("\nCalculating statistics of the hidden states...\n")
             hmm_stats(results_dir, subjects, debug)
 
         elif step == "GLM":
             print("\nFitting General Linear Model (GLM)...\n")
-            glm(data_dir, results_dir, subjects, debug, show_plots)
+            glm(results_dir, subjects, debug, show_plots)
 
         elif step == "Model comparison":
             print("\nComparing the different HMM models...\n")

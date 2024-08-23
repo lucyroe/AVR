@@ -1,16 +1,23 @@
 """
 Plotting hidden states from HMM analysis of the AVR data.
 
+Required packages: seaborn, mne
+
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 20 August 2024
-Last updated: 22 August 2024
+Last updated: 23 August 2024
 """
 
 # %%
 def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
+    subjects=["001", "002", "003","004", "005", "006", "007", "009",
+        "012", "014", "015", "016", "018", "019",
+        "020", "021", "022", "024", "025", "026", "027", "028", "029",
+        "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+        "040", "041", "042", "043", "045", "046"],
     show_plots=True,
 ):
     """
@@ -34,11 +41,15 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
     import seaborn as sns
     from matplotlib.collections import LineCollection
     from matplotlib.lines import Line2D
+
+    import mne
+    import sys
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
 
     # Path where the data is stored
     resultpath = Path(results_dir) / "phase3" / "AVR"
     events_dir = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "preproc"
+    data_path = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "features"
 
     # Which HMMs to plot
     models = ["cardiac"]
@@ -54,27 +65,26 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
     example_subject = "031"
     time_window = [14.5, 16.5]    # Time window for the example plot in minutes
 
-    # Colors
-    colors = {
-        "annotation": {"valence": "#0072B2", "arousal": "#0096c6"},  # shades of dark blue
-        "physiological": {
-            "ibi": "#CC79A7",
-            "hrv": "#ff9789",
-            "lf_hrv": "#f3849b",
-            "hf_hrv": "#ffb375",
-            # shades of pink-orange
-            "posterior_alpha": "#009E73",
-            "frontal_alpha": "#66b974",
-            "frontal_theta": "#a5d279",
-            "gamma": "#00c787",
-            "beta": "#85b082",
-        },  # shades of green
-    }
+    # Which frequencies to plot topoplots for
+    frequencies = ["alpha", "theta", "beta", "gamma"]
+
+    # Whether to z-standardize the data to average over all subjects
+    z_standardize = True
 
     # Colors of the hidden states
     colors_states = ["#D55E00", "#0072B2", "#009E73", "#CC79A7"]  #  dark orange, dark blue, green, pink
 
-    mark_significant_differences = True  # if True, significant differences will be marked in the boxplots
+    # Create custom colormaps for each state for the topoplot
+    color_poles_states = [
+        [26.48, 41.48, 100, 45],  # dark orange, light orange
+        [201.57, 190, 100, 35],  # dark blue, light blue
+        [163.67, 140, 100, 31],  # green, light green
+        [326.75, 350, 45, 64],  # pink, light pink
+    ]
+    cmap_states = [sns.light_palette(color, as_cmap=True) for color in colors_states]
+
+
+    mark_significant_differences = False  # if True, significant differences will be marked in the boxplots
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     def example_plot(  # noqa: PLR0913
@@ -267,7 +277,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
                 capsize=5,
                 capthick=2,
                 elinewidth=2)
-        
+
         # Change the axes to be centered
         axis.spines["left"].set_position("center")
         axis.spines["bottom"].set_position("center")
@@ -421,6 +431,36 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
                 )
 
                 counter += 0.3
+
+    def create_topoplot(data, info, axis, frequency, state):
+        """
+        Create a topoplot for the EEG features.
+
+        Args:
+        ----
+            data (pd.DataFrame): The data to plot.
+            info (mne.Info): The info object of the data.
+            axis (matplotlib.axis): The axis to plot on.
+            frequency (str): The frequency to plot.
+            state (int): The state to plot.
+        """
+        # Create the topoplot
+        mne.viz.plot_topomap(
+            data.to_numpy()[0],
+            info,
+            show=False,
+            axes=axis,
+            cmap=cmap_states[state],
+        )
+
+        # Add the title to the plot
+        axis.set_title(f"{frequency.capitalize()}", fontsize=14, fontweight="bold")
+
+        # Remove the x-label
+        axis.set_xlabel("")
+
+        # Remove the y-label
+        axis.set_ylabel("")
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     # %% STEP 1. LOAD DATA
@@ -579,7 +619,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
             features_data = features_data.rename(columns={"mean": feature})
             features_data = features_data.reset_index(drop=True)
 
-            # Get tjhe significant differences for the current feature
+            # Get the significant differences for the current feature
             significant_differences_current = significant_differences_dataframe[
                 significant_differences_dataframe["Variable"] == feature
             ]
@@ -613,8 +653,138 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         plt.close()
 
-
         # 3d. Topoplots for each state for all EEG features
+
+        # First, get the data for the topoplots
+        # Loop over all frequencies
+        data_freq = pd.DataFrame()
+        for frequency in frequencies:
+            data_states = pd.DataFrame()
+            # Loop over all states
+            for state in range(4):
+                data_state = pd.DataFrame()
+                # Loop over all participants
+                for subject in subjects:
+                    # Get correct file
+                    data_file = data_path / f"sub-{subject}" / "eeg" / f"sub-{subject}_task-AVR_eeg_features_all_channels_{frequency}_power.tsv"
+
+                    # Load the data
+                    data = pd.read_csv(data_file, sep="\t")
+
+                    # Z-standardize the data
+                    if z_standardize:
+                        data = (data - data.mean()) / data.std()
+
+                    # Get the hidden states file
+                    features_string_hidden_states = "_".join(models_features[model])
+                    hidden_states_file = hmm_path / f"all_subjects_task-AVR_{model}_model_hidden_states_{features_string_hidden_states}.tsv"
+
+                    # Load the hidden states
+                    hidden_states = pd.read_csv(hidden_states_file, sep="\t")
+                    # Get the hidden states for the current subject
+                    hidden_states_subject = hidden_states[hidden_states["subject"] == int(subject)]
+                    hidden_states_subject = hidden_states_subject.reset_index(drop=True)
+
+                    # Check if the data and the hidden states have the same length
+                    if len(data) != len(hidden_states_subject):
+                        # Cut the data to the shortest length
+                        min_length = min(len(data), len(hidden_states_subject))
+                        data = data[:min_length]
+                        hidden_states_subject = hidden_states_subject[:min_length]
+
+                    # Get the data for the current state
+                    data_state_subject = data[hidden_states_subject["state"] == state]
+
+                    # Drop the timestamp column
+                    data_state_subject = data_state_subject.drop(columns=["timestamp"])
+
+                    # Reset the index
+                    data_state_subject = data_state_subject.reset_index(drop=True)
+
+                    # Calculate the mean over all time points for each channel (column)
+                    data_state_subject = data_state_subject.mean()
+
+                    # Transform the data to a DataFrame
+                    data_state_subject = pd.DataFrame(data_state_subject).T
+
+                    # Add the data to the list
+                    data_state = pd.concat([data_state, data_state_subject])
+
+                # Calculate the mean over all participants
+                data_state = data_state.mean()
+
+                # Transform the data to a DataFrame
+                data_state = pd.DataFrame(data_state).T
+
+                # Add the state as first column to the data
+                data_state["state"] = state
+
+                data_states = pd.concat([data_states, data_state])
+
+            # Add the frequency to the data
+            data_states["frequency"] = frequency
+
+            # Add the data to the list
+            data_freq = pd.concat([data_freq, data_states])
+
+        # Set the montage
+        # Set EEG channel layout for topo plots
+        montage_filename = Path(data_dir) / "phase3" / "AVR" / "rawdata" / "CACS-64_REF.bvef"
+        if montage_filename.exists():
+            montage = mne.channels.read_custom_montage(montage_filename)
+        else:
+            print(
+                "ERROR! No montage file found. Make sure to download the CACS-64_REF.bvef file from Brainvision "
+                "(https://www.brainproducts.com/downloads/cap-montages/) and place it in the rawdata folder."
+            )
+            # Exit the program if no montage file is found
+            sys.exit()
+
+        channel_names = data_freq.columns
+        # Drop the state and frequency columns
+        channel_names = list(channel_names.drop(["state", "frequency"]))
+
+        # Create the info object
+        info = mne.create_info(
+            ch_names=channel_names,
+            sfreq=1,
+            ch_types="eeg",
+        )
+
+        info.set_montage(montage)
+
+        # %%
+        # Then, create one plot with four subplots for each states, with each four subplots for each frequency
+        # (4x4 grid)
+        fig, axes = plt.subplots(4, 4, figsize=(20, 20))
+
+        # Loop over all states
+        for state in range(4):
+            # Loop over all frequencies
+            for frequency in frequencies:
+                # Get the corresponding data
+                data_topoplot = data_freq[(data_freq["state"] == state) & (data_freq["frequency"] == frequency)]
+
+                # Drop the state and frequency columns
+                data_topoplot = data_topoplot.drop(columns=["state", "frequency"])
+
+                # Create the plot
+                create_topoplot(data_topoplot, info, axes[state, frequencies.index(frequency)], frequency, state)
+        
+        # Set the titles of the subplots (rows)
+        for ax, state in zip(axes[:, 0], range(4)):
+            ax.set_ylabel(f"State {state+1}", fontsize=14, fontweight="bold", rotation=360, labelpad=20)
+
+        # Add a colorbar to each row
+        for ax in axes[:, -1]:
+            cbar = plt.colorbar(ax.get_images()[0], ax=ax, orientation="vertical")
+            cbar.set_label("Power (z-scored)", fontsize=12)
+        
+        # TODO: find a way to make all plots the same size
+
+        # Show the plot
+        if show_plots:
+            plt.show()
 
 
 # %% __main__  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
