@@ -4,11 +4,9 @@ Script to compare the different Hidden Markov Model (HMM) models.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 19 August 2024
-Last update: 23 August 2024
+Last update: 27 August 2024
 """
 
-
-# %%
 def compare_models(  # noqa: PLR0915
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
@@ -21,16 +19,25 @@ def compare_models(  # noqa: PLR0915
     """
     Compare the different Hidden Markov Model (HMM) models.
 
-    Inputs: TODO
+    Inputs: The different HMMs (cardiac, neural, integrated, subjective) as trained in hmm.py
 
-    Outputs:
-    - TODO
-
-    Functions:
-    - TODO
+    Outputs: Parameters of model quality, accuracy, and distance between ratings for all models
 
     Steps:
-    1. TODO
+    1. Get the models and data
+    2. Assess relative model quality
+        2a. Log-likelihood
+        2b. AIC
+        2c. BIC
+    3. Assess accuracy of the models
+        3a. Get the hidden states
+        3b. Get the hidden states identified by the subjective model
+        3c. Compare the hidden states
+    4. Calculate distance between ratings
+        4a. Get the ratings
+        4b. Calculate the distance between the ratings
+        4c. Calculate the distance between the ratings for all states
+    5. Save the results
     """
     # %% Import
     import pickle
@@ -188,7 +195,7 @@ def compare_models(  # noqa: PLR0915
         df_distance.loc[model, "distance_mean"] = mean_distance
 
 
-    # %% STEP 4. SAVE THE RESULTS
+    # %% STEP 5. SAVE THE RESULTS
     # Save the results
     df_model_quality.to_csv(resultpath / "avg" / "hmm" / "model_quality.tsv", sep="\t")
     df_accuracy.to_csv(resultpath / "avg" / "hmm" / "model_accuracy.tsv", sep="\t")

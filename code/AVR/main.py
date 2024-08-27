@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 23 August 2024
+Last update: 27 August 2024
 """
 
 def main():  # noqa: PLR0915
@@ -91,6 +91,19 @@ def main():  # noqa: PLR0915
     # "020", "021", "022", "024", "025", "026", "027", "028", "029",
     # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
     # "040", "041", "042", "043", "045", "046"
+    # Model comparison was already performed for the following subjects:
+    # "001", "002", "003","004", "005", "006", "007", "009",
+    # "012", "014", "015", "016", "018", "019",
+    # "020", "021", "022", "024", "025", "026", "027", "028", "029",
+    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+    # "040", "041", "042", "043", "045", "046"
+    # Plotting was already performed for the following subjects:
+    # "001", "002", "003","004", "005", "006", "007", "009",
+    # "012", "014", "015", "016", "018", "019",
+    # "020", "021", "022", "024", "025", "026", "027", "028", "029",
+    # "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+    # "040", "041", "042", "043", "045", "046"
+
 
     # For comparison of phase 3 with phase 1
     subjects_annotations = ["001", "002", "003","004", "005", "006", "007", "009",
@@ -117,7 +130,6 @@ def main():  # noqa: PLR0915
                                 "neural": {0: "HN", 1: "LP", 2: "LN", 3: "HP"},
                                 "integrated": {0: "LN", 1: "HP", 2: "HN", 3: "LP"},
                                 "subjective": {0: "LP", 1: "HN", 2: "LN", 3: "HP"}}
-
 
     # Define if plots should be shown
     show_plots = False
