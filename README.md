@@ -10,6 +10,16 @@
     Author(s):  Lucy Roellecke
     Contact:    lucy.roellecke[at]tuta.com
 
+## Links
+
+### GitHub Repository
+
+The GitHub Repository with all the code can be assessed here: [github.com/lucyroe/AVR](https://github.com/lucyroe/AVR)
+
+### Code Documentation
+
+The Code Documentation can be assessed here: [lucyroe.github.io/AVR](https://lucyroe.github.io/AVR/)
+
 ## Project description
 
 *Affective VR* (AVR) aims to develop and test a tool for continous emotion ratings. The project proposes such a tool and assesses its effectiveness, usability and reliability using videos presented in virtual reality (VR).
