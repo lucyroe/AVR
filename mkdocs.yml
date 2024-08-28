@@ -50,3 +50,6 @@ markdown_extensions:
   - pymdownx.superfences
   - pymdownx.mark
   - attr_list
+
+copyright: |
+  &copy; 2024 <a href="https://github.com/lucyroe"  target="_blank" rel="noopener">Lucy Roellecke</a>

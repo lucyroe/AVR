@@ -28,29 +28,29 @@ This directory contains the results of the Selection, the Evaluation, and the Ph
 
 ## Univariate Results
 
-![Univariate Results](../results/phase3/AVR/avg/average_timeseries.png)
+![Univariate Results](results/phase3/AVR/avg/average_timeseries.png)
 
 ## Comparison of Variability between Selection and Physio Phase
 
-![Variability](../results/comparison_phase1_phase3/raincloud_phase1_phase3_std_dev_annotation.png)
+![Variability](results/comparison_phase1_phase3/raincloud_phase1_phase3_std_dev_annotation.png)
 
 ## HMM Results
 
 ### Cardiac Model
 
-![Cardiac Model](../publications/thesis/figures/phase3_cardiac_model.png)
+![Cardiac Model](publications/thesis/figures/phase3_cardiac_model.png)
 
 ### Neural Model
 
-![Cardiac Model](../publications/thesis/figures/phase3_neural_model.png)
+![Cardiac Model](publications/thesis/figures/phase3_neural_model.png)
 
 ### Integrated Model
 
-![Cardiac Model](../publications/thesis/figures/phase3_integrated_model.png)
+![Cardiac Model](publications/thesis/figures/phase3_integrated_model.png)
 
 ### Subjective Model
 
-![Cardiac Model](../publications/thesis/figures/phase3_subjective_model.png)
+![Cardiac Model](publications/thesis/figures/phase3_subjective_model.png)
 
 ## License
 MIT
