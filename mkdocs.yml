@@ -1,5 +1,5 @@
 site_name: AVR Embodied Emotion Code Documentation
-site_url: 
+site_url: https://lucyroe.github.io/AVR/
 
 nav:
   - Home: index.md
