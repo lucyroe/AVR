@@ -4,7 +4,7 @@
 # Inputs:       Raw data from Affective VR phase 2
 # Outputs:      Preprocessed data from AVR data for each participant as csv files in "Preprocessed" directory
 #
-# Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
+# Author:       Lucy Roellecke (ucy.roellecke[at]tuta.com)
 # Last version: 06.07.2024
 ########################################################################################################################
 

@@ -22,7 +22,7 @@
 #               Inputs:       csv files created by 02_summary_stats.py with averaged data for individual participants (cr_affectivevr_descriptive_individual.csv, cr_ceap_descriptive_individual.csv)
 #               Outputs:      violin plots with summary statistics (mean, std) for all dimensions (valence, arousal, distance, angle))
 #
-# Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
+# Author:       Lucy Roellecke (lucy.roellecke[at]tuta.com)
 # Last version: 08.11.2023
 ########################################################################################################################
 

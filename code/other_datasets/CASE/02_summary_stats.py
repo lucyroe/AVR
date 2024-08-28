@@ -16,7 +16,7 @@
 # Step 2e:      creates csv file with arousal and valence values for all timepoints, quadrants and rating methods averaged across participants
 #               Outputs:      cr_affectivevr_all.csv, cr_ceap_all.csv
 #
-# Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
+# Author:       Lucy Roellecke (lucy.roellecke[at]tuta.com)
 # Last version: 02.11.2023
 ########################################################################################################################
 

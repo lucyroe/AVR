@@ -1,3 +1,12 @@
+"""
+Script to check any remaining bad epochs after cleaning the data.
+
+Author: Antonin Fourcade
+Contact: fourcade[at]maxplanckschools.de
+Created on: 16 August 2024
+Last update: 16 August 2024
+"""
+
 # %% Import
 import json
 from pathlib import Path

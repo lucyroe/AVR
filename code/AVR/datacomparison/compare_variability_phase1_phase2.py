@@ -14,6 +14,7 @@ The following steps are performed:
         3.2.2 Bonferroni correction for multiple comparisons
 
 Author: Lucy Roellecke
+Contact: lucy.roellecke[at]tuta.com
 Created on: 10 June 2024
 Last updated: 10 June 2024
 """

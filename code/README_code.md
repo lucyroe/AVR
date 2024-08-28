@@ -7,6 +7,8 @@
 
 ## Description
 
+The whole preprocessing and analysis pipeline can be followed by running `main.py`.  
+
 The main analysis method used in this project is **Hidden Markov Models (HMMs)**. A Hidden Markov Model (HMM) is a data-driven generative statistical model that can be used to identify hidden states in dynamically changing systems, e.g., the brain or the heart ([Khalifa et al., 2021](https://www.sciencedirect.com/science/article/abs/pii/S1566253520304140?via%3Dihub); [Quinn et al., 2018](https://www.frontiersin.org/article/10.3389/fnins.2018.00603/full)). The hidden states are mutually exclusive, such that only one state occurs at any one point in time, and Markovian, such that one state is only dependent on the previous state. Each state has an initial probability 𝝅. As the states are hidden and cannot be observed directly in the data, observation models (or emission probabilities, 𝜽) link the data with each hidden state, representing the probability distribution from which the data is drawn while the state is active. Transitions between the states are represented in the transition probability matrix A. Given only a set of observations X, the Baum-Welch algorithm can be used to iteratively compute a set of model parameters λ = (𝝅, A, 𝜽) using both forward and Viterbi algorithms based on the expectation-maximization method. The such identified states can then be compared across different models or conditions.
 
 HMMs were implemented in this project using the Python package `hmmlearn` ([version 0.3.2](https://hmmlearn.readthedocs.io/en/latest/index.html)).
@@ -15,47 +17,118 @@ HMMs were implemented in this project using the Python package `hmmlearn` ([vers
 
 ## Preprocessing
 
-Two different directories exist for the preprocessing of annotation (`./code/AVR/preprocessing/annotation`) and physiological data (`./code/AVR/preprocessing/physiological`). There are scripts for preprocessing AVR data from the different phases.
+The script `read_xdf.py` reads in all data from the LSL-output format `.xdf`, allows for manual checks, and converts it into BIDS-compatible files and folder structure.   
+Two different directories exist for the preprocessing of annotation (`./code/AVR/preprocessing/annotation`) and physiological data (`./code/AVR/preprocessing/physiological`).
 
+     📂 preprocessing
+     ├── 📁 annotation
+     │   ├── 🐍 preprocessing_annotation_avr_phase1.py
+     │   ├── 🐍 preprocessing_annotation_avr_phase2.py
+     │   └── 🐍 preprocessing_annotation_avr_phase3.py
+     └── 📁 physiological
+         ├── 🐍 preprocessing_physiological_avr_phase3.py
+         ├── 🐍 preprocessing_metadata.py
+         ├── 🐍 bad_after_cleaning_check.py
+         └── 🐍 feature_extraction.py
 
-# TODO: After here
-The following open-source datasets are used for comparison:
-* *A Dataset of Continuous Affect Annotations and Physiological Signals for Emotion Analysis* **(CASE)** by [Sharma et al. (2019)](https://www.nature.com/articles/s41597-019-0209-0), accessible using this [link](https://springernature.figshare.com/collections/A_dataset_of_continuous_affect_annotations_and_physiological_signals_for_emotion_analysis/4260668). Sharma and colleagues used 1-3 min long 2D videos to elicit diverse emotions in viewers, and asked participants to continuously rate their emotions using a joystick. They additionally measured physiological data such as ECG, respiration, BVP, EDA and skin temperature.
+### Annotation
 
-* *Continuous Physiological and Behavioral Emotion Annotation Dataset for 360° Videos* **(CEAP-360VR)** by [Xue et al. (2021)](https://dl.acm.org/doi/10.1145/3411764.3445487), accessible using this [link](https://www.dis.cwi.nl/ceap-360vr-dataset/). Xue and colleagues used 60s long videos in virtual reality to elicit diverse emotions in viewers, and asked participants to continuously rate their emotions using a Joy-Con. They additionally measured physiological data such as pupil dilation, EDA, BVP, HR and skin temperature.
+**Preprocessing of annotation data** consists of these steps (for phase 3; for phase 1+2, see respective scripts):
 
-* *EmotionCompass* **(EmoCompass)** by [McClay et al. (2023)](https://www.nature.com/articles/s41467-023-42241-2), accessible using this [link](https://osf.io/s8g5n/). McClay and colleagues used 2 min long purposefully created songs to elicit diverse emotions in listeners, and asked participants to continuously rate their emotions using a mouse controller.
+1. **Cropping** 2.5 seconds at the start and end of the data to avoid edge artifacts.   
+2. **Downsampling** to 1 Hz.   
+3. **Interpolating** missing values linearly so the data of all participants has the same shape.   
 
-**Preprocessing** of both annotation and physiological data consists of two main steps:
+### Physiological
 
-1. **Formatting**, including a) rescaling valence and arousal values to a range of -1 to 1 for all annotations; b) shifting the start of all time series to 0.05 s; and c) putting all data into a dataframe that is structured the same across datasets.
+#### ECG
 
-2. **Resampling**, consisting of a) linearly interpolating values if the sampling frequency of the (annotation or physiological) input device does not match the stimuli's frame rates as was the case for the CEAP dataset (using `np.interp` or `interp1d` ); and b) downsampling the physiological data to fit with the sampling frequency of the annotation data in order to be able to compare both (it remains an open question whether this is necessary for the CASE dataset, see ToDos below).
+**Preprocessing of ECG data** consists of these steps:  
 
-For the CASE and the CEAP dataset, already preprocessed physiological data was used as an input to the aforementioned preprocessing steps. For the physiological AVR data from phase 3 of the project, the data was preprocessed in the following way:
+1. **Cropping** 2.5 seconds at the start and end of the data to avoid edge artifacts.  
+2. **Cleaning**: 50 Hz power line noise removal, Band-pass filtering between 0.5 and 30 Hz.
+3. **R-Peak Detection**: Automated R-Peak Detection using `neurokit2` ([Open Source Python Toolbox](https://neurokit2.readthedocs.io/en/legacy_docs/)), manual check of detected R-peaks in interactive window.
+4. **IBI Calculation**
 
-*TODO: Add infos about preprocessing physiological AVR data here after writing that script.*
+**Feature extraction of ECG data** consists of these steps:  
+
+1. **Resampling** to 4 Hz.
+2. **Symmetric Padding** of 90 seconds mirrored data to the start and end of the data.
+3. **Continuous Wavelet Transform (CWT)** using `fCWT` ([Python Library](https://github.com/fastlib/fCWT)) to get the **Time Frequency Representation (TFR)**.
+4. **Averaging** over 2s windows with 50% overlap.
+5. **Integrating** over frequency bands to get low-frequency (LF-) and high-frequency (HF-) heart rate variability (HRV).
+
+#### EEG
+
+**Preprocessing of EEG data** consists of these steps: 
+
+1. **Cropping** 2.5 seconds at the start and end of the data to avoid edge artifacts.  
+2. **Cleaning**: 50 Hz power line noise removal, re-referencing to average, band-pass filtering between 0.1 and 45 Hz, segmenting into epochs of 10s length, rejection or interpolation of bad channels and epochs using `autoreject` on 1 Hz-filtered data.
+3. **Independent Component Analysis (ICA)** to identify eye, cardiac, and muscle artifacts.
+4. **Final threshold check** to exclude any participants with more than 30% of remaining noisy epochs.
+
+**Feature extraction of EEG data** consists of these steps:  
+
+1. **Resampling** to 100 Hz.
+2. **Symmetric Padding** of 90 seconds mirrored data to the start and end of the data.
+3. **Continuous Wavelet Transform (CWT)** using `fCWT` ([Python Library](https://github.com/fastlib/fCWT)) to get the **Time Frequency Representation (TFR)**.
+4. **Averaging** over 2s windows with 50% overlap.
+5. **Integrating** over frequency bands to get alpha, beta, gamma, delta and theta power values.
+6. **Averaging** across regions of interest (ROIs): posterior, frontal, whole-brain.
+
+![image](../publications/thesis/figures/phase3_preprocessing.png)
+
+## Modelling
+
+In (`./code/AVR/modelling`) you can find one script that performs a Hidden Markov Model (HMM) analysis on the data from the Physio phase of the AVR project (`hmm.py`) and one script that compares the four models trained in the previous script in terms of their performance in decoding hidden affective states (`compare_models.py`).
+
+     📂 modelling
+     ├── 🐍 compare_models.py
+     └── 🐍 hmm.py
+
+Read the first paragraph of this README to learn about HMM. The four models trained in this thesis are:
+
+* A **cardiac** model, trained only on IBI & HF-HRV.
+* A **neural** model, trained on posterior alpha, frontal alpha, frontal theta, whole-brain gamma & whole-brain beta.
+* An **integrated** model, trained on all seven of these features.
+* A **subjective** model, trained only on the rating data.
+
+The models are then compared in terms of...
+
+* The general model quality (log-likelihood, AIC, BIC).
+* The model's accuracy (correlation with subjective model & fraction of corresponding states).
+* The distance between the model's states and the states identified by the subjective model.
+
+## Statistics
+
+In (`./code/AVR/statistics`) you can find one script that calculates univariate statistics for differences in features between different videos (`univariate_statistics.py`), one script that calculates statistics for differences in features between different hidden states (`hmm_stats.py`) and one script that fits a general linear model (GLM) to the hidden states as identified in each HMM to test the states for significance (`glm.py`).
+
+     📂 statistics
+     ├── 🐍 univariate_statistics.py
+     ├── 🐍 glm.py
+     └── 🐍 hmm_stats.py
+
+## Data Comparison
+
+In (`./code/AVR/datacomparison`) you can find scripts to compare the variability in ratings between the Selection Phase and the Evaluation/Physio Phase of the project AVR, respectively.
+
+     📂 datacomparison
+     ├── 🐍 compare_variability_phase1_phase2.py
+     └── 🐍 compare_variability_phase1_phase3.py
+
+## Data Visualization
+
+In (`./code/AVR/datavisualization`) you can find scripts for visualizing the results. `radar_plot.py`creates a radar plot to visualize AVR questionnaire data from the Selection phase. `raincloud_plot.py` creates raincloud plots to visualize the difference in variability between the Selection phase and the Evaluation/Physio phase. `plot_descriptives.py`plots the mean ratings, cardiac and neural features of the Physio phase across time. And `plot_hidden_states.py`creates plots of the differences of the features between the hidden states as identified by each of the four HMMs.
+
+     📂 datavisualization
+     ├── 🐍 plot_descriptives.py
+     ├── 🐍 plot_hidden_states.py
+     ├── 🐍 radar_plot.py
+     └── 🐍 raincloud_plot.py
 
 ## Codebase
 
-All code is written in Python 3.11. See below on how to install the code as a python package. Change point analysis was performed using the python package :hammer_and_wrench: `ruptures` by [Truong et al. (2020)](https://linkinghub.elsevier.com/retrieve/pii/S0165168419303494). See their [documentation](https://centre-borelli.github.io/ruptures-docs/) of the package for detailed information.   
-The `ruptures` package allows for the usage of different algorithms and models to define change points. For pragmatic reasons (especially the lack of a pre-defined number of change points), I decided to use the `Pelt` algorithm that linearly penalizes the segmentation of the time series. For this, a penalty parameter `pen` needs to be set. The optimal penalty parameter can be assessed by plotting different penalty values on the x-axis and the corresponding number of change points on the y-axis. In the resulting elbow plot, the optimal penalty value can be visually found at the 'knee' of the curve.
-
-![elbow_plot](./pics/elbow_plot.png)
-
-In this case, the penalty value would be defined as 1. Furthermore, the algorithm can use different models, defined in the `model` parameter. I decided to follow McClay et al. and use the least squared deviation `l2` model that detects the mean-shifts in a signal, but it's also possible to use the median or other models altogether. Different models, penalty and `jump` parameters will be compared in the future to see if they yield different results (see To Dos below).
-
-A detailed description of the scripts and their contents is given here:
-
-|               script               |                  contents                   |
-| :--------------------------------: | :-----------------------------------------: |
-|           `./code/AVR/cpa.py`                 | Script to perform a change point analysis (CPA) on continuous annotation or physiological data. Script includes functions to perform a CPA, to plot the results of a CPA, and to test the significance of the results for participants from a given dataset individually. If you want to perform a CPA for averaged data across participants, use the script `./code/AVR/cpa_averaged.py`|
-|       `.code/AVR/cpa_averaged.py`            | Script performs a CPA for averaged data across participants. If you want to perform a CPA for participants individually, use the script `cpa.py`
-|`./code/AVR/datacomparison/01_preprocessing.py`| Script to put CEAP and AVR phase 1 data in the same format so they can be compared later on.|
-|`./code/AVR/datacomparison/02_summary_stats.py`| Script to calculate summary statistics for CEAP dataset.|
-|`.code/AVR/datacomparison/03_plots_ceap_affectivevr.py`| Script to plot CEAP data against AVR phase 1 data in order to be able to compare both datasets. |
-
-The directories `./code/AVR/datavisualization` and `./code/AVR/modelling` contain nothing so far.
+All code is written in Python 3.11. See below on how to install the code as a python package.
 
 ### Python
 
@@ -66,10 +139,6 @@ To install the research code as package, run the following code in the project r
 ```shell
 pip install -e ".[develop]"
 ```
-
-### R
-
-The directory `./code/AVR/Rscripts` so far only contains old scripts performing statistical analyses for phase 1 of AVR. As it is planned to do all statistical analyses in Python for phase 2 and 3, this directory is only used for documentation purposes. However, it is possible to use R-packages in Python with, e.g., [rpy2](https://rpy2.github.io/), or use Python packages in R using, e.g., [reticulate](https://rstudio.github.io/reticulate/).
 
 ### Configs
 

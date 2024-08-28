@@ -36,7 +36,7 @@ Steps:
 Required packages: mne, neurokit
 
 Author: Lucy Roellecke
-Contact: lucy.roellecke@fu-berlin.de
+Contact: lucy.roellecke[at]tuta.com
 Last update: May 28th, 2024
 """
 

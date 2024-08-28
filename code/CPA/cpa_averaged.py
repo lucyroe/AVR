@@ -12,7 +12,7 @@ Outputs:
 Functions:
 
 Author: Lucy Roellecke
-Contact: lucy.roellecke@fu-berlin.de
+Contact: lucy.roellecke[at]tuta.com
 Last update: April 25th, 2024
 """
 

@@ -13,7 +13,7 @@ Outputs: TODO: define
 Functions: TODO: define
 
 Author: Lucy Roellecke
-Contact: lucy.roellecke@fu-berlin.de
+Contact: lucy.roellecke[at]tuta.com
 Last update: April 30th, 2024
 """
 

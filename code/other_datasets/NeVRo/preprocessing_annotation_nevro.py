@@ -21,7 +21,7 @@ Steps:
     3d. Save dataframe with mean arousal data (avg_..._arousal_preprocessed.tsv)
 
 Author: Lucy Roellecke
-Contact: lucy.roellecke@fu-berlin.de
+Contact: lucy.roellecke[at]tuta.com
 Last update: July 6th, 2024
 """
 

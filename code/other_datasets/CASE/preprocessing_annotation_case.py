@@ -4,7 +4,7 @@
 # Inputs:       Interpolated annotation data from CASE dataset (download here: https://springernature.figshare.com/collections/A_dataset_of_continuous_affect_annotations_and_physiological_signals_for_emotion_analysis/4260668)
 # Outputs:      Preprocessed annotation data from CASE dataset for each participant as csv files in "preprocessed/" directory
 #
-# Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
+# Author:       Lucy Roellecke (lucy.roellecke[at]tuta.com)
 # Last version: 24.11.2023
 ########################################################################################################################
 

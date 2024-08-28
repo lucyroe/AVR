@@ -15,7 +15,9 @@
 *Affective VR* (AVR) aims to develop and test a tool for continous emotion ratings. The project proposes such a tool and assesses its effectiveness, usability and reliability using videos presented in virtual reality (VR).
 
 ## Project structure
-The AVR project consists of three main stages: In the **Selection Phase**, three different rating methods ('Grid', 'Flubber' and 'Proprioceptive') were tested with different videos in VR of each 1 min length. In the **Evaluation Phase**, the 'Flubber' as winning rating method from the Selection Phase was tested for a longer VR experience of about 20 min with different videos playing after one another. In the **Physio Phase**, the very same stimuli and rating method are used but additionally to the behavioral data, EEG and periphysiological data are acquired.    
+The AVR project consists of three main stages: In the **Selection Phase**, three different rating methods ('Grid', 'Flubber' and 'Proprioceptive') were tested with different videos in VR of each 1 min length. In the **Evaluation Phase**, the 'Flubber' as winning rating method from the Selection Phase was tested for a longer VR experience of about 20 min with different videos playing after one another. In the **Physio Phase**, the very same stimuli and rating method are used but additionally to the behavioral data, EEG and periphysiological data are acquired.  
+
+![image](./publications/thesis/figures/phase3_experimental_setup.png)
 
 This repository mainly focuses on the Physio Phase as it contains code I wrote in the framework of my master thesis with the title **_Embodied Emotion: Decoding dynamic affective states by integrating neural and cardiac data_**. However, this repository also contains code and results of earlier phase of the project by PhD Candidate Antonin Fourcade that I could use and profit off during the analyses for the thesis.    
 

@@ -7,6 +7,7 @@ The following steps are performed:
     - Saving of radar chart as .pdf file
 
 Author: Lucy Roellecke
+Contact: lucy.roellecke[at]tuta.com
 Created on: 27 February 2024
 Last updated: 28 February 2024
 """

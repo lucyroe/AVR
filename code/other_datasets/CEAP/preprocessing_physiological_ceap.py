@@ -4,7 +4,7 @@
 # Inputs:       Frame physiological data from CEAP dataset (download here: https://github.com/cwi-dis/CEAP-360VR-Dataset)
 # Outputs:      Preprocessed physiological data from CEAP dataset for each participant as csv files in "Preprocessed" directory
 #
-# Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
+# Author:       Lucy Roellecke (lucy.roellecke[at]tuta.com)
 # Last version: 24.11.2023
 ########################################################################################################################
 

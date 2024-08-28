@@ -11,7 +11,7 @@
 #               1b: csv file with preprocessed data from CEAP dataset for all participants together
 #               1c: csv file from 1b merged with AffectiveVR data
 #
-# Author:       Lucy Roellecke (lucy.roellecke[at]fu-berlin.de)
+# Author:       Lucy Roellecke (lucy.roellecke[at]tuta.com)
 # Last version: 26.10.2023
 ########################################################################################################################
 

@@ -12,7 +12,7 @@ Steps:
 4. AVERAGE OVER ALL PARTICIPANTS
 
 Author: Lucy Roellecke
-Contact: lucy.roellecke@fu-berlin.de
+Contact: lucy.roellecke[at]tuta.com
 Last update: May 28th, 2024
 """
 
