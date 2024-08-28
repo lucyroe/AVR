@@ -1,7 +1,6 @@
+# AffectiveVR
 
 ![AVR Thesis Title](/publications/thesis/figures/AVR_Title.png)
-
-# AffectiveVR
 
 `[Last update: August 28, 2024]`
 
