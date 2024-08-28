@@ -14,9 +14,6 @@ code/CPA/
 code/other_datasets/
 results/other_datasets/
 
-# Large svg files
-*.svg
-
 # Consider to ignore specific file types unique to your project
 # *.png
 # *.nii

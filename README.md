@@ -1,3 +1,6 @@
+
+![AVR Thesis Title](/publications/thesis/figures/AVR_Title.png)
+
 # AffectiveVR
 
 `[Last update: August 28, 2024]`
@@ -7,8 +10,6 @@
 
     Author(s):  Lucy Roellecke
     Contact:    lucy.roellecke[at]tuta.com
-
-![AVR Thesis Title](/publications/thesis/figures/AVR_Title.png)
 
 ## Project description
 
