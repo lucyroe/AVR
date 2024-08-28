@@ -1,51 +1,50 @@
 # AffectiveVR
 
-`[Last update: December 13, 2023]`
+`[Last update: August 28, 2024]`
 
     Period:     2023-10 - 2024-09
     Status:     work in progress
 
     Author(s):  Lucy Roellecke
-    Contact:    lucy.roellecke@fu-berlin.de
+    Contact:    lucy.roellecke[at]tuta.com
 
+![AVR Thesis Title](/publications/thesis/figures/AVR_Title.png)
 
 ## Project description
 
 *Affective VR* (AVR) aims to develop and test a tool for continous emotion ratings. The project proposes such a tool and assesses its effectiveness, usability and reliability using videos presented in virtual reality (VR).
 
 ## Project structure
-The AVR project consists of three main stages: In **phase 1**, three different rating methods ('Grid', 'Flubber' and 'Proprioceptive') were tested with different videos in VR of each 1 min length. In **phase 2**, the 'Flubber' as winning rating method from phase 1 was tested for a longer VR experience of about 20 min with different videos playing after one another. In **phase 3**, the very same stimuli and rating method are used but additionally to the behavioral data, EEG and periphysiological data are acquired.
+The AVR project consists of three main stages: In the **Selection Phase**, three different rating methods ('Grid', 'Flubber' and 'Proprioceptive') were tested with different videos in VR of each 1 min length. In the **Evaluation Phase**, the 'Flubber' as winning rating method from the Selection Phase was tested for a longer VR experience of about 20 min with different videos playing after one another. In the **Physio Phase**, the very same stimuli and rating method are used but additionally to the behavioral data, EEG and periphysiological data are acquired.    
 
-**Code** for all three phases can be found in `./code/AVR`.    
-The directory `./code/AVR/preprocessing` contains scripts to preprocess annotation data and physiological data, respectively, of any dataset using continuous emotion ratings and videos.   
-The scripts `cpa.py` and `cpa_averaged.py` perform a change point analysis for continuous ratings from phase 2 of the AVR dataset, and for other open-source datasets such as the CASE and the CEAP datasets (for the downloadlinks see the [README_code.md](../code/AVR/README_code.md) in the code directory).   
-The directory `./code/AVR/datacomparison` contains files that compare continuous ratings from phase 1 of the AVR project with other open-source datasets (at the moment only the CEAP dataset).   
-The directories `./code/AVR/datavisualization` and `./code/AVR/modelling` contain nothing so far.   
-Additional R-scripts from phase 1 can be found in `./code/Rscripts`.
+This repository mainly focuses on the Physio Phase as it contains code I wrote in the framework of my master thesis with the title **_Embodied Emotion: Decoding dynamic affective states by integrating neural and cardiac data_**. However, this repository also contains code and results of earlier phase of the project by PhD Candidate Antonin Fourcade that I could use and profit off during the analyses for the thesis.    
+
+**Code** for all three phases can be found in `./code/AVR`.   
+The whole preprocessing and analysis pipeline can be followed by running `main.py`.   
+The directory `./code/AVR/preprocessing` contains scripts to preprocess annotation data and physiological data, respectively, of AVR Physio Phase.   
+The directory `./code/AVR/statistics` contains scripts to calculate both univariate statistics, as well as modelling statistics.    
+The directory `./code/AVR/datacomparison` contains scripts that compare continuous ratings from the Selection phase of the AVR project with the Physio Phase of the AVR project.    
+The directory `./code/AVR/modelling` contains scripts to perform a Hidden Markov Model (HMM) analysis on data from the Physio phase to identify hidden affective states by using the physiological data.    
+The directory `./code/AVR/datavisualization` contains plotting functions.   
 
      📂 code
+     ├── 🐍 main.py
      ├── 📂 AVR
      │   ├── 📁 datacomparison
      │   ├── 📁 datavisualization
+     │   ├── 📁 statistics
      │   ├── 📁 modelling
      │   └── 📁 preprocessing
      │       ├── 📁 annotation
      │       └── 📁 physiological 
-     ├── 📁 configs
-     ├── 📁 Rscripts
-     │   └── 📁 phase1
-     └── 📁 tests
+     └── 📁 configs
      
 The **results** of all analyses can be found in `./results`.    
-There is one sub-directory in the main results directory for each dataset being analyzed: `./results/CASE`, `./results/CEAP`, `./results/EmoCompass`, and `./results/phase1` and `./results/phase2` for the AVR data.
+There is one sub-directory in the main results directory for phase of the AVR project: `./results/phase1`, `./results/phase2`, `./results/phase3`, and `./results/comparison_phase1_phase2` and `./results/comparison_phase1_phase3` for comparing Selection and Evaluation/Physio phase.    
 
      📂 results
-     ├── 📁 CASE
-     │   ├── 📁 cpa
-     │   └── 📁 summary_stats
-     ├── 📁 CEAP
-     │   └── 📁 descriptives
-     ├── 📁 EmoCompass
+     ├── 📁 comparison_phase1_phase2
+     ├── 📁 comparison_phase1_phase3
      ├── 📁 phase1
      │   ├── 📁 assessment_results
      │   ├── 📁 cocor_results
@@ -55,9 +54,19 @@ There is one sub-directory in the main results directory for each dataset being 
      │   ├── 📁 datavisualization
      │   ├── 📁 descriptives
      │   └── 📁 icc_results
-     └── 📁 phase2
+     ├── 📁 phase2
+     │   ├── 📁 cpa
+     │   └── 📁 descriptives
+     └── 📁 phase3
+          └── 📁 AVR
 
+The **figures** published in my master thesis and the manuscripts can be found in `./publications`.    
 
+     📂 publications
+     ├── 📁 articles
+     │   └── 📁 figures
+     └── 📁 thesis
+          └── 📁 figures
 
 ## Install research code as package
 
@@ -84,17 +93,6 @@ pip install -e ".[develop]"
 i.e., changes to the code will be directly reflected in the installed package.
 Moreover, the code keeps its access to the research data in the underlying folder structure.
 Thus, the `-e` flag is recommended to use.
-
-*R*-projects should be initialized in the project root `.` with, e.g., `RStudio` as *existing directory*.
-Corresponding *R*-scripts can be stored in `./code/Rscripts/`
-
-Similarly, use this structure for Matlab or other programming languages, which are employed in this project.
-
-## To Dos
-
-- [x] write a more meaningful project structure paragraph
-- [ ] adapt all other READMEs
-- [ ] adapt main README before going public
 
 ## Contributors/Collaborators
 

@@ -1,20 +1,24 @@
 # AffectiveVR – **code**
 
-    Last update:    December 13, 2023
+    Last update:    August 28, 2024
     Status:         work in progress
 
 ***
 
 ## Description
 
-The main analysis method used in this project is **Change Point Analysis (CPA)**. CPA is a data-driven method to detect relevant changes in time series, and can be applied to a wide range of purposes. The CPA applied in this project was inspired by the procedure applied by [McClay et al. (2023)](https://www.nature.com/articles/s41467-023-42241-2) and [Sharma et al. (2017)](https://ieeexplore.ieee.org/abstract/document/8105870). Click [here](https://www.jstor.org/stable/23427357?sid=primo) if you want to find out more about the mathematics behind CPA.
+The main analysis method used in this project is **Hidden Markov Models (HMMs)**. A Hidden Markov Model (HMM) is a data-driven generative statistical model that can be used to identify hidden states in dynamically changing systems, e.g., the brain or the heart ([Khalifa et al., 2021](https://www.sciencedirect.com/science/article/abs/pii/S1566253520304140?via%3Dihub); [Quinn et al., 2018](https://www.frontiersin.org/article/10.3389/fnins.2018.00603/full)). The hidden states are mutually exclusive, such that only one state occurs at any one point in time, and Markovian, such that one state is only dependent on the previous state. Each state has an initial probability 𝝅. As the states are hidden and cannot be observed directly in the data, observation models (or emission probabilities, 𝜽) link the data with each hidden state, representing the probability distribution from which the data is drawn while the state is active. Transitions between the states are represented in the transition probability matrix A. Given only a set of observations X, the Baum-Welch algorithm can be used to iteratively compute a set of model parameters λ = (𝝅, A, 𝜽) using both forward and Viterbi algorithms based on the expectation-maximization method. The such identified states can then be compared across different models or conditions.
 
-![image](./pics/changepoints_V7_arousal_avg.jpg)
+HMMs were implemented in this project using the Python package `hmmlearn` ([version 0.3.2](https://hmmlearn.readthedocs.io/en/latest/index.html)).
+
+![image](../publications/thesis/figures/phase3_hmm.png)
 
 ## Preprocessing
 
-Two different directories exist for the preprocessing of annotation (`./code/AVR/preprocessing/annotation`) and physiological data (`./code/AVR/preprocessing/physiological`). There are scripts for preprocessing AVR data from the different phases, but also scripts for preprocessing other open-source datasets that use a similiar approach of continuously assessing subject's emotions based on the Circumplex Model of Emotion, using both 2D and VR videos or songs. These datasets are processed in such a way that they can later be compared to our data from the AVR project.
+Two different directories exist for the preprocessing of annotation (`./code/AVR/preprocessing/annotation`) and physiological data (`./code/AVR/preprocessing/physiological`). There are scripts for preprocessing AVR data from the different phases.
 
+
+# TODO: After here
 The following open-source datasets are used for comparison:
 * *A Dataset of Continuous Affect Annotations and Physiological Signals for Emotion Analysis* **(CASE)** by [Sharma et al. (2019)](https://www.nature.com/articles/s41597-019-0209-0), accessible using this [link](https://springernature.figshare.com/collections/A_dataset_of_continuous_affect_annotations_and_physiological_signals_for_emotion_analysis/4260668). Sharma and colleagues used 1-3 min long 2D videos to elicit diverse emotions in viewers, and asked participants to continuously rate their emotions using a joystick. They additionally measured physiological data such as ECG, respiration, BVP, EDA and skin temperature.
 
@@ -98,20 +102,6 @@ api_key = config.service_x.api_key
 *Fill the corresponding `*config.toml` files with your data.*
 
 For other programming languages, corresponding scripts must be implemented to use these `*config.toml` files in a similar way.
-
-## To Dos
-
-- [ ] CASE: calculate summary stats (number and distribution of change points across participants)
-- [ ] Adapt `cpa.py` and `cpa_averaged.py` so they can be used for any dataset (both annotation & physiological data)
-- [ ] Do CPA on CEAP data and AVR phase 1 and phase 2 data
-- [ ] Link CPA of annotations with CPA of physiological data (for CASE and CEAP)
-- [ ] AVR phase 3: prepare preprocessing of physiological data
-- [ ] Add README infos about preprocessing
-- [ ] ALL: statistical significance testing of CPA (permutation tests?)
-- [ ] Test different algorithms for CPA & compare
-- [ ] Test different models for CPA & compare
-- [ ] Adjust `pen` parameter?
-- [ ] Adjust `jump` parameter?
 
 ## LICENSE
 

@@ -2,10 +2,17 @@
 data/
 literature/
 organisation/
-publications/
+publications/material/
+publications/poster/
+publications/presentations/
 
 # Private configs in ./code/configs/
 *_config.toml
+
+# Code and results related to other datasets
+code/CPA/
+code/other_datasets/
+results/other_datasets/
 
 # Consider to ignore specific file types unique to your project
 # *.png
