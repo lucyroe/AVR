@@ -13,7 +13,7 @@ The main analysis method used in this project is **Hidden Markov Models (HMMs)**
 
 HMMs were implemented in this project using the Python package `hmmlearn` ([version 0.3.2](https://hmmlearn.readthedocs.io/en/latest/index.html)).
 
-![image](../publications/thesis/figures/phase3_hmm.png)
+![HMM](../publications/thesis/figures/phase3_hmm.png)
 
 ## Preprocessing
 
@@ -76,7 +76,7 @@ Two different directories exist for the preprocessing of annotation (`./code/AVR
 5. **Integrating** over frequency bands to get alpha, beta, gamma, delta and theta power values.
 6. **Averaging** across regions of interest (ROIs): posterior, frontal, whole-brain.
 
-![image](../publications/thesis/figures/phase3_preprocessing.png)
+![Preprocessing](../publications/thesis/figures/phase3_preprocessing.png)
 
 ## Modelling
 
