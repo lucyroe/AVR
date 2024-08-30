@@ -6,9 +6,9 @@ Required packages: statsmodels, scipy, sklearn
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 15 August 2024
-Last update: 23 August 2024
+Last update: 30 August 2024
 """
-# %%
+
 def glm(  # noqa: PLR0915, C901
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
@@ -52,13 +52,15 @@ def glm(  # noqa: PLR0915, C901
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to analyze
-    models = ["cardiac", "neural", "integrated", "subjective"]
+    models = ["cardiac", "neural", "integrated", "subjective", "multimodal"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "subjective": ["valence", "arousal"],
+        "multimodal": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma",
+                    "valence", "arousal"],
     }
 
     # Set the significance level

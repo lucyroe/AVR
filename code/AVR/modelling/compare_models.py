@@ -4,7 +4,7 @@ Script to compare the different Hidden Markov Model (HMM) models.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 19 August 2024
-Last update: 27 August 2024
+Last update: 30 August 2024
 """
 
 def compare_models(  # noqa: PLR0915
@@ -19,7 +19,7 @@ def compare_models(  # noqa: PLR0915
     """
     Compare the different Hidden Markov Model (HMM) models.
 
-    Inputs: The different HMMs (cardiac, neural, integrated, subjective) as trained in hmm.py
+    Inputs: The different HMMs (cardiac, neural, integrated, subjective, multimodal) as trained in hmm.py
 
     Outputs: Parameters of model quality, accuracy, and distance between ratings for all models
 
@@ -50,21 +50,20 @@ def compare_models(  # noqa: PLR0915
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to compare
-    models = ["cardiac", "neural", "integrated", "subjective"]
+    models = ["cardiac", "neural", "integrated", "subjective", "multimodal"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "subjective": ["valence", "arousal"],
+        "multimodal": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma",
+            "valence", "arousal"],
     }
 
     # Only analyze one subject if debug is True
     if debug:
         subjects = [subjects[0]]
-
-    # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o
-    pass
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
 

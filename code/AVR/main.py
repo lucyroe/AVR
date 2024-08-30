@@ -9,7 +9,7 @@ Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 27 August 2024
+Last update: 30 August 2024
 """
 
 def main():  # noqa: PLR0915
@@ -46,7 +46,7 @@ def main():  # noqa: PLR0915
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Model comparison"]   # Adjust as needed
+    steps = ["Modelling", "GLM", "Model comparison", "Plot results"]   # Adjust as needed
     # "Load data", "Preprocess data", "Extract features", "Univariate statistics",
     # "Modelling", "GLM", "Model comparison", "Plot results"
 
@@ -129,7 +129,8 @@ def main():  # noqa: PLR0915
     state_quadrant_mapping = {"cardiac": {0: "LN", 1: "HP", 2: "LP", 3: "HN"},
                                 "neural": {0: "HN", 1: "LP", 2: "LN", 3: "HP"},
                                 "integrated": {0: "LN", 1: "HP", 2: "HN", 3: "LP"},
-                                "subjective": {0: "LP", 1: "HN", 2: "LN", 3: "HP"}}
+                                "subjective": {0: "LP", 1: "HN", 2: "LN", 3: "HP"},
+                                "multimodal": {0: "LP", 1: "HN", 2: "LN", 3: "HP"}}
 
     # Define if plots should be shown
     show_plots = False
@@ -183,10 +184,10 @@ def main():  # noqa: PLR0915
 
         elif step == "Plot results":
             print("\nPlotting results...\n")
-            print("\nCreating descriptives plots...\n")
-            plot_descriptives(data_dir, results_dir, show_plots)
-            print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
-            raincloud_plot(data_dir, results_dir, show_plots)
+            #print("\nCreating descriptives plots...\n")
+            #plot_descriptives(data_dir, results_dir, show_plots)
+            #print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
+            #raincloud_plot(data_dir, results_dir, show_plots)
             print("\nCreating hidden states plots...\n")
             plot_hidden_states(data_dir, results_dir, subjects, show_plots)
 

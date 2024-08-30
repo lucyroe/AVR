@@ -6,10 +6,9 @@ Required packages: seaborn, mne
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 20 August 2024
-Last updated: 23 August 2024
+Last updated: 30 August 2024
 """
 
-# %%
 def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
@@ -52,13 +51,15 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
     data_path = Path(data_dir) / "phase3" / "AVR" / "derivatives" / "features"
 
     # Which HMMs to plot
-    models = ["cardiac", "neural", "integrated", "subjective"]
+    models = ["cardiac", "neural", "integrated", "subjective", "multimodal"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "subjective": ["valence", "arousal"],
+        "multimodal": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma",
+                    "valence", "arousal"],
     }
 
     # Which subject to use as example subject for HMM for methods
@@ -147,7 +148,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         axis.add_collection(lc)
 
         # Set the title of the plot
-        if title in ("ibi", "hf-hrv"):
+        if title in ("ibi", "hf-hrv", "valence", "arousal"):
             title = title.upper()
             ylabel = "Value (z-scored)"
         else:

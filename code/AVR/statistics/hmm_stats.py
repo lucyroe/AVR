@@ -4,9 +4,8 @@ Script to calculate summary stats of the hidden states of the different HMMs.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 14 August 2024
-Last update: 23 August 2024
+Last update: 30 August 2024
 """
-
 
 def hmm_stats(  # noqa: C901, PLR0915, PLR0912
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
@@ -39,13 +38,15 @@ def hmm_stats(  # noqa: C901, PLR0915, PLR0912
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to analyze
-    models = ["cardiac", "neural", "integrated", "subjective"]
+    models = ["cardiac", "neural", "integrated", "subjective", "multimodal"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "subjective": ["valence", "arousal"],
+        "multimodal": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma",
+                        "valence", "arousal"],
     }
 
     # Number of states (four quadrants of the Affect Grid)
@@ -167,7 +168,6 @@ def hmm_stats(  # noqa: C901, PLR0915, PLR0912
             print("Calculating global stats...")
             global_stats = pd.DataFrame()
             # Loop over all hidden states
-            # %%
             for state in range(number_of_states):
                 # Get the data for the state
                 data_state = data[data["state"] == state]
@@ -197,7 +197,7 @@ def hmm_stats(  # noqa: C901, PLR0915, PLR0912
                         lifetime = 0
                     elif timepoint == data_state["timestamp"][index - 1] + 1:
                         lifetime += 1
-                        if index == len(data_state) - 1:
+                        if index == len(data_state) - 1:  # noqa: SIM114
                             lifetimes.append(lifetime)
                             lifetime = 0
                         elif timepoint != data_state["timestamp"][index + 1] - 1:
@@ -216,7 +216,6 @@ def hmm_stats(  # noqa: C901, PLR0915, PLR0912
                 mean_intervaltime = 0 if len(intervaltimes) == 0 else np.mean(intervaltimes)
                 global_stats.loc[state, "mean_intervaltime"] = mean_intervaltime
 
-            # %%
             # Add the subject ID to the global stats as first column
             global_stats.insert(0, "subject", subject)
 

@@ -4,10 +4,10 @@ Plotting descriptive statistics for the AVR data.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 12 August 2024
-Last updated: 19 August 2024
+Last updated: 30 August 2024
 """
 
-
+# %%
 def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
@@ -28,6 +28,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     import numpy as np
     import pandas as pd
     import seaborn as sns
+    from scipy import stats
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
 
@@ -91,6 +92,24 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
             data=data, x="timestamp", y=variable_name, hue="variable", palette=colors, ax=ax, legend="brief", lw=1.5
         )
 
+        # Get the maximum y-value of the plot for the positioning of the video labels
+        if data["variable"].nunique() == 1:
+            mean = data.groupby("timestamp")[variable_name].mean()
+            sem = data.groupby("timestamp")[variable_name].sem()
+            ci_range = sem * stats.t.ppf((1 + 0.95) / 2., len(data.groupby("timestamp")[variable_name])-1)
+            upper_ci = mean + ci_range
+            max_y = upper_ci.max()
+        else:
+            max_all_variables = []
+            for variable in data["variable"].unique():
+                mean = data[data["variable"] == variable].groupby("timestamp")[variable_name].mean()
+                sem = data[data["variable"] == variable].groupby("timestamp")[variable_name].sem()
+                ci_range = sem * stats.t.ppf((1 + 0.95) / 2., len(data[data["variable"] == variable].groupby("timestamp")[variable_name])-1)
+                upper_ci = mean + ci_range
+                max_variable = upper_ci.max()
+                max_all_variables.append(max_variable)
+            max_y = max(max_all_variables)
+
         # Add shading for the different videos
         for video in videos:
             if video == "spaceship":
@@ -107,7 +126,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
                 # Add a text label for the video
                 ax.text(
                     timestamp_start_video + (timestamp_stop_video - timestamp_start_video) / 3,
-                    max(data[variable_name]),
+                    max_y,
                     video.capitalize(),
                     color="white",
                     fontsize=14,
@@ -261,38 +280,35 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     # %% STEP 1. LOAD DATA
-    # Create one dataframe for all datastreams
-    data = pd.DataFrame()
+    # Create a dictionary for all datastreams
+    data = {f"{variable}": [] for variable in datastreams["annotation"] + datastreams["physiological"]}
     # Load the annotation data
     annotations = pd.read_csv(annotation_dir / "all_subjects_task-AVR_beh_features.tsv", sep="\t")
     # Drop unnecessary columns
     annotations = annotations.drop(columns=["subject", "video"])
     # Average over all subjects
-    annotations = annotations.groupby("timestamp").mean()
+    #annotations = annotations.groupby("timestamp").mean()
 
     for variable in datastreams["annotation"]:
-        data[variable] = annotations[variable]
+        # Create a dataframe with the variable
+        variable_data = pd.DataFrame(annotations[variable])
+        # Add the timestamp as first column
+        variable_data.insert(0, "timestamp", annotations["timestamp"])
+        data[variable] = variable_data
 
     # Load the physiological data
     physiological = pd.read_csv(physiological_dir / "all_subjects_task-AVR_physio_features.tsv", sep="\t")
     # Drop unnecessary columns
     physiological = physiological.drop(columns=["subject", "video"])
     # Average over all subjects
-    physiological = physiological.groupby("timestamp").mean()
+    #physiological = physiological.groupby("timestamp").mean()
 
     for variable in datastreams["physiological"]:
-        # Check if the variable has the same length as the annotations
-        for annotation_variable in datastreams["annotation"]:
-            if len(physiological[variable]) != len(data[annotation_variable]):
-                # Cut the annotation data to match the length of the physiological data
-                data[annotation_variable] = data[annotation_variable][: len(physiological[variable])]
-        data[variable] = physiological[variable]
-
-    # Delete rows with NaN values
-    data = data.dropna()
-
-    # Add timestamp as first column
-    data.insert(0, "timestamp", np.arange(len(data)))
+        # Create a dataframe with the variable
+        variable_data = pd.DataFrame(physiological[variable])
+        # Add the timestamp as first column
+        variable_data.insert(0, "timestamp", physiological["timestamp"])
+        data[variable] = variable_data
 
     # Get events
     events = pd.read_csv(events_dir / "events_experiment.tsv", sep="\t")
@@ -300,18 +316,25 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     event_names = events["event_name"]
 
     # Create a list of the different phases that has the same length as the data
-    video_column = pd.DataFrame(index=data.index, columns=["video"])
-    for video in videos:
-        counter = 0
-        for row in data.iterrows():
-            # Get the timestamps of the start and end of the video
-            timestamp_start_video = timestamps_events[event_names == f"start_{video}"].reset_index()["onset"][counter]
-            timestamp_stop_video = timestamps_events[event_names == f"end_{video}"].reset_index()["onset"][counter]
-            if row[1]["timestamp"] >= timestamp_start_video and row[1]["timestamp"] <= timestamp_stop_video:
-                video_column.loc[row[0], "video"] = video
-            if video == "spaceship" and row[1]["timestamp"] >= timestamp_stop_video:
-                counter += 1
-    data["video"] = video_column
+    for variable in data:
+        variable_data = data[variable]
+        video_column = pd.DataFrame(index=variable_data.index, columns=["video"])
+        for video in videos:
+            counter = 0
+            for timestamp in variable_data["timestamp"].unique():
+                # Get the timestamps of the start and end of the video
+                timestamp_start_video = timestamps_events[event_names == f"start_{video}"].reset_index()["onset"][counter]
+                timestamp_stop_video = timestamps_events[event_names == f"end_{video}"].reset_index()["onset"][counter]
+                # Get the indices of the timestamp
+                timestamp_indices = variable_data.index[variable_data["timestamp"] == timestamp]
+                if timestamp >= timestamp_start_video and timestamp <= timestamp_stop_video:
+                    for index in timestamp_indices:
+                        video_column.loc[index, "video"] = video
+                if video == "spaceship" and timestamp >= timestamp_stop_video:
+                    counter += 1
+        variable_data["video"] = video_column
+        # Add the data to the dictionary
+        data[variable] = variable_data
 
     # %% STEP 2. PLOT AVERAGE TIMESERIES
     # Create a figure with subplots for annotation ratings, for ecg features, and for eeg features
@@ -321,18 +344,38 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
 
     # Plot annotation ratings
     annotation_axis = fig.add_subplot(gs[0])
-    annotation_data = data[["timestamp"] + datastreams["annotation"]]
+    annotation_data = pd.DataFrame()
+    for datastream in datastreams["annotation"]:
+        stream_data = data[f"{datastream}"]
+        annotation_data = pd.concat([annotation_data, stream_data], axis=1)
+
+    # Drop duplicate columns
+    annotation_data = annotation_data.loc[:, ~annotation_data.columns.duplicated()]
+
+    # Find NaN values and drop them
+    annotation_data = annotation_data.dropna()
+
     # Format data for plotting
-    annotation_data = pd.melt(annotation_data, id_vars="timestamp", var_name="variable", value_name="rating")
+    annotation_data = pd.melt(annotation_data, id_vars=["timestamp", "video"], var_name="variable", value_name="rating")
     plot_average_timeseries(annotation_data, "rating", colors["annotation"], colors_videos, annotation_axis)
 
     # Plot physiological features
     # ECG features
-    ecg_features = datastreams["physiological"][0:4]
-    colors_ecg = [colors["physiological"][ecg_feature] for ecg_feature in ecg_features]
-    ecg_data = data[["timestamp", *ecg_features]]
+    ecg_features = pd.DataFrame()
+    for datastream in datastreams["physiological"][0:4]:
+        stream_data = data[f"{datastream}"]
+        ecg_features = pd.concat([ecg_features, stream_data], axis=1)
+
+    # Drop duplicate columns
+    ecg_data = ecg_features.loc[:, ~ecg_features.columns.duplicated()]
+
+    # Find NaN values and drop them
+    ecg_data = ecg_data.dropna()
+
+    colors_ecg = [colors["physiological"][ecg_feature] for ecg_feature in datastreams["physiological"][0:4]]
+
     # Format data for plotting
-    ecg_data = pd.melt(ecg_data, id_vars="timestamp", var_name="variable", value_name="value")
+    ecg_data = pd.melt(ecg_data, id_vars=["timestamp", "video"], var_name="variable", value_name="value")
     # Plot IBI in one plot
     ibi_axis = fig.add_subplot(gs[1])
     ibi_data = ecg_data[ecg_data["variable"] == "ibi"]
@@ -343,13 +386,25 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
 
     # EEG features
     # Create one plot for each EEG feature
-    eeg_features = datastreams["physiological"][4:]
+    eeg_features = pd.DataFrame()
+    for datastream in datastreams["physiological"][4:]:
+        stream_data = data[f"{datastream}"]
+        eeg_features = pd.concat([eeg_features, stream_data], axis=1)
+ 
+    # Drop duplicate columns
+    eeg_features = eeg_features.loc[:, ~eeg_features.columns.duplicated()]
+
+    # Find NaN values and drop them
+    eeg_features = eeg_features.dropna()
+
+    eeg_feature_names = datastreams["physiological"][4:]
+
     index = 3
-    for eeg_feature in eeg_features:
+    for eeg_feature in eeg_feature_names:
         colors_eeg = [colors["physiological"][eeg_feature]]
-        eeg_data = data[["timestamp", eeg_feature]]
+        eeg_data = data[eeg_feature]
         # Format data for plotting
-        eeg_data = pd.melt(eeg_data, id_vars="timestamp", var_name="variable", value_name="power")
+        eeg_data = pd.melt(eeg_data, id_vars=["timestamp", "video"], var_name="variable", value_name="power")
         eeg_axis = fig.add_subplot(gs[index])
         plot_average_timeseries(eeg_data, "power", colors_eeg, colors_videos, eeg_axis)
         index += 1

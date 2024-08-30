@@ -1,14 +1,14 @@
 """
-Script to perform a Hidden Markov Model (HMM) analysis on Affective VR cardiac and neural data.
+Script to perform a Hidden Markov Model (HMM) analysis on Affective VR data.
 
 Required packages: hmmlearn, pickle, seaborn
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 22 May 2024
-Last update: 23 August 2024
+Last update: 30 August 2024
 """
-# %%
+
 def hmm(  # noqa: C901, PLR0912, PLR0915, PLR0913
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
@@ -20,17 +20,19 @@ def hmm(  # noqa: C901, PLR0912, PLR0915, PLR0913
     state_quadrant_mapping = {"cardiac": {0: "LN", 1: "HP", 2: "LP", 3: "HN"},  # noqa: B006
                                 "neural": {0: "HN", 1: "LP", 2: "LN", 3: "HP"},
                                 "integrated": {0: "LN", 1: "HP", 2: "HN", 3: "LP"},
-                                "subjective": {0: "LP", 1: "HN", 2: "LN", 3: "HP"}},
+                                "subjective": {0: "LP", 1: "HN", 2: "LN", 3: "HP"},
+                                "multimodal": {0: "LP", 1: "HN", 2: "LN", 3: "HP"}},
     debug=False,
     show_plots=False,
 ):
     """
-    Perform a Hidden Markov Model (HMM) analysis on Affective VR cardiac and neural data.
+    Perform a Hidden Markov Model (HMM) analysis on Affective VR data.
 
-    Inputs: Extracted ECG and EEG features.
+    Inputs: Extracted ECG, EEG features and ratings.
 
     Outputs:
-    - Four Hidden Markov Models (HMMs): Cardiac Model, Neural Model, Integrated Model, Subjective Model.
+    - Five Hidden Markov Models (HMMs): Cardiac Model, Neural Model, Integrated Model,
+                                        Subjective Model, Multimodal Model.
     - Plot of the data with the hidden states marked in color vertically.
 
     Functions:
@@ -60,13 +62,15 @@ def hmm(  # noqa: C901, PLR0912, PLR0915, PLR0913
     resultpath = Path(results_dir) / "phase3" / "AVR"
 
     # Which HMMs to create
-    models = ["cardiac", "neural", "integrated", "subjective"]
+    models = ["cardiac", "neural", "integrated", "subjective", "multimodal"]
     # Which features are used for which HMM
     models_features = {
         "cardiac": ["ibi", "hf-hrv"],
         "neural": ["posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "integrated": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma"],
         "subjective": ["valence", "arousal"],
+        "multimodal": ["ibi", "hf-hrv", "posterior_alpha", "frontal_alpha", "frontal_theta", "beta", "gamma",
+                    "valence", "arousal"],
     }
 
     # Define whether features should be z-scored to have mean 0 and standard deviation 1
@@ -244,6 +248,7 @@ def hmm(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     else:
                         feature_datafile = f"sub-{subject}_task-AVR_eeg_features_whole-brain_power.tsv"
                         feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature]
+
                 elif model == "integrated":
                     if feature in ["ibi", "hf-hrv"]:
                         feature_datafile = f"sub-{subject}_task-AVR_ecg_features.tsv"
@@ -263,6 +268,26 @@ def hmm(  # noqa: C901, PLR0912, PLR0915, PLR0913
                     # Get only the data of the current subject
                     feature_data = feature_data[feature_data["subject"] == int(subject)]
                     feature_data = feature_data[feature]
+
+                elif model == "multimodal":
+                    if feature in ["ibi", "hf-hrv"]:
+                        feature_datafile = f"sub-{subject}_task-AVR_ecg_features.tsv"
+                        feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature]
+                    elif feature in ["posterior_alpha", "frontal_alpha", "frontal_theta"]:
+                        feature_datafile = f"sub-{subject}_task-AVR_eeg_features_{feature.split('_')[0]}_power.tsv"
+                        feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[
+                            feature.split("_")[1]
+                        ]
+                    elif feature in ["beta", "gamma"]:
+                        feature_datafile = f"sub-{subject}_task-AVR_eeg_features_whole-brain_power.tsv"
+                        feature_data = pd.read_csv(subject_datapath / feature_datafile, sep="\t")[feature]
+                    else:   # subjective features
+                        beh_datapath = datapath / "avg" / "beh"
+                        feature_datafile = "all_subjects_task-AVR_beh_features.tsv"
+                        feature_data = pd.read_csv(beh_datapath / feature_datafile, sep="\t")
+                        # Get only the data of the current subject
+                        feature_data = feature_data[feature_data["subject"] == int(subject)]
+                        feature_data = feature_data[feature]
 
                 # Z-score the data if necessary
                 if z_score:
