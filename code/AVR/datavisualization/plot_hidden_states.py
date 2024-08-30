@@ -17,7 +17,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         "020", "021", "022", "024", "025", "026", "027", "028", "029",
         "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
         "040", "041", "042", "043", "045", "046"],
-    show_plots=True,
+    show_plots=False,
 ):
     """
     Plot descriptive statistics for the AVR data.
@@ -255,7 +255,6 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         # Set y-limits
         if variable == "fractional_occupancy":
             axis.set_ylim(0, 1)
-        # Change the x-ticks
         axis.set_xticklabels([f"State {i+1}" for i in range(4)], fontsize=12)
         # Add title
         title = (
@@ -411,6 +410,9 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
 
         # Set title
         axis.set_title(f"{variable.upper()}", fontsize=14, fontweight="bold", pad=20)
+
+        # Set limits of the plot
+        axis.set_ylim(-2.5, 2.5)
 
         if mark_significant_differences:
             # Mark significant differences with an asterisk and a line above the two groups
@@ -799,7 +801,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         # Then, create one plot with four subplots for each states, with each four subplots for each frequency
         # (4x4 grid)
         fig = plt.figure(figsize=(20, 20))
-        gs = gridspec.GridSpec(4, 5, width_ratios=[1, 1, 1, 1, 0.3])  # Extra column for colorbars
+        gs = gridspec.GridSpec(5, 4, height_ratios=[1, 1, 1, 1, 0.3])  # Extra row for colorbars
 
         # Loop over all states
         for state in range(4):
@@ -812,18 +814,18 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
                 data_topoplot = data_topoplot.drop(columns=["state", "frequency"])
 
                 # Create subplot in the grid
-                ax = plt.subplot(gs[state, freq_idx])
+                ax = plt.subplot(gs[freq_idx, state])
 
                 # Create the plot
                 cax = create_topoplot(data_topoplot, info, ax, frequency, state)
 
-                # Set the title of the subplot
-                if freq_idx == 0:
-                    ax.set_ylabel(f"State {state+1}", fontsize=24, fontweight="bold", rotation=360, labelpad=60)
+            # Add a title to each column with the state number below the topoplot
+            axis = plt.subplot(gs[0, state])
+            axis.set_title(f"State {state+1}", fontsize=24, fontweight="bold")
 
             # Add a colorbar to the extra column
-            axis = plt.subplot(gs[state, -1])  # Extra column for colorbars
-            cbar = plt.colorbar(cax, ax=axis, orientation="vertical")
+            axis = plt.subplot(gs[-1, state])  # Extra column for colorbars
+            cbar = plt.colorbar(cax, ax=axis, orientation="horizontal")
             cbar.set_label("Power (z-scored)", fontsize=14)
             axis.axis("off")  # Hide the axes of the colorbar subplot
 

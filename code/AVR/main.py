@@ -46,7 +46,7 @@ def main():  # noqa: PLR0915
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Modelling", "GLM", "Model comparison", "Plot results"]   # Adjust as needed
+    steps = ["Plot results"]   # Adjust as needed
     # "Load data", "Preprocess data", "Extract features", "Univariate statistics",
     # "Modelling", "GLM", "Model comparison", "Plot results"
 
@@ -184,10 +184,10 @@ def main():  # noqa: PLR0915
 
         elif step == "Plot results":
             print("\nPlotting results...\n")
-            #print("\nCreating descriptives plots...\n")
-            #plot_descriptives(data_dir, results_dir, show_plots)
-            #print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
-            #raincloud_plot(data_dir, results_dir, show_plots)
+            print("\nCreating descriptives plots...\n")
+            plot_descriptives(data_dir, results_dir, show_plots)
+            print("\nCreating raincloud plots to compare variability in ratings between phase 1 and phase 3...\n")
+            raincloud_plot(data_dir, results_dir, show_plots)
             print("\nCreating hidden states plots...\n")
             plot_hidden_states(data_dir, results_dir, subjects, show_plots)
 

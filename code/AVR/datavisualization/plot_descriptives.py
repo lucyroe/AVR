@@ -7,7 +7,6 @@ Created on: 12 August 2024
 Last updated: 30 August 2024
 """
 
-# %%
 def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
@@ -84,7 +83,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
         "underwood": "#7a86d1",
     }
 
-    mark_significant_differences = True  # if True, significant differences will be marked in the boxplots
+    mark_significant_differences = False  # if True, significant differences will be marked in the boxplots
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     def plot_average_timeseries(data, variable_name, colors, colors_videos, ax):
@@ -93,10 +92,10 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
         )
 
         # Get the maximum y-value of the plot for the positioning of the video labels
-        if data["variable"].nunique() == 1:
+        if len(data["variable"].unique()) == 1:
             mean = data.groupby("timestamp")[variable_name].mean()
             sem = data.groupby("timestamp")[variable_name].sem()
-            ci_range = sem * stats.t.ppf((1 + 0.95) / 2., len(data.groupby("timestamp")[variable_name])-1)
+            ci_range = sem * stats.t.ppf((1 + 0.95) / 2.0, len(data.groupby("timestamp")[variable_name]) - 1)
             upper_ci = mean + ci_range
             max_y = upper_ci.max()
         else:
@@ -104,7 +103,9 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
             for variable in data["variable"].unique():
                 mean = data[data["variable"] == variable].groupby("timestamp")[variable_name].mean()
                 sem = data[data["variable"] == variable].groupby("timestamp")[variable_name].sem()
-                ci_range = sem * stats.t.ppf((1 + 0.95) / 2., len(data[data["variable"] == variable].groupby("timestamp")[variable_name])-1)
+                ci_range = sem * stats.t.ppf(
+                    (1 + 0.95) / 2.0, len(data[data["variable"] == variable].groupby("timestamp")[variable_name]) - 1
+                )
                 upper_ci = mean + ci_range
                 max_variable = upper_ci.max()
                 max_all_variables.append(max_variable)
@@ -161,8 +162,13 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
         # Set the title
         fig.set_title(f"{variables_text}", fontsize=16, fontweight="bold", pad=20)
 
-    def plot_raincloudplot(
-        data: pd.DataFrame, variable: str, videos: list[str], significant_differences: list, axes: plt.Axes
+    def plot_raincloudplot(  # noqa: PLR0913
+        data: pd.DataFrame,
+        variable: str,
+        videos: list[str],
+        y_label: str,
+        significant_differences: list,
+        axes: plt.Axes,
     ) -> plt.figure():
         """
         Plot a raincloud plot for the given data.
@@ -177,6 +183,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
         data: dataframe with the data to be plotted.
         variable: variable for which the raincloud plot should be plotted.
         videos: list of videos for which the data should be plotted.
+        y_label: label for the y-axis.
         significant_differences: list of significant differences between the groups.
         axes: axes on which the plot should be plotted.
 
@@ -229,16 +236,22 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
 
         # Set labels
         axes.set_xticklabels([f"{video.capitalize()}" for video in videos])
-        axes.set_ylabel("Rating")
+        axes.set_ylabel(y_label)
 
         # Set title
-        axes.set_title(f"{variable.capitalize()}", fontsize=14, fontweight="bold", pad=20)
+        title = (
+            variable.upper()
+            if variable in ("ibi", "hrv", "lf_hrv", "hf_hrv")
+            else variable.replace("_", " ").title()
+        )
+
+        axes.set_title(f"{title}", fontsize=14, fontweight="bold", pad=20)
 
         if mark_significant_differences:
             # Mark significant differences with an asterisk and a line above the two groups
             counter = 0
             # Get distance between lines
-            distance = 0.5
+            distance = 0.5 * max([data_list[0].max(), data_list[1].max(), data_list[2].max(), data_list[3].max()])
 
             for difference in significant_differences:
                 first_group = difference[0].capitalize()
@@ -276,7 +289,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
                     color=color,
                 )
 
-                counter += 0.3
+                counter += 0.3 * max([data_list[0].max(), data_list[1].max(), data_list[2].max(), data_list[3].max()])
 
     # %% Script  >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     # %% STEP 1. LOAD DATA
@@ -286,8 +299,6 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     annotations = pd.read_csv(annotation_dir / "all_subjects_task-AVR_beh_features.tsv", sep="\t")
     # Drop unnecessary columns
     annotations = annotations.drop(columns=["subject", "video"])
-    # Average over all subjects
-    #annotations = annotations.groupby("timestamp").mean()
 
     for variable in datastreams["annotation"]:
         # Create a dataframe with the variable
@@ -300,8 +311,6 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     physiological = pd.read_csv(physiological_dir / "all_subjects_task-AVR_physio_features.tsv", sep="\t")
     # Drop unnecessary columns
     physiological = physiological.drop(columns=["subject", "video"])
-    # Average over all subjects
-    #physiological = physiological.groupby("timestamp").mean()
 
     for variable in datastreams["physiological"]:
         # Create a dataframe with the variable
@@ -323,7 +332,9 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
             counter = 0
             for timestamp in variable_data["timestamp"].unique():
                 # Get the timestamps of the start and end of the video
-                timestamp_start_video = timestamps_events[event_names == f"start_{video}"].reset_index()["onset"][counter]
+                timestamp_start_video = timestamps_events[event_names == f"start_{video}"].reset_index()["onset"][
+                    counter
+                ]
                 timestamp_stop_video = timestamps_events[event_names == f"end_{video}"].reset_index()["onset"][counter]
                 # Get the indices of the timestamp
                 timestamp_indices = variable_data.index[variable_data["timestamp"] == timestamp]
@@ -356,7 +367,9 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     annotation_data = annotation_data.dropna()
 
     # Format data for plotting
-    annotation_data = pd.melt(annotation_data, id_vars=["timestamp", "video"], var_name="variable", value_name="rating")
+    annotation_data = pd.melt(
+        annotation_data, id_vars=["timestamp", "video"], var_name="variable", value_name="rating"
+    )
     plot_average_timeseries(annotation_data, "rating", colors["annotation"], colors_videos, annotation_axis)
 
     # Plot physiological features
@@ -390,7 +403,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     for datastream in datastreams["physiological"][4:]:
         stream_data = data[f"{datastream}"]
         eeg_features = pd.concat([eeg_features, stream_data], axis=1)
- 
+
     # Drop duplicate columns
     eeg_features = eeg_features.loc[:, ~eeg_features.columns.duplicated()]
 
@@ -424,7 +437,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
     if show_plots:
         plt.show()
 
-    # %% STEP 3. PLOT RAINCLOUD PLOTS
+    # %% STEP 3. PLOT RAINCLOUD PLOTS FOR ANNOTATION RATINGS
     # Read in annotation data
     annotation_data = pd.read_csv(
         data_dir / "features" / "avg" / "beh" / "all_subjects_task-AVR_beh_features.tsv", sep="\t"
@@ -436,7 +449,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
 
     # Plot raincloud plots to visualize the differences in annotation ratings between the different videos
     # Create a figure with subplots for valence and arousal
-    figure, axes = plt.subplots(2, 1, figsize=(10, 10))
+    figure, axes = plt.subplots(2, 1, figsize=(8, 8))
 
     for variable in datastreams["annotation"]:
         if mark_significant_differences:
@@ -466,7 +479,12 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
 
         # Plot raincloud plot
         plot_raincloudplot(
-            annotation_data, variable, videos, significant_differences, axes[datastreams["annotation"].index(variable)]
+            annotation_data,
+            variable,
+            videos,
+            "Rating",
+            significant_differences,
+            axes[datastreams["annotation"].index(variable)],
         )
 
     # Remove the x-axis label from the upper plot
@@ -478,6 +496,71 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
 
     # Save figure
     figure.savefig(Path(results_dir_descriptives) / "beh" / "raincloud_mean_annotation.svg")
+
+    # Show plot
+    if show_plots:
+        plt.show()
+
+    # %% STEP 4. PLOT RAINCLOUD PLOTS FOR PHYSIOLOGICAL FEATURES
+    # Read in physiological data
+    physiological_data = pd.read_csv(
+        data_dir / "features" / "avg" / "eeg" / "all_subjects_task-AVR_physio_features.tsv", sep="\t"
+    )
+
+    # Read in results of the post-hoc-tests
+    posthoc_results = pd.read_csv(results_dir_descriptives / "stats" / "physiological_posthoc_results.tsv", sep="\t")
+
+    # Plot raincloud plots to visualize the differences in physiological features between the different videos
+    # Create a figure with subplots for the different physiological features
+    figure, axes = plt.subplots(9, 1, figsize=(8, 40))
+
+    for variable in datastreams["physiological"]:
+        if mark_significant_differences:
+            # Get significant differences for the current variable
+            significant_differences_current = posthoc_results[posthoc_results["Variable"] == variable][
+                posthoc_results["Significance"] == True  # noqa: E712
+            ]
+
+            # Put the significant differences in a list (pairs of groups)
+            significant_differences = [
+                [group1, group2]
+                for group1, group2 in zip(
+                    significant_differences_current["Group1"],
+                    significant_differences_current["Group2"],
+                    strict=True,
+                )
+            ]
+
+            # Delete duplicates (no matter in which order the groups are)
+            significant_differences = [sorted(difference) for difference in significant_differences]
+            significant_differences = list({tuple(difference) for difference in significant_differences})
+
+            # Sort so that the groups are in alphabetical order
+            significant_differences = sorted(significant_differences)
+        else:
+            significant_differences = []
+
+        ylabel = "Value" if variable in ("ibi", "hrv", "lf_hrv", "hf_hrv") else "Power"
+
+        # Plot raincloud plot
+        plot_raincloudplot(
+            physiological_data,
+            variable,
+            videos,
+            ylabel,
+            significant_differences,
+            axes[datastreams["physiological"].index(variable)],
+        )
+
+    # Remove the x-axis label from the upper plot
+    axes[0].set_xticklabels("")
+    axes[0].set_xticks([])
+
+    # More space between the two plots
+    plt.tight_layout()
+
+    # Save figure
+    figure.savefig(Path(results_dir_descriptives) / "eeg" / "raincloud_mean_physiological.svg")
 
     # Show plot
     if show_plots:
