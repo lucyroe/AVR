@@ -801,7 +801,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         # Then, create one plot with four subplots for each states, with each four subplots for each frequency
         # (4x4 grid)
         fig = plt.figure(figsize=(20, 20))
-        gs = gridspec.GridSpec(5, 4, height_ratios=[1, 1, 1, 1, 0.3])  # Extra row for colorbars
+        gs = gridspec.GridSpec(6, 4, height_ratios=[0.1, 1, 1, 1, 1, 0.3])  # Extra row for colorbars
 
         # Loop over all states
         for state in range(4):
@@ -814,7 +814,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
                 data_topoplot = data_topoplot.drop(columns=["state", "frequency"])
 
                 # Create subplot in the grid
-                ax = plt.subplot(gs[freq_idx, state])
+                ax = plt.subplot(gs[freq_idx+1, state])
 
                 # Create the plot
                 cax = create_topoplot(data_topoplot, info, ax, frequency, state)
@@ -822,6 +822,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
             # Add a title to each column with the state number below the topoplot
             axis = plt.subplot(gs[0, state])
             axis.set_title(f"State {state+1}", fontsize=24, fontweight="bold")
+            axis.axis("off")
 
             # Add a colorbar to the extra column
             axis = plt.subplot(gs[-1, state])  # Extra column for colorbars
