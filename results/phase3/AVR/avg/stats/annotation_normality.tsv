@@ -1,9 +1,9 @@
 Group	Variable	Statistic	Samples	p-value	Significance
-spaceship	valence		15664		False
-spaceship	arousal	0.67	15664	0.0	True
-invasion	valence	0.87	11132	0.0	True
-invasion	arousal	0.88	11132	0.0	True
-asteroids	valence	0.86	17204	0.0	True
-asteroids	arousal	0.87	17204	0.0	True
-underwood	valence	0.77	16764	0.0	True
-underwood	arousal	0.85	16764	0.0	True
+spaceship	valence	0.97	44	0.274	False
+spaceship	arousal	0.88	44	0.0	True
+invasion	valence	0.97	44	0.202	False
+invasion	arousal	0.97	44	0.264	False
+asteroids	valence	0.96	44	0.099	False
+asteroids	arousal	0.96	44	0.132	False
+underwood	valence	0.88	44	0.0	True
+underwood	arousal	0.9	44	0.001	True

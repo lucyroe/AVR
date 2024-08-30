@@ -6,16 +6,16 @@ Required packages: statsmodels, scipy, pingouin
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 9 August 2024
-Last update: 16 August 2024
+Last update: 30 August 2024
 """
 
-
+# %%
 def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
-                "011", "012", "014", "015", "016", "017", "018", "019",
-                "020", "021", "022", "024", "025", "026", "027", "028", "029",
-                "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
-                "040", "041", "042", "043", "044", "045", "046", "047"],
+        "012", "014", "015", "016", "018", "019",
+        "020", "021", "022", "024", "025", "026", "027", "028", "029",
+        "030", "031", "032", "033", "034", "035", "036", "037", "038", "039",
+        "040", "041", "042", "043", "045", "046"],
     data_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/data/",
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     debug=False,
@@ -54,6 +54,7 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     import pandas as pd
     import pingouin as pg
     from scipy import stats
+    from scipy.stats import friedmanchisquare
     from statsmodels.stats.anova import AnovaRM
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
@@ -551,9 +552,16 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     )
     # %% STEP 2. TEST ASSUMPTIONS
     # 2a. For Annotation Data
+    # Calculate a mean valence and arousal rating for each video for each participant
+    mean_valence = annotation_data.groupby(["subject", "video"])["valence"].mean().reset_index()
+    mean_arousal = annotation_data.groupby(["subject", "video"])["arousal"].mean().reset_index()
+
+    # Add both dataframes to one dataframe
+    mean_valence_arousal = mean_valence.merge(mean_arousal, on=["subject", "video"])
+
     # Test the assumptions for a repeated measures ANOVA
     table_normality_annotation, fig_normality_annotation, table_sphericity_annotation = test_assumptions(
-        annotation_data, "video", ["valence", "arousal"], alpha
+        mean_valence_arousal, "video", ["valence", "arousal"], alpha
     )
 
     # Save the results of the Shapiro-Wilk test as a tsv file
@@ -570,9 +578,12 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     fig_normality_annotation.savefig(results_dir / exp_name / averaged_name / "stats" / "annotation_normality.png")
 
     # 2b. For Physiological Data
+    # Calculate a mean value for each physiological feature for each video for each participant
+    mean_physiological = physiological_data.groupby(["subject", "video"]).mean().reset_index()
+
     # Test the assumptions for a repeated measures ANOVA
     table_normality_physiological, fig_normality_physiological, table_sphericity_physiological = test_assumptions(
-        physiological_data, "video", physiological_data.columns.unique()[2:-1], alpha
+        mean_physiological, "video", physiological_data.columns.unique()[2:-1], alpha
     )
 
     # Save the results of the Shapiro-Wilk test as a tsv file
@@ -591,14 +602,13 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     )
 
     # %% STEP 3. CALCULATE DESCRIPTIVE STATISTICS
-
     # Define results directory
     results_filepath_stats = results_dir / exp_name / averaged_name / "stats"
 
     # Create directory if it does not exist
     results_filepath_stats.mkdir(parents=True, exist_ok=True)
 
-    # 2a. Demographics
+    # 3a. Demographics
     # Calculate descriptive statistics of age
     age_stats = demographics["age"].describe()
 
@@ -619,7 +629,7 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     # Save dataframe as tsv file
     demographics_stats.to_csv(results_filepath_stats / "demographics_stats.tsv", sep="\t", index=False)
 
-    # 2b. Annotation Data
+    # 3b. Annotation Data
     # Calculate descriptive statistics of valence and arousal ratings
     video_stats_annotation = descriptives(annotation_data, ["valence", "arousal"], videos, "video")
 
@@ -627,10 +637,39 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     video_stats_annotation.to_csv(results_filepath_stats / "annotation_stats.tsv", sep="\t", index=True)
 
     # Perform repeated measures ANOVA to test for differences in valence & arousal ratings between the videos
-    results_annotation_anova = perform_anova(annotation_data, ["valence", "arousal"], "video", alpha)
+    results_annotation_anova = perform_anova(mean_valence_arousal, ["valence", "arousal"], "video", alpha)
 
     # Save results to a tsv file
     results_annotation_anova.to_csv(results_filepath_stats / "annotation_anova.tsv", sep="\t", index=True)
+
+    # Perform a Friedman test (non-parametric alternative to repeated measures ANOVA for non-normal data)
+    # Calculate the Friedman test for valence ratings
+    friedman_valence, p_valence = friedmanchisquare(
+        mean_valence_arousal[mean_valence_arousal["video"] == "spaceship"]["valence"],
+        mean_valence_arousal[mean_valence_arousal["video"] == "invasion"]["valence"],
+        mean_valence_arousal[mean_valence_arousal["video"] == "asteroids"]["valence"],
+        mean_valence_arousal[mean_valence_arousal["video"] == "underwood"]["valence"],
+    )
+
+    # Calculate the Friedman test for arousal ratings
+    friedman_arousal, p_arousal = friedmanchisquare(
+        mean_valence_arousal[mean_valence_arousal["video"] == "spaceship"]["arousal"],
+        mean_valence_arousal[mean_valence_arousal["video"] == "invasion"]["arousal"],
+        mean_valence_arousal[mean_valence_arousal["video"] == "asteroids"]["arousal"],
+        mean_valence_arousal[mean_valence_arousal["video"] == "underwood"]["arousal"],
+    )
+
+    # Save the results of the Friedman test as a tsv file
+    friedman_results_annotation = pd.DataFrame(
+        {
+            "Variable": ["valence", "arousal"],
+            "Friedman": [friedman_valence, friedman_arousal],
+            "df": len(videos) - 1,
+            "p-value": [p_valence, p_arousal],
+            "Significance": [p_valence < alpha, p_arousal < alpha],
+        }
+    )
+    friedman_results_annotation.to_csv(results_filepath_stats / "annotation_friedman_results.tsv", sep="\t")
 
     # Post hoc tests
     results_table_posthoc_tests_annotation = post_hoc_tests(
@@ -640,7 +679,7 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     # Save the results of the post-hoc tests as a tsv file
     results_table_posthoc_tests_annotation.to_csv(results_filepath_stats / "annotation_posthoc_results.tsv", sep="\t")
 
-    # 2c. Physiological Data
+    # 3c. Physiological Data
     # Calculate descriptive statistics of physiological features
     video_stats_physiological = descriptives(
         physiological_data, physiological_data.columns.unique()[2:-1], videos, "video"
@@ -651,11 +690,26 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
 
     # Perform repeated measures ANOVA to test for significant differences in physiological features between the videos
     results_physiological_anova = perform_anova(
-        physiological_data, physiological_data.columns.unique()[2:-1], "video", alpha
+        mean_physiological, physiological_data.columns.unique()[2:-1], "video", alpha
     )
 
     # Save results to a tsv file
     results_physiological_anova.to_csv(results_filepath_stats / "physiological_anova.tsv", sep="\t", index=True)
+
+    # Perform a Friedman test (non-parametric alternative to repeated measures ANOVA for non-normal data)
+    # Calculate the Friedman test for each physiological feature
+    friedman_results_physiological = pd.DataFrame(columns=["Variable", "Friedman", "df", "p-value", "Significance"])
+    for index, feature in enumerate(physiological_data.columns.unique()[2:-1]):
+        friedman, p = friedmanchisquare(
+            mean_physiological[mean_physiological["video"] == "spaceship"][feature],
+            mean_physiological[mean_physiological["video"] == "invasion"][feature],
+            mean_physiological[mean_physiological["video"] == "asteroids"][feature],
+            mean_physiological[mean_physiological["video"] == "underwood"][feature],
+        )
+        friedman_results_physiological.loc[index] = [feature, friedman, len(videos) - 1, p, p < alpha]
+
+    # Save the results of the Friedman test as a tsv file
+    friedman_results_physiological.to_csv(results_filepath_stats / "physiological_friedman_results.tsv", sep="\t")
 
     # Post hoc tests
     results_table_posthoc_tests_physiological = post_hoc_tests(
