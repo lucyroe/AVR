@@ -1,14 +1,14 @@
 """
 Script to calculate a general linear model (GLM) to compare features across hidden affective states.
 
-Required packages: statsmodels, scipy, sklearn
+Required packages: statsmodels, scipy, sklearn, scikit-bio
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 15 August 2024
-Last update: 30 August 2024
+Last update: 2 September 2024
 """
-
+# %%
 def glm(  # noqa: PLR0915, C901
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
@@ -33,6 +33,8 @@ def glm(  # noqa: PLR0915, C901
         2.2 Homogeneity of variance-covariance matrices (Barlett's and Levene's tests)
         2.3 Linearity
     3. Perform first level GLM (MANOVA)
+        3.1 MANOVA for each subject
+        3.2 Perform a non-parametric MANOVA (PERMANOVA) for the case of non-normality
     4. Perform second level GLM (one-sample t-test)
     5. Perform post-hoc tests to see between which states the features differ
     """
@@ -45,8 +47,9 @@ def glm(  # noqa: PLR0915, C901
     import scipy
     from numpy.linalg import LinAlgError
     from scipy import stats
+    from scipy.spatial.distance import pdist, squareform
+    from skbio.stats.distance import DistanceMatrix, permanova
     from statsmodels.multivariate.manova import MANOVA
-
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     resultpath = Path(results_dir) / "phase3" / "AVR"
@@ -106,11 +109,11 @@ def glm(  # noqa: PLR0915, C901
         list_groups.sort()
         # Create a matrix of plots for each group and variable
         # Determine the number of rows and columns for the subplot grid
-        num_cols = len(list_groups)
-        num_rows = len(list_variables)
+        num_cols = len(list_variables)
+        num_rows = len(list_groups)
 
         # Create a figure and a grid of subplots
-        fig_normality, axes = plt.subplots(num_rows, num_cols, figsize=(num_rows * 5, num_cols * 4))
+        fig_normality, axes = plt.subplots(num_rows, num_cols, figsize=(num_rows * 5, num_cols * 3))
 
         # Flatten the axes array for easier indexing
         axes = axes.flatten()
@@ -313,13 +316,6 @@ def glm(  # noqa: PLR0915, C901
                     if group1 != group2:
                         data_group1 = data[data[f"{variable_name}"] == group1][variable]
                         data_group2 = data[data[f"{variable_name}"] == group2][variable]
-                        # Interpolate the data if the lengths of the two datasets do not match
-                        if len(data_group1) != len(data_group2):
-                            required_length = max(len(data_group1), len(data_group2))
-                            data_group1 = data_group1.reset_index(drop=True)
-                            data_group2 = data_group2.reset_index(drop=True)
-                            data_group1 = data_group1.reindex(range(required_length)).interpolate()
-                            data_group2 = data_group2.reindex(range(required_length)).interpolate()
                         # Perform t-test
                         ttest_stats, ttest_p = stats.ttest_rel(data_group1, data_group2)
                         # Append results to results_table
@@ -404,8 +400,12 @@ def glm(  # noqa: PLR0915, C901
         all_data["state"] = hidden_states_data["state"]
 
         # Initialize the results dataframe
-        results = pd.DataFrame(
+        results_manova = pd.DataFrame(
             columns=["subject", "test", "value", "num_df", "den_df", "F", "p-value", "significance"]
+        )
+
+        results_permanova = pd.DataFrame(
+            columns=["subject", "test", "num_groups", "n_samples", "n_permutations", "F", "p-value", "significance"]
         )
 
         # Loop over all subjects
@@ -473,6 +473,7 @@ def glm(  # noqa: PLR0915, C901
             data = data.rename(columns={f: f.replace("-", "_") for f in data.columns})
             list_variables = "+".join(list_features)
 
+            # 3.1 Perform MANOVA for each subject
             manova_model = MANOVA.from_formula(f"{list_variables} ~ state", data=data)
 
             # Add the results to the results dataframe
@@ -485,59 +486,115 @@ def glm(  # noqa: PLR0915, C901
                     * subject_index
                     + index_test_statistic
                 )
-                results.loc[index_row, "subject"] = subject
-                results.loc[index_row, "test"] = test_statistic
-                results.loc[index_row, "value"] = manova_model.mv_test().results["state"]["stat"]["Value"][
+                results_manova.loc[index_row, "subject"] = subject
+                results_manova.loc[index_row, "test"] = test_statistic
+                results_manova.loc[index_row, "value"] = manova_model.mv_test().results["state"]["stat"]["Value"][
                     test_statistic
                 ]
-                results.loc[index_row, "num_df"] = manova_model.mv_test().results["state"]["stat"]["Num DF"][
+                results_manova.loc[index_row, "num_df"] = manova_model.mv_test().results["state"]["stat"]["Num DF"][
                     test_statistic
                 ]
-                results.loc[index_row, "den_df"] = manova_model.mv_test().results["state"]["stat"]["Den DF"][
+                results_manova.loc[index_row, "den_df"] = manova_model.mv_test().results["state"]["stat"]["Den DF"][
                     test_statistic
                 ]
-                results.loc[index_row, "F"] = manova_model.mv_test().results["state"]["stat"]["F Value"][
+                results_manova.loc[index_row, "F"] = manova_model.mv_test().results["state"]["stat"]["F Value"][
                     test_statistic
                 ]
-                results.loc[index_row, "p-value"] = manova_model.mv_test().results["state"]["stat"]["Pr > F"][
+                results_manova.loc[index_row, "p-value"] = manova_model.mv_test().results["state"]["stat"]["Pr > F"][
                     test_statistic
                 ]
-                results.loc[index_row, "significance"] = results.loc[index_row, "p-value"] < alpha
+                results_manova.loc[index_row, "significance"] = results_manova.loc[index_row, "p-value"] < alpha
+
+            # 3.2 Perform a non-parametric MANOVA (PERMANOVA) for the case of non-normality
+            # Create a distance matrix (Euclidean distance) for the features
+            # Copy of the data with features only
+            data_features = data[list_features]
+            distance_matrix = DistanceMatrix(squareform(pdist(data_features, metric="euclidean")), ids=data.index)
+
+            # Perform PERMANOVA
+            permanova_model = permanova(distance_matrix, data["state"].reset_index(drop=True), permutations=1000)
+
+            # Add the results to the results dataframe
+            results_permanova.loc[subject_index, "subject"] = subject
+            results_permanova.loc[subject_index, "test"] = permanova_model["method name"]
+            results_permanova.loc[subject_index, "num_groups"] = permanova_model["number of groups"]
+            results_permanova.loc[subject_index, "n_samples"] = permanova_model["sample size"]
+            results_permanova.loc[subject_index, "n_permutations"] = permanova_model["number of permutations"]
+            results_permanova.loc[subject_index, "F"] = permanova_model["test statistic"]
+            results_permanova.loc[subject_index, "p-value"] = permanova_model["p-value"]
+            results_permanova.loc[subject_index, "significance"] = results_permanova.loc[subject_index,
+                                                                    "p-value"] < alpha
 
         # Save the results
         glm_results_path = resultpath / "avg" / "glm" / model
         # Create the directory if it does not exist
         glm_results_path.mkdir(parents=True, exist_ok=True)
-        results.to_csv(
-            glm_results_path / f"all_subjects_task-AVR_{model}_model_glm_results.tsv", sep="\t", index=False
+        results_manova.to_csv(
+            glm_results_path / f"all_subjects_task-AVR_{model}_model_glm_results_manova.tsv", sep="\t", index=False
+        )
+
+        results_permanova.to_csv(
+            glm_results_path / f"all_subjects_task-AVR_{model}_model_glm_results_permanova.tsv", sep="\t", index=False
         )
 
         # %% STEP 4: SECOND LEVEL GLM
-        # Test the effect of the hidden states on the features across all subjects
+        # Test the effect of the hidden states on the features across all subjects (with significant results)
         print("Performing second level GLM...")
 
         # Perform a one-sample t-test to test if the features are significantly different in the hidden states
         # Compare the MANOVA results to a t-test against 0 (no effect)
-        results_ttest = pd.DataFrame()
+        results_ttest_manova = pd.DataFrame()
+        results_ttest_permanova = pd.DataFrame()
+
+        # Calculate the t-test for the MANOVA results
         for index_test_statistic, test_statistic in enumerate(
             ["Wilks' lambda", "Pillai's trace", "Hotelling-Lawley trace", "Roy's greatest root"]
         ):
+            # Get only data of participants with significant results
+            results_manova_significant = results_manova[results_manova["significance"]]
+
             # Extract the values and convert to numeric, coercing errors to NaN
-            values = pd.to_numeric(results[results["test"] == test_statistic]["value"], errors="coerce").dropna()
+            values_manova = pd.to_numeric(results_manova_significant[results_manova_significant["test"] ==
+                                        test_statistic]["value"], errors="coerce").dropna()
+
+            # Log-transform the values
+            log_values_manova = np.log(values_manova)
 
             # Perform a one-sample t-test
-            tstats = scipy.stats.ttest_1samp(values, 0, alternative="two-sided")
-            results_ttest.loc[index_test_statistic, "test"] = test_statistic
-            results_ttest.loc[index_test_statistic, "t-value"] = tstats.statistic
-            results_ttest.loc[index_test_statistic, "df"] = tstats.df
-            results_ttest.loc[index_test_statistic, "p-value"] = tstats.pvalue
-            results_ttest.loc[index_test_statistic, "significance"] = (
-                results_ttest.loc[index_test_statistic, "p-value"] < alpha
+            tstats = scipy.stats.ttest_1samp(log_values_manova, 0, alternative="two-sided")
+            results_ttest_manova.loc[index_test_statistic, "test"] = test_statistic
+            results_ttest_manova.loc[index_test_statistic, "t-value"] = tstats.statistic
+            results_ttest_manova.loc[index_test_statistic, "df"] = tstats.df
+            results_ttest_manova.loc[index_test_statistic, "p-value"] = tstats.pvalue
+            results_ttest_manova.loc[index_test_statistic, "significance"] = (
+                results_ttest_manova.loc[index_test_statistic, "p-value"] < alpha
             )
 
+        # Calculate the t-test for the PERMANOVA results
+        # Get only data of participants with significant results
+        results_permanova_significant = results_permanova[results_permanova["significance"]]
+
+        # Extract the values and convert to numeric, coercing errors to NaN
+        values_permanova = pd.to_numeric(results_permanova_significant["F"], errors="coerce").dropna()
+
+        # Log-transform the values
+        log_values_permanova = np.log(values_permanova)
+
+        # Perform a one-sample t-test
+        tstats = scipy.stats.ttest_1samp(log_values_permanova, 0, alternative="two-sided")
+        results_ttest_permanova.loc[0, "test"] = "PERMANOVA"
+        results_ttest_permanova.loc[0, "t-value"] = tstats.statistic
+        results_ttest_permanova.loc[0, "df"] = tstats.df
+        results_ttest_permanova.loc[0, "p-value"] = tstats.pvalue
+        results_ttest_permanova.loc[0, "significance"] = results_ttest_permanova.loc[0, "p-value"] < alpha
+
         # Save the results
-        results_ttest.to_csv(
-            glm_results_path / f"avg_task-AVR_{model}_model_glm_results_ttest.tsv", sep="\t", index=False
+        results_ttest_manova.to_csv(
+            glm_results_path / f"avg_task-AVR_{model}_model_glm_results_manova_ttest.tsv", sep="\t", index=False
+        )
+
+        results_ttest_permanova.to_csv(
+            glm_results_path / f"avg_task-AVR_{model}_model_glm_results_permanova_ttest.tsv", sep="\t", index=False
         )
 
         # %% STEP 5: POST-HOC TESTS
@@ -550,16 +607,42 @@ def glm(  # noqa: PLR0915, C901
         list_features.remove("subject")
         list_features.remove("timestamp")
 
+        # Calculate the mean of the features for each state for each subject
+        feature_data_mean = all_data.groupby(["subject", "state"]).mean()
+
         # Drop the timestamp column
-        feature_data = all_data.drop(columns=["timestamp"])
-        feature_data = feature_data.reset_index(drop=True)
+        feature_data_mean = feature_data_mean.drop(columns=["timestamp"])
+        # Add a column with states from the index
+        feature_data_mean["state"] = feature_data_mean.index.get_level_values("state")
+        # Add a column with subjects from the index
+        feature_data_mean["subject"] = feature_data_mean.index.get_level_values("subject")
+        feature_data_mean = feature_data_mean.reset_index(drop=True)
+
+        # Get only the significant subjects
+        significant_subjects_manova = results_manova[results_manova["significance"]]["subject"].unique()
+        significant_subjects_permanova = results_permanova[results_permanova["significance"]]["subject"].unique()
+        # Transform the subjects to integers
+        significant_subjects_manova = [int(subject) for subject in significant_subjects_manova]
+        significant_subjects_permanova = [int(subject) for subject in significant_subjects_permanova]
+
+        # Get the corresponding data
+        feature_data_manova = feature_data_mean[feature_data_mean["subject"].isin(significant_subjects_manova)]
+        feature_data_permanova = feature_data_mean[feature_data_mean["subject"].isin(significant_subjects_permanova)]
 
         # Perform post-hoc tests to see between which states the features differ
-        results_table_posthoc_tests = post_hoc_tests(feature_data, list_features, list_states, "state", alpha)
+        results_table_posthoc_tests_manova = post_hoc_tests(feature_data_manova, list_features, list_states,
+                                            "state", alpha)
+        results_table_posthoc_tests_permanova = post_hoc_tests(feature_data_permanova, list_features, list_states,
+                                            "state", alpha)
 
         # Save the results
-        results_table_posthoc_tests.to_csv(
-            glm_results_path / f"avg_task-AVR_{model}_model_glm_results_posthoc_tests.tsv", sep="\t", index=False
+        results_table_posthoc_tests_manova.to_csv(
+            glm_results_path / f"avg_task-AVR_{model}_model_glm_results_manova_posthoc_tests.tsv", sep="\t",
+            index=False
+        )
+        results_table_posthoc_tests_permanova.to_csv(
+            glm_results_path / f"avg_task-AVR_{model}_model_glm_results_permanova_posthoc_tests.tsv", sep="\t",
+            index=False
         )
 
 

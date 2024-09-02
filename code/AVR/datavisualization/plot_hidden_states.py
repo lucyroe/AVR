@@ -6,7 +6,7 @@ Required packages: seaborn, mne
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 20 August 2024
-Last updated: 30 August 2024
+Last updated: 2 September 2024
 """
 
 def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
@@ -95,7 +95,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         for color_poles in color_poles_states
     ]
 
-    mark_significant_differences = False  # if True, significant differences will be marked in the boxplots
+    mark_significant_differences = True  # if True, significant differences will be marked in the boxplots
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     def example_plot(
@@ -412,13 +412,13 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         axis.set_title(f"{variable.upper()}", fontsize=14, fontweight="bold", pad=20)
 
         # Set limits of the plot
-        axis.set_ylim(-2.5, 2.5)
+        axis.set_ylim(-3.2, 3.2)
 
         if mark_significant_differences:
             # Mark significant differences with an asterisk and a line above the two groups
             counter = 0
             # Get distance between lines
-            distance = 0.5
+            distance = 0.2
 
             for difference in significant_differences:
                 first_group = f"State {difference[0]+1}"
@@ -456,7 +456,7 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
                     color=color,
                 )
 
-                counter += 0.3
+                counter += 0.2
 
     def create_topoplot(data, info, axis, frequency, state):
         """
@@ -516,7 +516,8 @@ def plot_hidden_states(  # noqa: C901, PLR0915, PLR0912
         hmm_feature_stats_avg = pd.read_csv(hmm_path / f"avg_task-AVR_{model}_model_states_stats.tsv", sep="\t")
 
         # Read in the results of the post-hoc-tests
-        posthoc_results = pd.read_csv(glm_path / f"avg_task-AVR_{model}_model_glm_results_posthoc_tests.tsv", sep="\t")
+        posthoc_results = pd.read_csv(glm_path /
+                f"avg_task-AVR_{model}_model_glm_results_permanova_posthoc_tests.tsv", sep="\t")
 
         # %% STEP 2. PLOT EXAMPLE OF HMM ALGORITHM FOR METHODS
         # Get data for example subject

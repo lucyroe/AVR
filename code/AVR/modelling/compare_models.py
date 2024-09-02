@@ -4,9 +4,8 @@ Script to compare the different Hidden Markov Model (HMM) models.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 19 August 2024
-Last update: 30 August 2024
+Last update: 2 September 2024
 """
-
 def compare_models(  # noqa: PLR0915
     results_dir="/Users/Lucy/Documents/Berlin/FU/MCNB/Praktikum/MPI_MBE/AVR/results/",
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
@@ -29,6 +28,7 @@ def compare_models(  # noqa: PLR0915
         2a. Log-likelihood
         2b. AIC
         2c. BIC
+        2d. Percentage of Variance Explained (Pillai-Bartlett trace)
     3. Assess accuracy of the models
         3a. Get the hidden states
         3b. Get the hidden states identified by the subjective model
@@ -69,7 +69,8 @@ def compare_models(  # noqa: PLR0915
 
     # %% STEP 1. GET MODELS AND DATA
     # Initialize dataframes to store the results
-    df_model_quality = pd.DataFrame(columns=["log-likelihood", "AIC", "BIC"])
+    df_model_quality = pd.DataFrame(columns=["log-likelihood", "AIC", "BIC", "Pillai's trace mean",
+                                "Pillai's trace std", "Pillai's trace max", "Pillai's trace min"])
     df_accuracy = pd.DataFrame(columns=["correlation", "accuracy"])
     df_distance = pd.DataFrame(columns=["distance_valence_state_0", "distance_arousal_state_0",
         "distance_valence_state_1", "distance_arousal_state_1", "distance_valence_state_2", "distance_arousal_state_2",
@@ -88,7 +89,8 @@ def compare_models(  # noqa: PLR0915
             hmm = pickle.load(f)
 
         # Get the data
-        data = pd.read_csv(modelpath / f"all_subjects_task-AVR_{model}_model_data_{features_string}.tsv", sep="\t")
+        data = pd.read_csv(resultpath / "avg" / "hmm" / model /
+                    f"all_subjects_task-AVR_{model}_model_data_{features_string}.tsv", sep="\t")
 
         # Drop unnecessary columns
         data = data.drop(columns=["subject", "timestamp", "state"])
@@ -97,6 +99,7 @@ def compare_models(  # noqa: PLR0915
         print("Assessing relative model quality...\n")
 
         # 2a. Log-likelihood
+        # Log-likelihood of the trained data
         log_likelihood = hmm.score(data, lengths=[len(data)])
 
         # 2b. AIC
@@ -106,8 +109,19 @@ def compare_models(  # noqa: PLR0915
         # 2c. BIC
         bic = np.log(len(data)) * number_of_parameters - 2 * log_likelihood
 
+        # 2d. Percentage of Variance Explained (Pillai-Bartlett trace)
+        manova_path = resultpath / "avg" / "glm" / model
+        manova_results = pd.read_csv(manova_path / f"all_subjects_task-AVR_{model}_model_glm_results_manova.tsv",
+                                                 sep="\t")
+        pillai_bartlett_trace_rows = manova_results[manova_results["test"] =="Pillai's trace"]["value"]
+        pillai_bartlett_trace_mean = pillai_bartlett_trace_rows.mean()
+        pillai_bartlett_trace_std = pillai_bartlett_trace_rows.std()
+        pillai_bartlett_trace_max = pillai_bartlett_trace_rows.max()
+        pillai_bartlett_trace_min = pillai_bartlett_trace_rows.min()
+
         # Store the results
-        df_model_quality.loc[model] = [log_likelihood, aic, bic]
+        df_model_quality.loc[model] = [log_likelihood, aic, bic, pillai_bartlett_trace_mean,
+                pillai_bartlett_trace_std, pillai_bartlett_trace_max, pillai_bartlett_trace_min]
 
         # %% STEP 3. ASSESS ACCURACY OF THE MODELS
         print("Assessing accuracy of the models...\n")

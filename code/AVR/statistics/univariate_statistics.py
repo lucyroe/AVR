@@ -6,10 +6,9 @@ Required packages: statsmodels, scipy, pingouin
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 9 August 2024
-Last update: 30 August 2024
+Last update: 1 September 2024
 """
 
-# %%
 def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
     subjects=["001", "002", "003","004", "005", "006", "007", "009",  # noqa: B006
         "012", "014", "015", "016", "018", "019",
@@ -673,7 +672,7 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
 
     # Post hoc tests
     results_table_posthoc_tests_annotation = post_hoc_tests(
-        annotation_data, ["valence", "arousal"], videos, "video", alpha
+        mean_valence_arousal, ["valence", "arousal"], videos, "video", alpha
     )
 
     # Save the results of the post-hoc tests as a tsv file
@@ -713,7 +712,7 @@ def univariate_statistics(  # noqa: C901, PLR0912, PLR0915
 
     # Post hoc tests
     results_table_posthoc_tests_physiological = post_hoc_tests(
-        physiological_data, physiological_data.columns.unique()[2:-1], videos, "video", alpha
+        mean_physiological, physiological_data.columns.unique()[2:-1], videos, "video", alpha
     )
 
     # Save the results of the post-hoc tests as a tsv file

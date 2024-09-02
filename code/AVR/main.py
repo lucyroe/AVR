@@ -3,13 +3,13 @@ Main module for AVR project.
 
 Required packages:  numpy, pandas, json, time, pathlib, pyxdf, gzip, sys,
                     mne, neurokit2, systole, autoreject,
-                    fcwt, scipy, foof, statsmodels,
+                    fcwt, scipy, foof, statsmodels, scikit-bio, sklearn,
                     matplotlib, seaborn, IPython
 
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 1 August 2024
-Last update: 30 August 2024
+Last update: 2 September 2024
 """
 
 def main():  # noqa: PLR0915

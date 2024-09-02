@@ -4,7 +4,7 @@ Plotting descriptive statistics for the AVR data.
 Author: Lucy Roellecke
 Contact: lucy.roellecke[at]tuta.com
 Created on: 12 August 2024
-Last updated: 30 August 2024
+Last updated: 2 September 2024
 """
 
 def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
@@ -83,7 +83,7 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
         "underwood": "#7a86d1",
     }
 
-    mark_significant_differences = False  # if True, significant differences will be marked in the boxplots
+    mark_significant_differences = True  # if True, significant differences will be marked in the boxplots
 
     # %% Functions >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
     def plot_average_timeseries(data, variable_name, colors, colors_videos, ax):
@@ -487,10 +487,6 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
             axes[datastreams["annotation"].index(variable)],
         )
 
-    # Remove the x-axis label from the upper plot
-    axes[0].set_xticklabels("")
-    axes[0].set_xticks([])
-
     # More space between the two plots
     plt.tight_layout()
 
@@ -551,10 +547,6 @@ def plot_descriptives(  # noqa: C901, PLR0915, PLR0912
             significant_differences,
             axes[datastreams["physiological"].index(variable)],
         )
-
-    # Remove the x-axis label from the upper plot
-    axes[0].set_xticklabels("")
-    axes[0].set_xticks([])
 
     # More space between the two plots
     plt.tight_layout()
