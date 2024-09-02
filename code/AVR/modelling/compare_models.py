@@ -69,9 +69,9 @@ def compare_models(  # noqa: PLR0915
 
     # %% STEP 1. GET MODELS AND DATA
     # Initialize dataframes to store the results
-    df_model_quality = pd.DataFrame(columns=["log-likelihood", "AIC", "BIC", "Pillai's trace mean",
+    df_model_quality = pd.DataFrame(columns=["log-likelihood", "AIC", "BIC"])
+    df_accuracy = pd.DataFrame(columns=["correlation", "accuracy", "Pillai's trace mean",
                                 "Pillai's trace std", "Pillai's trace max", "Pillai's trace min"])
-    df_accuracy = pd.DataFrame(columns=["correlation", "accuracy"])
     df_distance = pd.DataFrame(columns=["distance_valence_state_0", "distance_arousal_state_0",
         "distance_valence_state_1", "distance_arousal_state_1", "distance_valence_state_2", "distance_arousal_state_2",
         "distance_valence_state_3", "distance_arousal_state_3", "distance_valence_mean", "distance_arousal_mean",
@@ -109,19 +109,8 @@ def compare_models(  # noqa: PLR0915
         # 2c. BIC
         bic = np.log(len(data)) * number_of_parameters - 2 * log_likelihood
 
-        # 2d. Percentage of Variance Explained (Pillai-Bartlett trace)
-        manova_path = resultpath / "avg" / "glm" / model
-        manova_results = pd.read_csv(manova_path / f"all_subjects_task-AVR_{model}_model_glm_results_manova.tsv",
-                                                 sep="\t")
-        pillai_bartlett_trace_rows = manova_results[manova_results["test"] =="Pillai's trace"]["value"]
-        pillai_bartlett_trace_mean = pillai_bartlett_trace_rows.mean()
-        pillai_bartlett_trace_std = pillai_bartlett_trace_rows.std()
-        pillai_bartlett_trace_max = pillai_bartlett_trace_rows.max()
-        pillai_bartlett_trace_min = pillai_bartlett_trace_rows.min()
-
         # Store the results
-        df_model_quality.loc[model] = [log_likelihood, aic, bic, pillai_bartlett_trace_mean,
-                pillai_bartlett_trace_std, pillai_bartlett_trace_max, pillai_bartlett_trace_min]
+        df_model_quality.loc[model] = [log_likelihood, aic, bic]
 
         # %% STEP 3. ASSESS ACCURACY OF THE MODELS
         print("Assessing accuracy of the models...\n")
@@ -160,8 +149,19 @@ def compare_models(  # noqa: PLR0915
         correlation = hidden_states_model["state"].corr(hidden_states_subjective["state"])
         accuracy = np.mean(hidden_states_model["state"] == hidden_states_subjective["state"])
 
+        # 2d. Percentage of Variance Explained (Pillai-Bartlett trace)
+        manova_path = resultpath / "avg" / "glm" / model
+        manova_results = pd.read_csv(manova_path / f"all_subjects_task-AVR_{model}_model_glm_results_manova.tsv",
+                                                 sep="\t")
+        pillai_bartlett_trace_rows = manova_results[manova_results["test"] =="Pillai's trace"]["value"]
+        pillai_bartlett_trace_mean = pillai_bartlett_trace_rows.mean()
+        pillai_bartlett_trace_std = pillai_bartlett_trace_rows.std()
+        pillai_bartlett_trace_max = pillai_bartlett_trace_rows.max()
+        pillai_bartlett_trace_min = pillai_bartlett_trace_rows.min()
+
         # Store the results
-        df_accuracy.loc[model] = [correlation, accuracy]
+        df_accuracy.loc[model] = [correlation, accuracy, pillai_bartlett_trace_mean,
+                pillai_bartlett_trace_std, pillai_bartlett_trace_max, pillai_bartlett_trace_min]
 
         # %% STEP 4. CALCULATE DISTANCE BETWEEN RATINGS
         print("Calculating distance between ratings...\n")

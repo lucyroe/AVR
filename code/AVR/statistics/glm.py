@@ -550,11 +550,8 @@ def glm(  # noqa: PLR0915, C901
         for index_test_statistic, test_statistic in enumerate(
             ["Wilks' lambda", "Pillai's trace", "Hotelling-Lawley trace", "Roy's greatest root"]
         ):
-            # Get only data of participants with significant results
-            results_manova_significant = results_manova[results_manova["significance"]]
-
             # Extract the values and convert to numeric, coercing errors to NaN
-            values_manova = pd.to_numeric(results_manova_significant[results_manova_significant["test"] ==
+            values_manova = pd.to_numeric(results_manova[results_manova["test"] ==
                                         test_statistic]["value"], errors="coerce").dropna()
 
             # Log-transform the values
@@ -571,11 +568,8 @@ def glm(  # noqa: PLR0915, C901
             )
 
         # Calculate the t-test for the PERMANOVA results
-        # Get only data of participants with significant results
-        results_permanova_significant = results_permanova[results_permanova["significance"]]
-
         # Extract the values and convert to numeric, coercing errors to NaN
-        values_permanova = pd.to_numeric(results_permanova_significant["F"], errors="coerce").dropna()
+        values_permanova = pd.to_numeric(results_permanova["F"], errors="coerce").dropna()
 
         # Log-transform the values
         log_values_permanova = np.log(values_permanova)

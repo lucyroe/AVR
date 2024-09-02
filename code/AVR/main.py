@@ -46,7 +46,7 @@ def main():  # noqa: PLR0915
     from AVR.statistics.univariate_statistics import univariate_statistics
 
     # %% Set global vars & paths >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >><< o >>
-    steps = ["Plot results"]   # Adjust as needed
+    steps = ["Model comparison"]   # Adjust as needed
     # "Load data", "Preprocess data", "Extract features", "Univariate statistics",
     # "Modelling", "GLM", "Model comparison", "Plot results"
 
