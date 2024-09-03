@@ -42,15 +42,19 @@ This directory contains the results of the Selection, the Evaluation, and the Ph
 
 ### Neural Model
 
-![Cardiac Model](publications/thesis/figures/phase3_neural_model.png)
+![Neural Model](publications/thesis/figures/phase3_neural_model.png)
 
 ### Integrated Model
 
-![Cardiac Model](publications/thesis/figures/phase3_integrated_model.png)
+![Integrated Model](publications/thesis/figures/phase3_integrated_model.png)
+
+### Multimodal Model
+
+![Multimodal Model](publications/thesis/figures/phase3_multimodal_model.png)
 
 ### Subjective Model
 
-![Cardiac Model](publications/thesis/figures/phase3_subjective_model.png)
+![Subjective Model](publications/thesis/figures/phase3_subjective_model.png)
 
 ## License
 MIT

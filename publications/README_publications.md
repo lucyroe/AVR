@@ -32,6 +32,8 @@ This directory contains the figures in the publications. In (`./publications/art
              ├── 📊 phase3_neural_model.svg
              ├── 📊 phase3_integrated_model.png
              ├── 📊 phase3_integrated_model.svg
+             ├── 📊 phase3_multimodal_model.png
+             ├── 📊 phase3_multimodal_model.svg
              ├── 📊 phase3_subjective_model.png
              └── 📊 phase3_subjective_model.svg
 

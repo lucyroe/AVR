@@ -80,17 +80,18 @@ Two different directories exist for the preprocessing of annotation (`./code/AVR
 
 ## Modelling
 
-In (`./code/AVR/modelling`) you can find one script that performs a Hidden Markov Model (HMM) analysis on the data from the Physio phase of the AVR project (`hmm.py`) and one script that compares the four models trained in the previous script in terms of their performance in decoding hidden affective states (`compare_models.py`).
+In (`./code/AVR/modelling`) you can find one script that performs a Hidden Markov Model (HMM) analysis on the data from the Physio phase of the AVR project (`hmm.py`) and one script that compares the five models trained in the previous script in terms of their performance in decoding hidden affective states (`compare_models.py`).
 
      📂 modelling
      ├── 🐍 compare_models.py
      └── 🐍 hmm.py
 
-Read the first paragraph of this README to learn about HMM. The four models trained in this thesis are:
+Read the first paragraph of this README to learn about HMM. The five models trained in this thesis are:
 
 * A **cardiac** model, trained only on IBI & HF-HRV.
 * A **neural** model, trained on posterior alpha, frontal alpha, frontal theta, whole-brain gamma & whole-brain beta.
 * An **integrated** model, trained on all seven of these features.
+* A **multimodal** model, trained on the seven physiological features and the rating data.
 * A **subjective** model, trained only on the rating data.
 
 The models are then compared in terms of...
