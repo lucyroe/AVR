@@ -1,7 +1,7 @@
 # AffectiveVR – **results**
 
-    Last update:    August 28, 2024
-    Status:         in preparation
+    Last update:    September 16, 2024
+    Status:         completed
 
 
 ## Description of results

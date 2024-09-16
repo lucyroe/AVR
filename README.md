@@ -2,10 +2,10 @@
 
 ![AVR Thesis Title](publications/thesis/figures/AVR_Title.png)
 
-`[Last update: August 28, 2024]`
+`[Last update: September 16, 2024]`
 
     Period:     2023-10 - 2024-09
-    Status:     work in progress
+    Status:     completed
 
     Author(s):  Lucy Roellecke
     Contact:    lucy.roellecke[at]tuta.com

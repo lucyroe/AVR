@@ -1,7 +1,7 @@
 # AffectiveVR – **code**
 
-    Last update:    August 28, 2024
-    Status:         work in progress
+    Last update:    September 16, 2024
+    Status:         completed
 
 ***
 

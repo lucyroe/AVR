@@ -1,12 +1,12 @@
 # AffectiveVR – **publications**
 
-    Last update:    August 28, 2024
+    Last update:    September 16, 2024
     Status:         in preparation
 
 
 ## Description of publications
 
-This directory contains the figures in the publications. In (`./publications/articles/figures`) you can find figures for the Selection and Evaluation phase of the AVR project that will be published in articles (currently in preparation). In (`./publications/thesis/figures`) you can find figures for my master thesis that is being finalized at the moment.
+This directory contains the figures in the publications. In (`./publications/articles/figures`) you can find figures for the Selection and Evaluation phase of the AVR project that will be published in articles (currently in preparation). In (`./publications/thesis/figures`) you can find figures for my master thesis.
 
      📂 publications
      ├── 📁 articles
